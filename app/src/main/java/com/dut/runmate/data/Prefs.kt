@@ -50,6 +50,17 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         get() = sp.getBoolean("mapHintShown", false)
         set(v) = sp.edit().putBoolean("mapHintShown", v).apply()
 
+    // 更新
+    var updAutoCheck: Boolean
+        get() = sp.getBoolean("updAutoCheck", true)
+        set(v) = sp.edit().putBoolean("updAutoCheck", v).apply()
+    var updServerUrl: String
+        get() = sp.getString("updServerUrl", "") ?: ""
+        set(v) = sp.edit().putString("updServerUrl", v).apply()
+    var updLastCheckMs: Long
+        get() = sp.getLong("updLastCheckMs", 0L)
+        set(v) = sp.edit().putLong("updLastCheckMs", v).apply()
+
     companion object {
         @Volatile private var inst: Prefs? = null
         fun get(ctx: Context): Prefs =

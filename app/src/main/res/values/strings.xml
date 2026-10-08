@@ -120,4 +120,30 @@
     <string name="tts_missed">注意，%1$s未确认打卡，请减速返回或留意手机</string>
     <string name="tts_pass_gps">%1$s已通过，请自行确认打卡</string>
     <string name="tts_summary">本次结束：确认%1$d个，未确认%2$d个，用时%3$s</string>
+
+    <!-- 更新 -->
+    <string name="pref_update">更新</string>
+    <string name="pref_upd_auto">自动检查更新</string>
+    <string name="pref_upd_auto_sub">每天启动时静默检查一次</string>
+    <string name="pref_upd_server">更新服务器地址</string>
+    <string name="pref_upd_server_hint">https://…/api/latest</string>
+    <string name="pref_upd_server_sub">填发布中心页面显示的地址，留空则仅使用 GitHub</string>
+    <string name="pref_upd_check_now">立即检查更新</string>
+    <string name="upd_uptodate">已是最新版本</string>
+    <string name="upd_failed">检查更新失败：%1$s</string>
+    <string name="upd_found_title">发现新版本 v%1$s</string>
+    <string name="upd_found_msg">来源：%1$s\n\n%2$s</string>
+    <string name="upd_src_server">本站服务器</string>
+    <string name="upd_src_github">GitHub Release</string>
+    <string name="upd_now">立即更新</string>
+    <string name="upd_later">稍后再说</string>
+    <string name="upd_dl_title">正在下载 v%1$s</string>
+    <string name="upd_dl_connecting">连接中…</string>
+    <string name="upd_dl_progress">%1$d / %2$d MB（%3$d%%）</string>
+    <string name="upd_dl_bytes">已下载 %1$d MB</string>
+    <string name="upd_dl_err">下载失败：%1$s</string>
+    <string name="upd_perm_title">需要安装权限</string>
+    <string name="upd_perm_msg">Android 8 及以上需授予本应用「安装未知应用」权限才能安装更新。\n\n前往系统设置 → 找到「跑伴」→ 允许安装未知应用，返回后将自动继续。</string>
+    <string name="upd_perm_go">去授权</string>
+    <string name="upd_perm_manual">请到系统设置中手动允许「安装未知应用」后重试</string>
 </resources>

@@ -14,6 +14,7 @@ import com.dut.runmate.ui.ApiFragment
 import com.dut.runmate.ui.CalibrateFragment
 import com.dut.runmate.ui.MapFragment
 import com.dut.runmate.ui.RunFragment
+import com.dut.runmate.update.UpdateFlow
 
 class MainActivity : AppCompatActivity() {
 
@@ -47,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             b.bottomNav.selectedItemId = R.id.nav_run
             askPermissions()
+            UpdateFlow.maybeAutoCheck(this)
         }
 
         b.toolbar.setOnMenuItemClickListener {
@@ -57,6 +59,11 @@ class MainActivity : AppCompatActivity() {
                 else -> false
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        UpdateFlow.resumePendingInstall(this)
     }
 
     private fun swap(f: Fragment) {

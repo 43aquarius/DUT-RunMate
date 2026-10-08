@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.dut.runmate.data.CheckpointStore
 import com.dut.runmate.data.Prefs
 import com.dut.runmate.databinding.ActivitySettingsBinding
+import com.dut.runmate.update.UpdateFlow
 
 class SettingsActivity : AppCompatActivity() {
 
@@ -68,6 +69,18 @@ class SettingsActivity : AppCompatActivity() {
             prefs.coordGcj = id == R.id.rbCoordGcj
         }
 
+        // 更新
+        b.swUpdAuto.isChecked = prefs.updAutoCheck
+        b.swUpdAuto.setOnCheckedChangeListener { _, c -> prefs.updAutoCheck = c }
+        b.etUpdServer.setText(prefs.updServerUrl)
+        b.etUpdServer.setOnEditorActionListener { v, _, _ ->
+            prefs.updServerUrl = v.text.toString().trim(); true
+        }
+        b.btnUpdCheck.setOnClickListener {
+            prefs.updServerUrl = b.etUpdServer.text.toString().trim()
+            UpdateFlow.manualCheck(this)
+        }
+
         // 系统
         b.btnBattery.setOnClickListener {
             try {
@@ -84,5 +97,11 @@ class SettingsActivity : AppCompatActivity() {
             cm.setPrimaryClip(ClipData.newPlainText("runmate", store.exportJson()))
             Toast.makeText(this, getString(R.string.pref_export_done, store.count), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    override fun onPause() {
+        // 离开设置页时保存更新地址，避免只点返回未触发 EditorAction
+        if (::b.isInitialized) prefs.updServerUrl = b.etUpdServer.text.toString().trim()
+        super.onPause()
     }
 }
