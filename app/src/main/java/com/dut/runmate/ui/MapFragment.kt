@@ -1,38 +1,48 @@
 package com.dut.runmate.ui
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.dut.runmate.R
 import com.dut.runmate.data.Checkpoint
 import com.dut.runmate.data.CheckpointStore
 import com.dut.runmate.data.Prefs
 import com.dut.runmate.databinding.FragmentMapBinding
 import com.dut.runmate.geo.GeoKit
+import com.dut.runmate.map.AmapTileSource
 import com.dut.runmate.run.RunBus
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.osmdroid.events.MapEventsReceiver
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * 地图选点页：Esri 卫星（可至 20 级）/ OSM 街道切换、长按或点按空白处添加点位、
- * 拖动图标微调、点按图标编辑、检测半径圈、操场环线参考。
+ * 地图选点页。
+ *
+ * 图源为高德瓦片（GCJ-02，国内秒开）：卫星实测到 18 级、街道（矢量）到 20 级；
+ * 卫星 19~20 级由 osmdroid 自动放大 18 级瓦片。
+ *
+ * 坐标策略（关键）：所有点位一律以 WGS-84（原始 GPS）存储；
+ * 地图显示时 WGS-84 → GCJ-02（toDisplay），点选/拖动落点时 GCJ-02 → WGS-84（fromDisplay）。
+ * 长按或点按空白处添加点位、拖动图标微调、点按图标编辑、检测半径圈、操场环线参考。
  */
 class MapFragment : Fragment() {
 
@@ -41,15 +51,29 @@ class MapFragment : Fragment() {
     private val prefs by lazy { Prefs.get(requireContext()) }
     private val store by lazy { CheckpointStore.get(requireContext().filesDir) }
 
-    private var myLoc: MyLocationNewOverlay? = null
     private var routeLine: Polyline? = null
     private val circles = mutableListOf<Polygon>()
     private val markers = mutableListOf<Marker>()
+    private var myLocMarker: Marker? = null
+    private var locMgr: LocationManager? = null
 
-    private val esriSat = XYTileSource(
-        "EsriSat", 3, 20, 256, ".png",
-        arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/")
-    )
+    private val locListener = LocationListener { l: Location ->
+        if (_b == null) return@LocationListener
+        showMyLocation(l.latitude, l.longitude)
+    }
+
+    // 大工凌水校区中心（WGS-84）
+    private val campusWgs = doubleArrayOf(39.0853, 121.8085)
+
+    /** WGS-84（存储）→ GCJ-02（地图显示） */
+    private fun toDisplay(lat: Double, lon: Double): GeoPoint {
+        val g = GeoKit.wgs2gcj(lat, lon)
+        return GeoPoint(g[0], g[1])
+    }
+
+    /** GCJ-02（地图交互）→ WGS-84（存储） */
+    private fun fromDisplay(p: GeoPoint): DoubleArray =
+        GeoKit.gcj2wgs(p.latitude, p.longitude)
 
     override fun onCreateView(i: LayoutInflater, c: ViewGroup?, s: Bundle?): View {
         _b = FragmentMapBinding.inflate(i, c, false)
@@ -64,19 +88,25 @@ class MapFragment : Fragment() {
         b.map.setBuiltInZoomControls(true)
         b.map.setTilesScaledToDpi(true)
         b.map.maxZoomLevel = 20.0
-        b.map.minZoomLevel = 11.0
-        b.map.controller.setZoom(18.5)
-        b.map.controller.setCenter(GeoPoint(39.0853, 121.8085))   // 大工凌水校区
+        b.map.minZoomLevel = 3.0
+        b.map.controller.setZoom(18.0)
+        b.map.controller.setCenter(toDisplay(campusWgs[0], campusWgs[1]))
         applyTileSource()
 
-        // 事件层（底部）：空白处点按/长按 → 新增点位
+        // 事件层（底部）：空白处点按/长按 → 新增点位（落点 GCJ-02 → 转 WGS-84 存储）
         b.map.overlays.add(0, MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
-                if (p != null) openAddSheet(p.latitude, p.longitude)
+                if (p != null) {
+                    val w = fromDisplay(p)
+                    openAddSheet(w[0], w[1])
+                }
                 return true
             }
             override fun longPressHelper(p: GeoPoint?): Boolean {
-                if (p != null) openAddSheet(p.latitude, p.longitude)
+                if (p != null) {
+                    val w = fromDisplay(p)
+                    openAddSheet(w[0], w[1])
+                }
                 return true
             }
         }))
@@ -91,14 +121,22 @@ class MapFragment : Fragment() {
         b.chipRoute.isChecked = false
         b.chipRoute.setOnCheckedChangeListener { _, c2 -> setRouteVisible(c2) }
 
-        // 回到我
+        // 回到我（GPS 为 WGS-84，显示前转 GCJ-02）
         b.fabLocate.setOnClickListener {
             val f = RunBus.state.value.fix
             if (f != null) {
-                b.map.controller.animateTo(GeoPoint(f.latitude, f.longitude))
+                b.map.controller.animateTo(toDisplay(f.latitude, f.longitude))
                 b.map.controller.setZoom(19.0)
             } else {
                 android.widget.Toast.makeText(requireContext(), "暂无定位（先开始跑步或在标定页等待GPS）", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // 我的位置（蓝点，GPS WGS-84 → GCJ-02 显示；不使用 MyLocationNewOverlay，避免偏移）
+        viewLifecycleOwner.lifecycleScope.launch {
+            RunBus.state.collect { st ->
+                val fix = st.fix ?: return@collect
+                showMyLocation(fix.latitude, fix.longitude)
             }
         }
 
@@ -111,7 +149,7 @@ class MapFragment : Fragment() {
     }
 
     private fun applyTileSource() {
-        b.map.setTileSource(if (prefs.tileSat) esriSat else TileSourceFactory.MAPNIK)
+        b.map.setTileSource(if (prefs.tileSat) AmapTileSource.SATELLITE else AmapTileSource.STREET)
     }
 
     private fun setRouteVisible(on: Boolean) {
@@ -122,8 +160,8 @@ class MapFragment : Fragment() {
                 val arr = JSONObject(txt).getJSONArray("points")
                 val pts = ArrayList<GeoPoint>(arr.length())
                 for (i in 0 until arr.length()) {
-                    val p = arr.getJSONArray(i)
-                    pts.add(GeoPoint(p.getDouble(1), p.getDouble(0)))
+                    val p = arr.getJSONArray(i)          // [lon, lat]（WGS-84）
+                    pts.add(toDisplay(p.getDouble(1), p.getDouble(0)))
                 }
                 routeLine = Polyline(b.map).apply {
                     outlinePaint.color = Color.parseColor("#FF1151FF")
@@ -152,15 +190,19 @@ class MapFragment : Fragment() {
     }
 
     private fun addCpOverlays(cp: Checkpoint) {
-        // 半径圈
+        // 存储的 WGS-84 中心 → GCJ-02 显示中心
+        val g = GeoKit.wgs2gcj(cp.lat, cp.lon)
+        val cLat = g[0]; val cLon = g[1]
+
+        // 半径圈（在显示坐标系里画，半径换算误差 < 1 cm，可忽略）
         val poly = Polygon(b.map)
         val pts = ArrayList<GeoPoint>(49)
         val r = cp.radius.toDouble()
         val dLat = r / 111320.0
-        val dLon = r / (111320.0 * cos(Math.toRadians(cp.lat)))
+        val dLon = r / (111320.0 * cos(Math.toRadians(cLat)))
         for (i in 0..48) {
             val ang = 2 * Math.PI * i / 48
-            pts.add(GeoPoint(cp.lat + dLat * sin(ang), cp.lon + dLon * cos(ang)))
+            pts.add(GeoPoint(cLat + dLat * sin(ang), cLon + dLon * cos(ang)))
         }
         poly.points = pts
         poly.outlinePaint.color = ContextCompat.getColor(requireContext(), R.color.md_secondary)
@@ -171,7 +213,7 @@ class MapFragment : Fragment() {
 
         // 图钉
         val mk = Marker(b.map)
-        mk.position = GeoPoint(cp.lat, cp.lon)
+        mk.position = GeoPoint(cLat, cLon)
         mk.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
         mk.isDraggable = true
         val d = ContextCompat.getDrawable(requireContext(), R.drawable.ic_place)!!.mutate()
@@ -182,8 +224,10 @@ class MapFragment : Fragment() {
         mk.setOnMarkerDragListener(object : Marker.OnMarkerDragListener {
             override fun onMarkerDrag(marker: Marker) { }
             override fun onMarkerDragEnd(marker: Marker) {
-                cp.lat = marker.position.latitude
-                cp.lon = marker.position.longitude
+                // 拖动落点为 GCJ-02 → 转 WGS-84 存储
+                val w = fromDisplay(marker.position)
+                cp.lat = w[0]
+                cp.lon = w[1]
                 store.upsert(cp)
                 rebuild()
             }
@@ -201,21 +245,38 @@ class MapFragment : Fragment() {
         CheckpointSheet.show(this, store, cp) { rebuild() }
     }
 
+    /** 把 WGS-84 定位画到地图（蓝点，自动创建） */
+    private fun showMyLocation(lat: Double, lon: Double) {
+        val bb = _b ?: return
+        val dp = toDisplay(lat, lon)
+        val mk = myLocMarker ?: Marker(bb.map).also { m ->
+            m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+            m.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_myloc)
+            m.isDraggable = false
+            myLocMarker = m
+            bb.map.overlays.add(m)
+        }
+        mk.position = dp
+        bb.map.invalidate()
+    }
+
     override fun onResume() {
         super.onResume()
         rebuild()
-        if (myLoc == null &&
-            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
+        // 不开跑步服务也能看到自身位置：独立监听系统定位
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) {
-            myLoc = MyLocationNewOverlay(b.map).also {
-                it.enableMyLocation()
-                b.map.overlays.add(it)
-            }
+            try {
+                locMgr = requireContext().getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                locMgr?.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 2f, locListener)
+                locMgr?.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 5000L, 5f, locListener)
+            } catch (_: Exception) { }
         }
     }
 
     override fun onPause() {
-        myLoc?.disableMyLocation()
+        locMgr?.removeUpdates(locListener)
+        locMgr = null
         super.onPause()
     }
 
