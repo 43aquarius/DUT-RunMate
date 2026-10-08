@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/tvSheetApiTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:text="@string/api_edit" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:hint="名称">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etApiTitle" android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chipsMethod" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_marginTop="12dp"
+        app:singleSelection="true" app:selectionRequired="true">
+        <com.google.android.material.chip.Chip android:id="@+id/chipGet"
+            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="GET" />
+        <com.google.android.material.chip.Chip android:id="@+id/chipPost"
+            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="POST" />
+        <com.google.android.material.chip.Chip android:id="@+id/chipPut"
+            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="PUT" />
+    </com.google.android.material.chip.ChipGroup>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:hint="@string/api_url">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etApiUrl" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
+            android:fontFamily="monospace" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:hint="@string/api_headers">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etApiHeaders" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
+            android:fontFamily="monospace" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:hint="@string/api_body">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etApiBody" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
+            android:fontFamily="monospace" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:hint="@string/api_path">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etApiPath" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:fontFamily="monospace" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSheetApiSave" style="@style/Widget.RunMate.PillButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:text="@string/save" />
+</LinearLayout>

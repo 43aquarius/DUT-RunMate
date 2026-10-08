@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_run" android:icon="@drawable/ic_run" android:title="@string/tab_run" />
+    <item android:id="@+id/nav_map" android:icon="@drawable/ic_map" android:title="@string/tab_map" />
+    <item android:id="@+id/nav_calib" android:icon="@drawable/ic_gps" android:title="@string/tab_calib" />
+    <item android:id="@+id/nav_api" android:icon="@drawable/ic_api" android:title="@string/tab_api" />
+</menu>

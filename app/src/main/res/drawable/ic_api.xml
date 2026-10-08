@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 接口 tab：终端提示符 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M3,4h18v16H3V4z M5,6v12h14V6H5z M7.2,8l3.2,4l-3.2,4h2.3l3.2,-4l-3.2,-4H7.2z M13.5,14h4v2h-4z"/>
+</vector>

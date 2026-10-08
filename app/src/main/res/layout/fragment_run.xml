@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- 状态大卡 -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="24dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp"
+                    android:gravity="center_horizontal">
+
+                    <TextView
+                        android:id="@+id/tvHeadline"
+                        style="@style/TextAppearance.RunMate.Label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/gps_waiting" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="4dp">
+
+                        <com.dut.runmate.ui.RadarView
+                            android:id="@+id/radar"
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
+                            android:layout_marginEnd="16dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvBigDist"
+                                style="@style/TextAppearance.RunMate.Display"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="--" />
+
+                            <TextView
+                                android:id="@+id/tvTargetName"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textAppearance="?attr/textAppearanceTitleMedium"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:text="—" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="end">
+
+                            <TextView
+                                android:id="@+id/tvApiDist"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textAppearance="?attr/textAppearanceLabelMedium"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:text="@string/api_distance_now" />
+
+                            <TextView
+                                android:id="@+id/tvApiDistVal"
+                                style="@style/TextAppearance.RunMate.Metric"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="-- m" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 统计三列 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="16dp">
+
+                <LinearLayout android:orientation="vertical" android:gravity="center"
+                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content">
+                    <TextView style="@style/TextAppearance.RunMate.Label"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/stat_time" />
+                    <TextView android:id="@+id/tvTime" style="@style/TextAppearance.RunMate.Metric"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0:00" />
+                </LinearLayout>
+
+                <LinearLayout android:orientation="vertical" android:gravity="center"
+                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content">
+                    <TextView style="@style/TextAppearance.RunMate.Label"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/stat_dist" />
+                    <TextView android:id="@+id/tvOdometer" style="@style/TextAppearance.RunMate.Metric"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.00 km" />
+                </LinearLayout>
+
+                <LinearLayout android:orientation="vertical" android:gravity="center"
+                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content">
+                    <TextView style="@style/TextAppearance.RunMate.Label"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/stat_pace" />
+                    <TextView android:id="@+id/tvPace" style="@style/TextAppearance.RunMate.Metric"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="--" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvRunHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:text="@string/run_idle_hint" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvPoints"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:nestedScrollingEnabled="false" />
+        </LinearLayout>
+    </ScrollView>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:background="?android:colorBackground">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRun"
+            style="@style/Widget.RunMate.PillButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/ic_play"
+            app:iconGravity="textStart"
+            android:text="@string/run_start" />
+    </FrameLayout>
+</LinearLayout>

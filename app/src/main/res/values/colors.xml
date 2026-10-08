@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- RunMate 主题色：参照 Nike 近单色设计语言（黑/白/灰阶 + 语义色） -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- 主色（近黑） -->
+    <color name="md_primary">#FF111111</color>
+    <color name="md_on_primary">#FFFFFFFF</color>
+    <color name="md_primary_container">#FFE5E5E5</color>
+    <color name="md_on_primary_container">#FF111111</color>
+
+    <!-- 次级（炭灰） -->
+    <color name="md_secondary">#FF39393B</color>
+    <color name="md_on_secondary">#FFFFFFFF</color>
+    <color name="md_secondary_container">#FFF5F5F5</color>
+    <color name="md_on_secondary_container">#FF39393B</color>
+
+    <!-- 三级（信息蓝） -->
+    <color name="md_tertiary">#FF1151FF</color>
+    <color name="md_on_tertiary">#FFFFFFFF</color>
+    <color name="md_tertiary_container">#FFD6E2FF</color>
+    <color name="md_on_tertiary_container">#FF00308F</color>
+
+    <!-- 错误（警示红） -->
+    <color name="md_error">#FFD30005</color>
+    <color name="md_on_error">#FFFFFFFF</color>
+    <color name="md_error_container">#FFFFDAD4</color>
+    <color name="md_on_error_container">#FF780700</color>
+
+    <!-- 成功（打卡绿，自定义语义色） -->
+    <color name="md_success">#FF007D48</color>
+    <color name="md_success_bright">#FF1EAA52</color>
+    <color name="md_success_container">#FFD5F5E4</color>
+    <color name="md_on_success_container">#FF00391F</color>
+
+    <!-- 琥珀（接近/检测中） -->
+    <color name="md_amber">#FFB26001</color>
+    <color name="md_amber_container">#FFFFE8CC</color>
+    <color name="md_on_amber_container">#FF5A3900</color>
+
+    <!-- 中性 -->
+    <color name="md_background">#FFFFFFFF</color>
+    <color name="md_on_background">#FF111111</color>
+    <color name="md_surface">#FFFFFFFF</color>
+    <color name="md_on_surface">#FF111111</color>
+    <color name="md_surface_variant">#FFF5F5F5</color>
+    <color name="md_on_surface_variant">#FF707072</color>
+    <color name="md_outline">#FFCACACB</color>
+    <color name="md_outline_variant">#FFE5E5E5</color>
+    <color name="md_scrim">#FF000000</color>
+
+    <!-- 地图相关 -->
+    <color name="map_stroke_pending">#FF707072</color>
+    <color name="map_stroke_near">#FFB26001</color>
+    <color name="map_stroke_inzone">#FF1151FF</color>
+    <color name="map_stroke_ok">#FF1EAA52</color>
+    <color name="map_stroke_miss">#FFD30005</color>
+</resources>

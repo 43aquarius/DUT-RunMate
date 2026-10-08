@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <string name="app_name">跑伴</string>
+    <string name="app_subtitle">大工健康长跑助手</string>
+
+    <!-- 底部导航 -->
+    <string name="tab_run">跑步</string>
+    <string name="tab_map">地图</string>
+    <string name="tab_calib">标定</string>
+    <string name="tab_api">接口</string>
+    <string name="title_settings">设置</string>
+
+    <!-- 跑步页 -->
+    <string name="run_start">开始跑步</string>
+    <string name="run_stop">结束跑步</string>
+    <string name="run_idle_hint">先在「标定/地图」页录入打卡点，再开始跑步。\n跑步中请保持本App后台运行（建议佩戴耳机）。</string>
+    <string name="run_no_points">尚未录入任何打卡点</string>
+    <string name="stat_time">用时</string>
+    <string name="stat_dist">自测距离</string>
+    <string name="stat_pace">配速</string>
+    <string name="state_pending">待经过</string>
+    <string name="state_near">接近中</string>
+    <string name="state_inzone">检测区内·等待确认</string>
+    <string name="state_grace">已出区·宽限核查中</string>
+    <string name="state_confirmed">已打卡 ✓</string>
+    <string name="state_missed">未确认打卡！</string>
+    <string name="api_distance_now">接口距离</string>
+    <string name="api_off">API判定关闭·纯GPS模式</string>
+    <string name="gps_waiting">等待 GPS 定位…</string>
+
+    <!-- 标定页 -->
+    <string name="calib_title">现场标定</string>
+    <string name="calib_hint">站在打卡点中央，等精度收敛（≤10m 更佳），点击「开始平均标定」。</string>
+    <string name="calib_start">开始平均标定</string>
+    <string name="calib_stop">停止并保存</string>
+    <string name="calib_running">采集中 %1$ds · 已收 %2$d 点</string>
+    <string name="calib_avg_label">均值（WGS-84）</string>
+    <string name="calib_gcj_label">高德 GCJ-02（参考）</string>
+    <string name="calib_accuracy">精度 ±%1$s m</string>
+    <string name="calib_save_as">保存为打卡点</string>
+    <string name="calib_point_name">点位名称</string>
+    <string name="calib_need_more">有效定位不足，请站定不动稍候</string>
+    <string name="satellites">卫星 %1$d/%2$d</string>
+
+    <!-- 地图页 -->
+    <string name="map_hint">长按地图任意位置添加打卡点；拖动图标微调；点按图标编辑。\n双指缩放最深可到 20 级（约 0.1 米/像素）。</string>
+    <string name="map_tile_sat">卫星</string>
+    <string name="map_tile_street">街道</string>
+    <string name="map_route">操场环线</string>
+    <string name="map_locate">回到我的位置</string>
+    <string name="add_point">添加打卡点</string>
+    <string name="edit_point">编辑打卡点</string>
+    <string name="cp_name">名称</string>
+    <string name="cp_radius">检测半径（米）</string>
+    <string name="cp_note">备注（可选）</string>
+    <string name="save">保存</string>
+    <string name="delete">删除</string>
+    <string name="cancel">取消</string>
+    <string name="coord_wgs">WGS-84（原始 GPS）</string>
+    <string name="coord_gcj">GCJ-02（高德/火星）</string>
+    <string name="delete_confirm">确定删除该打卡点？</string>
+
+    <!-- 接口页 -->
+    <string name="api_title">接口调试</string>
+    <string name="api_token_label">令牌 Token / Cookie（从抓包获取，支持 {token} 占位）</string>
+    <string name="api_token_hint">例：skey=ST-12345..;  或 Bearer eyJhbGci…</string>
+    <string name="api_test">发送测试</string>
+    <string name="api_edit">编辑</string>
+    <string name="api_url">请求 URL</string>
+    <string name="api_method">方法</string>
+    <string name="api_headers">请求头 JSON（可选，值支持 {token}）</string>
+    <string name="api_body">请求体 JSON（可选，值支持 {token}）</string>
+    <string name="api_path">距离字段路径（如 data.runDistance / data.distance）</string>
+    <string name="api_result_none">尚无结果</string>
+    <string name="api_result_fmt">HTTP %1$d · %2$d ms</string>
+    <string name="api_extracted">提取距离：%1$s</string>
+    <string name="api_extract_fail">未能按路径提取到数值，请调整路径</string>
+    <string name="api_usage_hint">在「i大工-体质测评-健康长跑」页面操作时用抓包工具（HttpCanary/Charles）捕获 XHR，把 URL/头/距离字段填入下方模板即可调试与联动。详见交付文档。</string>
+    <string name="api_enabled_title">API 判定（进区后轮询距离增量）</string>
+    <string name="api_enabled_off">关闭：出区即提示（无法判定漏卡）</string>
+
+    <!-- 设置 -->
+    <string name="pref_detect">检测参数</string>
+    <string name="pref_default_radius">默认检测半径（米）</string>
+    <string name="pref_approach">预告距离（米）</string>
+    <string name="pref_confirm_delta">确认距离增量阈值（米）</string>
+    <string name="pref_poll_interval">轮询间隔（秒）</string>
+    <string name="pref_grace">出区宽限期（秒）</string>
+    <string name="pref_alert">提醒方式</string>
+    <string name="pref_tts">语音播报（耳机）</string>
+    <string name="pref_chime">提示音</string>
+    <string name="pref_vibrate">震动</string>
+    <string name="pref_api">API 判定</string>
+    <string name="pref_api_enabled">启用 API 判定</string>
+    <string name="pref_map">地图与坐标</string>
+    <string name="pref_tile">瓦片源</string>
+    <string name="pref_tile_sat">卫星（Esri）</string>
+    <string name="pref_tile_street">街道（OSM）</string>
+    <string name="pref_coord">坐标显示制式</string>
+    <string name="pref_coord_wgs">WGS-84（GPS 原始）</string>
+    <string name="pref_coord_gcj">GCJ-02（高德）</string>
+    <string name="pref_system">系统</string>
+    <string name="pref_battery">后台保底：电池优化白名单</string>
+    <string name="pref_battery_sub">加入白名单，防止跑步中进程被杀</string>
+    <string name="pref_export">导出打卡点 JSON 到剪贴板</string>
+    <string name="pref_export_done">已复制 %1$d 个点位，可粘贴备档</string>
+    <string name="pref_about">关于</string>
+    <string name="pref_about_body">跑伴 RunMate v1.0\n配合「i大工-体质测评-健康长跑」使用的独立辅助 App。\n坐标以 WGS-84 存储，自动换算 GCJ-02。\n仅供个人跑步提醒使用。</string>
+
+    <!-- 服务通知 -->
+    <string name="ch_name">跑步进行中</string>
+    <string name="notif_title">跑步进行中</string>
+    <string name="notif_stop">结束</string>
+
+    <!-- TTS 文案 -->
+    <string name="tts_started">跑步提醒已启动，共%1$d个点位</string>
+    <string name="tts_approach">前方%1$s米，%2$s，请准备</string>
+    <string name="tts_enter">已进入%1$s检测区</string>
+    <string name="tts_confirmed">%1$s，打卡成功</string>
+    <string name="tts_missed">注意，%1$s未确认打卡，请减速返回或留意手机</string>
+    <string name="tts_pass_gps">%1$s已通过，请自行确认打卡</string>
+    <string name="tts_summary">本次结束：确认%1$d个，未确认%2$d个，用时%3$s</string>
+</resources>

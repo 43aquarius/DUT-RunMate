@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+app/build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# 本地环境（SDK 路径因机器而异，不入库）
+local.properties
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志与崩溃
+*.log
+captures/

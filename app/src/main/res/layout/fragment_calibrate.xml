@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView style="@style/TextAppearance.RunMate.Label"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/calib_title" />
+
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/calib_hint" />
+
+            <!-- 实时定位卡 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="24dp" app:strokeWidth="0dp">
+                <LinearLayout android:orientation="vertical" android:padding="20dp"
+                    android:layout_width="match_parent" android:layout_height="wrap_content">
+
+                    <TextView android:id="@+id/tvLat" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:fontFamily="sans-serif-condensed" android:text="纬度 --" />
+                    <TextView android:id="@+id/tvLon" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:fontFamily="sans-serif-condensed" android:text="经度 --" />
+                    <TextView android:id="@+id/tvGcj" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:layout_marginTop="4dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/calib_gcj_label" />
+                    <LinearLayout android:orientation="horizontal" android:layout_marginTop="8dp"
+                        android:layout_width="match_parent" android:layout_height="wrap_content">
+                        <TextView android:id="@+id/tvAcc" android:layout_width="0dp"
+                            android:layout_weight="1" android:layout_height="wrap_content"
+                            android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:text="±-- m" />
+                        <TextView android:id="@+id/tvSats" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodyMedium"
+                            android:text="--" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- 平均标定卡 -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="24dp" app:strokeWidth="0dp">
+                <LinearLayout android:orientation="vertical" android:padding="20dp"
+                    android:layout_width="match_parent" android:layout_height="wrap_content">
+
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" android:text="@string/calib_title" />
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chipsDur" android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                        app:singleSelection="true" app:selectionRequired="true">
+                        <com.google.android.material.chip.Chip android:id="@+id/chip10"
+                            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:text="10 s" />
+                        <com.google.android.material.chip.Chip android:id="@+id/chip20"
+                            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:checkable="true" android:text="20 s" />
+                        <com.google.android.material.chip.Chip android:id="@+id/chip30"
+                            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" android:text="30 s" />
+                    </com.google.android.material.chip.ChipGroup>
+
+                    <TextView android:id="@+id/tvAvgStatus" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:text="待开始" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnAvg" style="@style/Widget.RunMate.PillButton"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp" android:text="@string/calib_start" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:id="@+id/tilName" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                        android:hint="@string/calib_point_name">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etName" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:text="点位" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSave" style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp" android:enabled="false"
+                        android:text="@string/calib_save_as" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView style="@style/TextAppearance.RunMate.Label"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" android:text="@string/add_point" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvCalib" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                android:nestedScrollingEnabled="false" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

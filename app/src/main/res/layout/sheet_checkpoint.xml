@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/tvSheetTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:text="@string/add_point" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilCpName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/cp_name">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etCpName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chipsCoord"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        app:singleSelection="true"
+        app:selectionRequired="true">
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipWgs" style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:checkable="true" android:text="@string/coord_wgs" />
+        <com.google.android.material.chip.Chip
+            android:id="@+id/chipGcj" style="@style/Widget.Material3.Chip.Filter"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="@string/coord_gcj" />
+    </com.google.android.material.chip.ChipGroup>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilLat" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="12dp"
+        android:hint="纬度（可直接输入修正）">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etLat" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:inputType="numberDecimal|numberSigned" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilLon" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:hint="经度（可直接输入修正）">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etLon" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:inputType="numberDecimal|numberSigned" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/tvSheetCoords"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:fontFamily="monospace"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:text="" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:text="@string/cp_radius" />
+
+    <TextView
+        android:id="@+id/tvSheetRadius"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:text="25 m" />
+
+    <com.google.android.material.slider.Slider
+        android:id="@+id/sliderSheetRadius"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:valueFrom="10" android:valueTo="100" android:stepSize="5" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilCpNote" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:hint="@string/cp_note">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etCpNote" android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSheetDelete"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="@string/delete"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSheetSave"
+            style="@style/Widget.RunMate.PillButton"
+            android:layout_width="0dp"
+            android:layout_weight="2"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="@string/save" />
+    </LinearLayout>
+</LinearLayout>

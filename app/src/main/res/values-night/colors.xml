@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 夜间（黑底） -->
+    <color name="md_primary">#FFF5F5F5</color>
+    <color name="md_on_primary">#FF111111</color>
+    <color name="md_primary_container">#FF39393B</color>
+    <color name="md_on_primary_container">#FFF5F5F5</color>
+
+    <color name="md_secondary">#FFCACACB</color>
+    <color name="md_on_secondary">#FF111111</color>
+    <color name="md_secondary_container">#FF1F1F22</color>
+    <color name="md_on_secondary_container">#FFE5E5E5</color>
+
+    <color name="md_tertiary">#FFAEC5FF</color>
+    <color name="md_on_tertiary">#FF00308F</color>
+    <color name="md_tertiary_container">#FF00308F</color>
+    <color name="md_on_tertiary_container">#FFD6E2FF</color>
+
+    <color name="md_error">#FFFFB4AB</color>
+    <color name="md_on_error">#FF780700</color>
+    <color name="md_error_container">#FF780700</color>
+    <color name="md_on_error_container">#FFFFDAD4</color>
+
+    <color name="md_success">#FF1EAA52</color>
+    <color name="md_success_bright">#FF1EAA52</color>
+    <color name="md_success_container">#FF00391F</color>
+    <color name="md_on_success_container">#FFD5F5E4</color>
+
+    <color name="md_amber">#FFE2B96B</color>
+    <color name="md_amber_container">#FF5A3900</color>
+    <color name="md_on_amber_container">#FFFFE8CC</color>
+
+    <color name="md_background">#FF0B0B0C</color>
+    <color name="md_on_background">#FFF5F5F5</color>
+    <color name="md_surface">#FF0B0B0C</color>
+    <color name="md_on_surface">#FFF5F5F5</color>
+    <color name="md_surface_variant">#FF1F1F22</color>
+    <color name="md_on_surface_variant">#FFB9B9BD</color>
+    <color name="md_outline">#FF4B4B4D</color>
+    <color name="md_outline_variant">#FF39393B</color>
+
+    <color name="map_stroke_pending">#FF9E9EA0</color>
+    <color name="map_stroke_near">#FFE2B96B</color>
+    <color name="map_stroke_inzone">#FFAEC5FF</color>
+    <color name="map_stroke_ok">#FF1EAA52</color>
+    <color name="map_stroke_miss">#FFFFB4AB</color>
+</resources>
