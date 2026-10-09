@@ -33,11 +33,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".SettingsActivity"
-            android:exported="false"
-            android:label="@string/title_settings" />
-
         <service
             android:name=".service.RunTrackerService"
             android:exported="false"

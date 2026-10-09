@@ -129,19 +129,34 @@ class RunTrackerService : Service() {
         startPoller()
     }
 
+    /**
+     * v1.3.0 轮询器重构（打卡核对）：
+     *  - 500ms 心跳检查三类触发条件；
+     *  - 区内/宽限期：按 pollInterval 高频轮询（RFID 命中一次 +100m，进区即核对）；
+     *  - 锚点轮询：无论是否在区内，每 15s 拉一次，维持「进区前基线」新鲜（DetectEngine 用）；
+     *  - 手动触发：UI 递增 RunBus.pollReq（「立即核对」），下个心跳立即执行。
+     */
     private fun startPoller() {
         scope?.launch(Dispatchers.Main) {
+            var lastZonePoll = 0L
             var lastAnchor = 0L
+            var lastReqSeen = RunBus.state.value.pollReq
             while (isActive) {
-                delay(prefs.pollInterval * 1000L)
+                delay(500)
                 if (!prefs.apiEnabled) continue
                 val eng = engine ?: break
                 val prof = apiStore.distanceProfile() ?: continue
                 if (prof.url.isBlank()) continue
+                val now = SystemClock.elapsedRealtime()
+                val manual = RunBus.state.value.pollReq != lastReqSeen
+                if (manual) lastReqSeen = RunBus.state.value.pollReq
                 val need = eng.needsPoll()
-                val anchorDue = SystemClock.elapsedRealtime() - lastAnchor > 15_000
-                if (!need && !anchorDue) continue
+                val zoneDue = need && now - lastZonePoll >= prefs.pollInterval * 1000L
+                val anchorDue = now - lastAnchor > 15_000L
+                if (!zoneDue && !anchorDue && !manual) continue
+
                 val resp = Http.call(prof, prefs.apiToken)
+                val doneAt = SystemClock.elapsedRealtime()
                 if (resp.error != null) {
                     RunBus.update { it.copy(apiErr = "网络错误: ${resp.error}") }
                     continue
@@ -150,11 +165,12 @@ class RunTrackerService : Service() {
                     RunBus.update { it.copy(apiErr = "HTTP ${resp.code}") }
                     continue
                 }
-                lastAnchor = SystemClock.elapsedRealtime()
+                if (need) lastZonePoll = doneAt
+                lastAnchor = doneAt
                 val v = Http.extractDouble(resp.body, prof.distPath)
                 if (v != null) {
                     RunBus.update { it.copy(apiDistance = v, apiErr = null) }
-                    eng.onApiDistance(v)
+                    eng.onApiDistance(v, doneAt)
                 } else {
                     RunBus.update { it.copy(apiErr = "未能提取: ${prof.distPath}") }
                 }

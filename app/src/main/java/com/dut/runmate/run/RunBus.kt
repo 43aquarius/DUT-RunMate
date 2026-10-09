@@ -51,7 +51,9 @@ object RunBus {
         val apiErr: String? = null,
         val snaps: List<CpSnap> = emptyList(),
         val stats: Stats = Stats(),
-        val summary: Summary? = null
+        val summary: Summary? = null,
+        /** 手动「立即核对」请求计数：UI 递增，服务轮询循环感知后立即拉取一次 */
+        val pollReq: Long = 0L
     )
 
     val state = MutableStateFlow(UiState())

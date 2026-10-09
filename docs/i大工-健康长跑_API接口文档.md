@@ -210,6 +210,14 @@ URL：http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise
 > 以上 userId/amId/pmId/sign/Authorization 全部照抄你自己抓包里的值
 >（抓包方法见 §5）。`pmDel.distance` 为 `"2700米"` 样式字符串，跑伴 v1.2.0
 > 起自动提取首个数字，无需处理。
+>
+> **跑伴 v1.3.0 起**：「接口」页的「健康长跑距离」模板已按上述推荐配置**预填**
+>（含内网直连 URL、Authorization/Content-Type 请求头、pmDel.distance 路径），
+> 只需把抓包的 userId/amId/pmId/sign 填进请求体、令牌粘到令牌栏即可；
+> 校外把 URL 换成 §3.4 的 WebVPN 隐道地址并在请求头补 Cookie。
+> 打卡核对判定 = **服务端距离较进区前基线出现增长（≥3m）且此刻正在打卡区域内**；
+> 基线取「进区前最后一次轮询距离」（每 15s 锚点轮询维持新鲜），确保 RFID 注册
+> 先于 App 轮询时也能立即判出 +100m 阶跃。
 
 ---
 

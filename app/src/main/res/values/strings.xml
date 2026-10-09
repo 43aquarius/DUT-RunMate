@@ -13,7 +13,7 @@
     <!-- 跑步页 -->
     <string name="run_start">开始跑步</string>
     <string name="run_stop">结束跑步</string>
-    <string name="run_idle_hint">先在「标定/地图」页录入打卡点，再开始跑步。\n跑步中请保持本App后台运行（建议佩戴耳机）。</string>
+    <string name="run_idle_hint">未开始跑步也可实时定位预览（本页即显示位置与最近点位）。\n先在「地图/标定」页录入打卡点，开始跑步后自动语音提醒。\n跑步中请保持本App后台运行（建议佩戴耳机）。</string>
     <string name="run_no_points">尚未录入任何打卡点</string>
     <string name="stat_time">用时</string>
     <string name="stat_dist">自测距离</string>
@@ -24,9 +24,20 @@
     <string name="state_grace">已出区·宽限核查中</string>
     <string name="state_confirmed">已打卡 ✓</string>
     <string name="state_missed">未确认打卡！</string>
-    <string name="api_distance_now">接口距离</string>
+    <string name="api_distance_now">服务端距离</string>
+    <string name="api_dist_verify">服务端距离·点按核对</string>
+    <string name="api_dist_query">服务端距离·点按查询</string>
     <string name="api_off">API判定关闭·纯GPS模式</string>
     <string name="gps_waiting">等待 GPS 定位…</string>
+    <string name="run_preview">定位预览</string>
+    <string name="loc_searching">定位搜索中…</string>
+    <string name="loc_src_gps_fmt">GPS · ±%1$d m</string>
+    <string name="loc_src_net_fmt">网络定位 · ±%1$d m</string>
+    <string name="loc_net_education">当前为网络定位（基站/WiFi，误差几十至几百米，仅作参考）。\nGPS 需直视卫星：室内/楼宇遮挡下无法锁定，才会回落到网络定位。\n到室外开阔处静止半分钟，GPS 锁定后会自动切换为蓝点（更准）。</string>
+    <string name="verify_requested">已请求立即核对，稍候…</string>
+    <string name="verify_querying">查询服务端距离…</string>
+    <string name="api_not_configured">距离接口未配置，请到「接口」页填写抓包参数</string>
+    <string name="api_need_enable">请先在「设置」页开启 API 判定</string>
 
     <!-- 标定页 -->
     <string name="calib_title">现场标定</string>
@@ -49,7 +60,7 @@
     <string name="map_route">操场环线</string>
     <string name="map_locate">回到我的位置</string>
     <string name="map_loc_net_toast">当前为网络定位，精度较低，仅作参考</string>
-    <string name="map_loc_none">暂无定位（请到开阔处等待 GPS，或先开始跑步）</string>
+    <string name="map_loc_none">暂无定位，请到室外开阔处等待 GPS…</string>
     <string name="map_pick_title">在此添加打卡点？</string>
     <string name="map_pick_coords">WGS-84　%1$s, %2$s</string>
     <string name="map_pick_hint">拖动准星可微调，放大地图核对后确认</string>
@@ -68,8 +79,8 @@
 
     <!-- 接口页 -->
     <string name="api_title">接口调试</string>
-    <string name="api_token_label">令牌 Token / Cookie（从抓包获取，支持 {token} 占位）</string>
-    <string name="api_token_hint">例：skey=ST-12345..;  或 Bearer eyJhbGci…</string>
+    <string name="api_token_label">令牌 Token（从抓包获取，支持 {token} 占位）</string>
+    <string name="api_token_hint">findExtExercise 填「userId:accessToken」整串</string>
     <string name="api_test">发送测试</string>
     <string name="api_edit">编辑</string>
     <string name="api_url">请求 URL</string>
@@ -81,7 +92,7 @@
     <string name="api_result_fmt">HTTP %1$d · %2$d ms</string>
     <string name="api_extracted">提取距离：%1$s</string>
     <string name="api_extract_fail">未能按路径提取到数值，请调整路径</string>
-    <string name="api_usage_hint">在「i大工-体质测评-健康长跑」页面操作时用抓包工具（HttpCanary/Charles）捕获 XHR，把 URL/头/距离字段填入下方模板即可调试与联动。详见交付文档。</string>
+    <string name="api_usage_hint">「健康长跑距离」模板已预填实测接口（校内直连地址，校外换 WebVPN 隐道 URL）：把抓包到的 userId/amId/pmId/sign 填进请求体、Authorization 令牌粘到上方令牌栏，发送测试能提取距离即配置成功，开启 API 判定后跑步自动核对打卡。</string>
     <string name="api_enabled_title">API 判定（进区后轮询距离增量）</string>
     <string name="api_enabled_off">关闭：出区即提示（无法判定漏卡）</string>
 
@@ -111,7 +122,7 @@
     <string name="pref_export">导出打卡点 JSON 到剪贴板</string>
     <string name="pref_export_done">已复制 %1$d 个点位，可粘贴备档</string>
     <string name="pref_about">关于</string>
-    <string name="pref_about_body">跑伴 RunMate v1.2.0\n配合「i大工-体质测评-健康长跑」使用的独立辅助 App。\n坐标以 WGS-84 存储，自动换算 GCJ-02（v1.2.0 修正换算偏差，历史点位已自动迁移）。\n仅供个人跑步提醒使用。</string>
+    <string name="pref_about_body">跑伴 RunMate v%1$s\n配合「i大工-体质测评-健康长跑」使用的独立辅助 App。\n打卡核对：轮询 findExtExercise，服务端距离增长且经过打卡区域即确认成功。\n坐标以 WGS-84 存储，自动换算 GCJ-02。\n仅供个人跑步提醒使用。</string>
 
     <!-- 服务通知 -->
     <string name="ch_name">跑步进行中</string>

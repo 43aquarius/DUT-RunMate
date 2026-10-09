@@ -14,6 +14,7 @@ import com.dut.runmate.ui.ApiFragment
 import com.dut.runmate.ui.CalibrateFragment
 import com.dut.runmate.ui.MapFragment
 import com.dut.runmate.ui.RunFragment
+import com.dut.runmate.ui.SettingsFragment
 import com.dut.runmate.update.UpdateFlow
 
 class MainActivity : AppCompatActivity() {
@@ -24,6 +25,7 @@ class MainActivity : AppCompatActivity() {
     private val mapFrag by lazy { MapFragment() }
     private val calibFrag by lazy { CalibrateFragment() }
     private val apiFrag by lazy { ApiFragment() }
+    private val settingsFrag by lazy { SettingsFragment() }
 
     private var cur: Fragment? = null
 
@@ -42,6 +44,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_map -> swap(mapFrag)
                 R.id.nav_calib -> swap(calibFrag)
                 R.id.nav_api -> swap(apiFrag)
+                R.id.nav_settings -> swap(settingsFrag)
             }
             true
         }
@@ -54,7 +57,9 @@ class MainActivity : AppCompatActivity() {
         b.toolbar.setOnMenuItemClickListener {
             when (it.itemId) {
                 R.id.action_settings -> {
-                    startActivity(Intent(this, SettingsActivity::class.java)); true
+                    // v1.3.0：齿轮同样切到设置 Tab（设置已是底部导航一级页面）
+                    b.bottomNav.selectedItemId = R.id.nav_settings
+                    true
                 }
                 else -> false
             }

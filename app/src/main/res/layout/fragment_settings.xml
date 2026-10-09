@@ -6,12 +6,6 @@
     android:orientation="vertical"
     android:background="?android:colorBackground">
 
-    <com.google.android.material.appbar.MaterialToolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize"
-        app:navigationIcon="@drawable/ic_close"
-        app:title="@string/title_settings" />
 
     <ScrollView
         android:layout_width="match_parent"
@@ -285,7 +279,7 @@
             <TextView android:id="@+id/tvAbout" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:layout_marginTop="24dp"
                 android:textAppearance="?attr/textAppearanceBodySmall"
-                android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/pref_about_body" />
+                android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

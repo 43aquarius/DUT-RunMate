@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.2.0-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.3.0-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -23,19 +23,22 @@
 
 - 🎧 **戴耳机自动语音提醒**：接近点位预告 → 进入检测区提示 → 打卡结果播报，全程无需看手机；
 - 📍 **两种点位录入方式**：亲赴现场 GPS 标定（精度加权平均，推荐）/ 地图选点（高德图源：街道最深 20 级，卫星 18 级）—— **v1.2.0 起点按地图即出橙色准星，可拖动微调、放大核对后再确认**，蓝点带精度圈，GPS/网络定位源一目了然；
-- 🔎 **官方距离接口判定**：进入点位检测圈后轮询「跑步距离」接口，**区间内距离增长 = 打卡成功；离开区间距离未变 = 漏卡，立刻语音 + 震动强提醒**，减速折返补卡即可；
+- 🔎 **官方距离接口判定（打卡核对）**：进入点位检测圈后轮询官方距离接口，**区内距离增长 = 打卡成功；离开区间距离未变 = 漏卡，立刻语音 + 震动强提醒**，减速折返补卡即可；**v1.3.0 起接口模板已预填实测 findExtExercise**，抓包填参即用；
 - 🏃 **实测打卡机制**（v1.2.0 抓包确认）：健康长跑为操场 RFID 读卡器计圈，官方距离每次经过读卡器 +100m 阶跃，`findExtExercise` 接口一次返回全部状态（详见 API 文档 §3）；
+- 👁 **随时定位预览**（v1.3.0）：不开跑步也能在首页/地图实时查看位置、定位源与精度（GPS 蓝/网络橙徽章）、最近点位距离与方向；
 - 🔒 **数据全部留在本机**：不联网上传、不读取 i大工 数据、不需要 root。
-- 🔄 **应用内自更新**（v1.1.0 起）：支持自建服务器（发布中心）+ GitHub Release 双通道，每天自动检查，下载带 SHA256 校验；
+- 🔄 **应用内自更新**（v1.1.0 起）：支持自建服务器（发布中心）+ GitHub Release 双通道，每天自动检查，下载带 SHA256 校验；v1.3.0 起设置成为底部导航一级页面，入口更直观；
 
 > 判定逻辑说明：官方成绩以服务端记录的距离为准，因此「距离接口的增量」比单纯 GPS 进出圈更可靠 —— 这正是本 App 的核心判定依据。
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.2.0.apk`（约 5.8 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.3.0.apk`（约 5.8 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
-4. 进「设置」→ 底部 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
+4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
+
+> 老版本（v1.0.x）内没有更新入口，需手动下载本次 APK 覆盖安装一次；v1.1.0+ 可在 App 内更新（设置 → 立即检查）。
 
 详细使用教程见 📖 [docs/使用说明.md](docs/使用说明.md)。
 
@@ -68,13 +71,13 @@
 
 ```
 进入检测圈（半径可设，默认 25m）
-   → 锁定官方「跑步距离」基线 → 每 3s 轮询接口
-        距离增量 ≥ 3m   ⇒ 打卡成功 ✓（语音 + 短震）
+   → 基线取「进区前最后一次轮询的官方距离」（v1.3.0，RFID 已注册也能立即判出）
+   → 区内每 3s 轮询 findExtExercise（全稈每 15s 锚点轮询维持基线）
+        距离增量 ≥ 3m（RFID 命中一次 = +100m） ⇒ 打卡成功 ✓（语音 + 短震）
         出圈后 12s 宽限仍无增量 ⇒ 漏卡！强提醒 ⚠（语音 + 急震 + 警示音）
 ```
 
-配置步骤（约 10 分钟，一次性）见 📖 [docs/i大工-健康长跑_API接口文档.md](docs/i大工-健康长跑_API接口文档.md)：
-抓包拿到「查询跑步距离」接口 → 在 App「接口」页填令牌、编辑请求模板 → 发送测试直到能提取距离值 → 设置页打开「API 判定」。
+配置步骤（约 5 分钟，一次性）：「接口」页「健康长跑距离」模板**已预填实测接口**，只需把抓包到的 `userId/amId/pmId/sign` 填进请求体、「userId:accessToken」令牌粘到令牌栏（详见 [docs/i大工-健康长跑_API接口文档.md](docs/i大工-健康长跑_API接口文档.md) §3.5）→ 发送测试直到能提取距离值 → 设置页打开「API 判定」。跑步中也可随时点按首页「服务端距离」**立即核对**。
 
 ## 从源码构建
 
@@ -93,18 +96,20 @@ cd DUT-RunMate
 
 ```
 app/src/main/java/com/dut/runmate/
-├── App.kt / MainActivity.kt / SettingsActivity.kt   # 入口与设置
-├── service/RunTrackerService.kt                     # 前台定位服务（息屏持续运行）
-├── run/DetectEngine.kt · RunBus.kt                  # 检测引擎：进出圈判定 + 距离轮询核对
-├── geo/GeoKit.kt                                    # WGS-84 ↔ GCJ-02 坐标转换
+├── App.kt / MainActivity.kt                            # 入口（底部导航 5 Tab：跑步/地图/标定/接口/设置）
+├── service/RunTrackerService.kt                        # 前台定位服务（息屏持续运行 + 距离轮询核对）
+├── run/DetectEngine.kt · RunBus.kt                     # 检测引擎：进出圈判定 + 距离增量核对
+├── geo/GeoKit.kt · LocGate.kt                          # WGS-84 ↔ GCJ-02 转换 + 定位源归一
 ├── data/CheckpointStore.kt · Prefs.kt · api/ApiStore.kt   # 点位/设置/接口模板本机存储
-├── alert/AlertManager.kt                            # TTS 语音（导航通道）+ 提示音 + 震动
+├── alert/AlertManager.kt                               # TTS 语音（导航通道）+ 提示音 + 震动
+├── update/Updater.kt · UpdateFlow.kt                   # 应用内更新（服务器 + GitHub 双通道）
 └── ui/
-    ├── RunFragment.kt · RadarView.kt                # 跑步页：状态、雷达图、小结
-    ├── MapFragment.kt                               # 地图选点（osmdroid，缩放至 20 级）
-    ├── CalibrateFragment.kt                         # 现场标定（精度加权平均）
-    ├── ApiFragment.kt                               # 接口调试（URL/令牌/解析测试）
-    └── CheckpointSheet.kt · PointAdapters.kt        # 点位编辑面板与列表
+    ├── RunFragment.kt · RadarView.kt                   # 跑步页：定位预览、状态、雷达、小结
+    ├── MapFragment.kt                                  # 地图选点（osmdroid，缩放至 20 级）
+    ├── CalibrateFragment.kt                            # 现场标定（精度加权平均）
+    ├── ApiFragment.kt                                  # 接口调试（预填 findExtExercise 模板）
+    ├── SettingsFragment.kt                             # 设置（检测参数/提醒/更新/系统）
+    └── CheckpointSheet.kt · PointAdapters.kt           # 点位编辑面板与列表
 ```
 
 **技术栈**：Kotlin · AndroidX · Material Components · osmdroid 6.1.18（开源地图框架 + 高德瓦片，含超源缩放） · OkHttp 4.12 · 前台服务 + WakeLock · TTS
@@ -118,6 +123,12 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.3.0（2026-10-09）**
+  - ✨ **设置成为底部导航一级页面**（第 5 个 Tab），「检查更新」入口不再难找；关于区块动态显示当前版本；
+  - ✨ **随时定位预览**：不开跑步也能在首页实时查看位置、定位源与精度（「定位预览 · GPS ±8m」）、最近点位距离与雷达方向；
+  - ✨ **地图定位源徽章**：顶部常驻「GPS · ±Xm」（蓝）/「网络定位 · ±Xm」（橙）/「定位搜索中」（灰），点按弹出 GPS 与网络定位切换说明；
+  - ✨ **打卡核对增强**：距离接口模板预填实测 findExtExercise（校内直连地址 + Authorization/body 模板 + pmDel.distance 路径）；基线改取「进区前最后一次轮询距离」（RFID 注册先于区内首次轮询时也能立即判出 +100m 阶跃）；首页「服务端距离」可点按**立即核对**（未跑步时点按直接查询一次）；
+  - 🔧 轮询器重构：区内按设定间隔轮询 + 全稈 15s 锚点轮询 + 手动触发三合一。
 - **v1.2.0（2026-10-09）**
   - 🐛 修复地图定位严重偏移（一两百米~570m）：GCJ-02 换算算法抄写错误（transformLat/Lon 互换），实测校区偏移 570m，已修正并**自动迁移历史点选点位**；
   - 🐛 网络定位（GCJ-02）自动归一，GPS 优先，消除双重偏移与蓝点跳动；蓝点新增精度圈，GPS=蓝点/网络=灰点；

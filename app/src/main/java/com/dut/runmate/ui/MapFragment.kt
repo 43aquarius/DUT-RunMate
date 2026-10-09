@@ -139,6 +139,14 @@ class MapFragment : Fragment() {
         b.btnPickOk.setOnClickListener { confirmPick() }
         b.btnPickCancel.setOnClickListener { clearPick() }
 
+        // 定位源状态徽章：点按弹出 GPS/网络定位说明（回答「为什么显示网络定位」）
+        b.chipLocStatus.setOnClickListener {
+            android.widget.Toast.makeText(
+                requireContext(), R.string.loc_net_education, android.widget.Toast.LENGTH_LONG
+            ).show()
+        }
+        renderLocChip(null)
+
         if (!prefs.mapHintShown) {
             prefs.mapHintShown = true
         } else {
@@ -331,10 +339,11 @@ class MapFragment : Fragment() {
         CheckpointSheet.show(this, store, cp) { rebuild() }
     }
 
-    /** 把 WGS-84 定位画到地图：GPS 蓝点 / 网络灰点 + 精度圈 */
+    /** 把 WGS-84 定位画到地图：GPS 蓝点 / 网络灰点 + 精度圈，并刷新定位源徽章 */
     private fun showMyLocation(lat: Double, lon: Double, acc: Float, network: Boolean) {
         val bb = _b ?: return
         val dp = toDisplay(lat, lon)
+        renderLocChip(if (network) acc to true else acc to false)
 
         // 精度圈（数值有效时）
         if (acc > 0f && acc < 500f) {
@@ -359,6 +368,31 @@ class MapFragment : Fragment() {
         )
         mk.position = dp
         bb.map.invalidate()
+    }
+
+    /** 定位源徽章：null=搜索中；GPS=蓝；网络=琥珀（附精度） */
+    private fun renderLocChip(state: Pair<Float, Boolean>?) {
+        val bb = _b ?: return
+        val chip = bb.chipLocStatus
+        when (state) {
+            null -> {
+                chip.text = getString(R.string.loc_searching)
+                chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(requireContext(), R.color.md_surface_variant))
+                chip.setTextColor(ContextCompat.getColor(requireContext(), R.color.md_on_surface_variant))
+            }
+            else -> {
+                val (acc, net) = state
+                chip.text = getString(
+                    if (net) R.string.loc_src_net_fmt else R.string.loc_src_gps_fmt,
+                    acc.toInt()
+                )
+                chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(requireContext(), if (net) R.color.md_amber else R.color.md_tertiary)
+                )
+                chip.setTextColor(ContextCompat.getColor(requireContext(), R.color.white))
+            }
+        }
     }
 
     override fun onResume() {

@@ -47,6 +47,15 @@
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:text="@string/map_route" />
+
+            <!-- 定位源状态徽章：GPS 蓝 / 网络橙 / 搜索中灰，点按弹出说明 -->
+            <com.google.android.material.chip.Chip
+                android:id="@+id/chipLocStatus"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:checkable="false"
+                android:text="@string/loc_searching" />
         </LinearLayout>
     </HorizontalScrollView>
 

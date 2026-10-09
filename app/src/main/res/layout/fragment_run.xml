@@ -75,11 +75,18 @@
                                 android:text="—" />
                         </LinearLayout>
 
+                        <!-- 服务端距离：点按 = 跑步中「立即核对」/ 未跑步「查询一次」 -->
                         <LinearLayout
+                            android:id="@+id/layoutApi"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:orientation="vertical"
-                            android:gravity="end">
+                            android:gravity="end"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:background="?attr/selectableItemBackground"
+                            android:paddingStart="8dp"
+                            android:paddingEnd="4dp">
 
                             <TextView
                                 android:id="@+id/tvApiDist"

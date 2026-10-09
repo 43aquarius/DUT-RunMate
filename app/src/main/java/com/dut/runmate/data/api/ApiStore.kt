@@ -48,6 +48,11 @@ class ApiStore private constructor(private val file: File) {
         const val PING_ID = "p_ping"
         const val CUSTOM_ID = "p_custom"
 
+        /** 实测抓包得到的健康长跑距离接口（v1.3.0 预填，详见 docs API 文档 §3） */
+        const val DIST_TITLE = "健康长跑距离 findExtExercise（打卡核对用）"
+        const val DIST_URL = "http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise"
+        const val DIST_PATH = "pmDel.distance"
+
         @Volatile private var inst: ApiStore? = null
         fun get(dir: File): ApiStore =
             inst ?: synchronized(this) {
@@ -73,20 +78,37 @@ class ApiStore private constructor(private val file: File) {
                         } catch (_: Exception) { }
                     }
                     if (s.profiles.isEmpty()) s.seed()
+                    else s.migrateBlankDist()
                 }
             }
+
+        /**
+         * v1.3.0 迁移：老版本（≤1.2.0）默认距离模板 URL 为空。
+         * 若用户未自定义，则升级为实测抓包得到的 findExtExercise 模板；已自定义（URL 非空）不动。
+         */
+        private fun ApiStore.migrateBlankDist() {
+            val p = profiles.firstOrNull { it.id == DIST_ID } ?: return
+            if (p.url.isNotBlank()) return
+            p.title = DIST_TITLE
+            p.method = "POST"
+            p.url = DIST_URL
+            p.headers = "{\"Authorization\":\"{token}\",\"Content-Type\":\"application/json;charset=UTF-8\"}"
+            p.body = "{\"userId\":\"抓包值\",\"amId\":\"抓包值\",\"pmId\":\"抓包值\",\"sign\":\"抓包值\"}"
+            p.distPath = DIST_PATH
+            persist()
+        }
 
         private fun ApiStore.seed() {
             profiles.addAll(
                 listOf(
                     ApiProfile(
                         id = DIST_ID,
-                        title = "跑步距离查询（进区判定用）",
-                        method = "GET",
-                        url = "",
-                        headers = "{\"Cookie\":\"{token}\"}",
-                        body = "",
-                        distPath = "data.distance"
+                        title = DIST_TITLE,
+                        method = "POST",
+                        url = DIST_URL,
+                        headers = "{\"Authorization\":\"{token}\",\"Content-Type\":\"application/json;charset=UTF-8\"}",
+                        body = "{\"userId\":\"抓包值\",\"amId\":\"抓包值\",\"pmId\":\"抓包值\",\"sign\":\"抓包值\"}",
+                        distPath = DIST_PATH
                     ),
                     ApiProfile(
                         id = PING_ID,
