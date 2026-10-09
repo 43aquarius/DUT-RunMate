@@ -21,6 +21,7 @@ import com.dut.runmate.data.CheckpointStore
 import com.dut.runmate.data.Prefs
 import com.dut.runmate.databinding.FragmentCalibrateBinding
 import com.dut.runmate.geo.GeoKit
+import com.dut.runmate.geo.LocGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -160,17 +161,21 @@ class CalibrateFragment : Fragment() {
         refreshList()
     }
 
-    private fun onFix(loc: Location) {
+    private fun onFix(raw: Location) {
+        // 坐标归一：网络定位(GCJ-02)→WGS-84，GPS 原样（v1.2.0）
+        val loc = LocGate.normalize(raw)
         lastFix = loc
         if (_b == null) return
         val la = loc.latitude; val lo = loc.longitude
-        b.tvLat.text = "纬度 ${GeoKit.fmt7(la)}${if (prefs.coordGcj) "" else ""}"
+        b.tvLat.text = "纬度 ${GeoKit.fmt7(la)}"
         b.tvLon.text = "经度 ${GeoKit.fmt7(lo)}"
         val g = GeoKit.wgs2gcj(la, lo)
         b.tvGcj.text = "GCJ-02 ${GeoKit.fmt7(g[0])}, ${GeoKit.fmt7(g[1])}"
-        b.tvAcc.text = "±${"%.1f".format(loc.accuracy)} m"
+        val src = if (LocGate.isNetwork(raw)) "网络" else "GPS"
+        b.tvAcc.text = "±${"%.1f".format(loc.accuracy)} m · $src"
         b.tvSats.text = getString(R.string.satellites, satsUsed, satsInView)
-        if (averaging && loc.accuracy <= 30f) {
+        // 标定采样：仅采 GPS 源（网络定位精度不足且坐标制式不同）
+        if (averaging && !LocGate.isNetwork(raw) && loc.accuracy <= 30f) {
             samples.add(doubleArrayOf(la, lo, loc.accuracy.toDouble()))
         }
     }

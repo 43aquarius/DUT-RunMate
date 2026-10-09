@@ -22,6 +22,7 @@ import com.dut.runmate.data.CheckpointStore
 import com.dut.runmate.data.Prefs
 import com.dut.runmate.data.api.ApiStore
 import com.dut.runmate.geo.GeoKit
+import com.dut.runmate.geo.LocGate
 import com.dut.runmate.net.Http
 import com.dut.runmate.run.DetectEngine
 import com.dut.runmate.run.RunBus
@@ -55,6 +56,8 @@ class RunTrackerService : Service() {
     private var fixCount = 0
     private var lastFix: Location? = null
     private var lastNotif = 0L
+    // 定位源缓存（坐标已归一 WGS-84）：GPS 优先，网络仅兑底
+    private var lastGpsFix: Location? = null
 
     private val locListener = LocationListener { loc -> onFix(loc) }
 
@@ -91,7 +94,7 @@ class RunTrackerService : Service() {
         }
 
         startAt = SystemClock.elapsedRealtime()
-        sessionMeters = 0.0; fixCount = 0; lastFix = null
+        sessionMeters = 0.0; fixCount = 0; lastFix = null; lastGpsFix = null
 
         // 前台服务 + 常驻通知
         val n = buildNotification("定位中…")
@@ -159,7 +162,17 @@ class RunTrackerService : Service() {
         }
     }
 
-    private fun onFix(loc: Location) {
+    private fun onFix(raw: Location) {
+        // v1.2.0：坐标归一（网络定位 GCJ-02 → WGS-84），GPS 优先策略：
+        // GPS 新鲜（20s 内）时忽略网络定位，避免低精度坐标使检测圈抖动。
+        val loc = LocGate.normalize(raw)
+        if (LocGate.isNetwork(raw)) {
+            val gpsFresh = lastGpsFix != null &&
+                (raw.elapsedRealtimeNanos - lastGpsFix!!.elapsedRealtimeNanos) < 20_000_000_000L
+            if (gpsFresh) return
+        } else {
+            lastGpsFix = loc
+        }
         if (loc.accuracy > 60f) return
         val eng = engine ?: return
         val now = SystemClock.elapsedRealtime()

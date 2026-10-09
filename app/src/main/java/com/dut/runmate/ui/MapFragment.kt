@@ -20,6 +20,7 @@ import com.dut.runmate.data.CheckpointStore
 import com.dut.runmate.data.Prefs
 import com.dut.runmate.databinding.FragmentMapBinding
 import com.dut.runmate.geo.GeoKit
+import com.dut.runmate.geo.LocGate
 import com.dut.runmate.map.AmapTileSource
 import com.dut.runmate.run.RunBus
 import kotlinx.coroutines.launch
@@ -42,7 +43,11 @@ import kotlin.math.sin
  *
  * 坐标策略（关键）：所有点位一律以 WGS-84（原始 GPS）存储；
  * 地图显示时 WGS-84 → GCJ-02（toDisplay），点选/拖动落点时 GCJ-02 → WGS-84（fromDisplay）。
- * 长按或点按空白处添加点位、拖动图标微调、点按图标编辑、检测半径圈、操场环线参考。
+ * v1.2.0 起：定位源经 LocGate 归一（网络定位 GCJ-02 → WGS-84），GPS 优先展示，
+ * 蓝点附带精度圈，网络定位显示为灰点。
+ *
+ * 选点流程（v1.2.0）：点按/长按地图 → 放置橙色准星（可拖动微调）→
+ * 底部确认栏核对 WGS-84 坐标 → 「确认添加」打开点位信息表单。
  */
 class MapFragment : Fragment() {
 
@@ -55,12 +60,16 @@ class MapFragment : Fragment() {
     private val circles = mutableListOf<Polygon>()
     private val markers = mutableListOf<Marker>()
     private var myLocMarker: Marker? = null
+    private var myAccCircle: Polygon? = null
     private var locMgr: LocationManager? = null
 
-    private val locListener = LocationListener { l: Location ->
-        if (_b == null) return@LocationListener
-        showMyLocation(l.latitude, l.longitude)
-    }
+    // 选点（准星）状态
+    private var pickMarker: Marker? = null
+    private var pickWgs: DoubleArray? = null
+
+    // 定位缓存（坐标已经 LocGate 归一为 WGS-84）
+    private var lastGpsFix: Location? = null
+    private var lastNetFix: Location? = null
 
     // 大工凌水校区中心（WGS-84）
     private val campusWgs = doubleArrayOf(39.0853, 121.8085)
@@ -93,20 +102,14 @@ class MapFragment : Fragment() {
         b.map.controller.setCenter(toDisplay(campusWgs[0], campusWgs[1]))
         applyTileSource()
 
-        // 事件层（底部）：空白处点按/长按 → 新增点位（落点 GCJ-02 → 转 WGS-84 存储）
+        // 事件层（底部）：空白处点按/长按 → 放置选点准星（不直接建点，先确认）
         b.map.overlays.add(0, MapEventsOverlay(object : MapEventsReceiver {
             override fun singleTapConfirmedHelper(p: GeoPoint?): Boolean {
-                if (p != null) {
-                    val w = fromDisplay(p)
-                    openAddSheet(w[0], w[1])
-                }
+                if (p != null) placePick(p)
                 return true
             }
             override fun longPressHelper(p: GeoPoint?): Boolean {
-                if (p != null) {
-                    val w = fromDisplay(p)
-                    openAddSheet(w[0], w[1])
-                }
+                if (p != null) placePick(p)
                 return true
             }
         }))
@@ -122,23 +125,19 @@ class MapFragment : Fragment() {
         b.chipRoute.setOnCheckedChangeListener { _, c2 -> setRouteVisible(c2) }
 
         // 回到我（GPS 为 WGS-84，显示前转 GCJ-02）
-        b.fabLocate.setOnClickListener {
-            val f = RunBus.state.value.fix
-            if (f != null) {
-                b.map.controller.animateTo(toDisplay(f.latitude, f.longitude))
-                b.map.controller.setZoom(19.0)
-            } else {
-                android.widget.Toast.makeText(requireContext(), "暂无定位（先开始跑步或在标定页等待GPS）", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }
+        b.fabLocate.setOnClickListener { locateMe() }
 
-        // 我的位置（蓝点，GPS WGS-84 → GCJ-02 显示；不使用 MyLocationNewOverlay，避免偏移）
+        // 我的位置（蓝点，坐标已归一 WGS-84 → GCJ-02 显示；不使用 MyLocationNewOverlay）
         viewLifecycleOwner.lifecycleScope.launch {
             RunBus.state.collect { st ->
                 val fix = st.fix ?: return@collect
-                showMyLocation(fix.latitude, fix.longitude)
+                showMyLocation(fix.latitude, fix.longitude, fix.accuracy, LocGate.isNetwork(fix))
             }
         }
+
+        // 选点确认栏
+        b.btnPickOk.setOnClickListener { confirmPick() }
+        b.btnPickCancel.setOnClickListener { clearPick() }
 
         if (!prefs.mapHintShown) {
             prefs.mapHintShown = true
@@ -150,6 +149,39 @@ class MapFragment : Fragment() {
 
     private fun applyTileSource() {
         b.map.setTileSource(if (prefs.tileSat) AmapTileSource.SATELLITE else AmapTileSource.STREET)
+    }
+
+    private fun locateMe() {
+        val f = RunBus.state.value.fix ?: bestFix()
+        if (f != null) {
+            b.map.controller.animateTo(toDisplay(f.latitude, f.longitude))
+            b.map.controller.setZoom(19.0)
+            if (LocGate.isNetwork(f)) {
+                android.widget.Toast.makeText(
+                    requireContext(), R.string.map_loc_net_toast, android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        } else {
+            android.widget.Toast.makeText(
+                requireContext(), R.string.map_loc_none, android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    /** GPS 新鲜（30s 内）优先，否则用最近一次网络定位 */
+    private fun bestFix(): Location? {
+        val g = lastGpsFix
+        if (g != null && System.nanoTime() - g.elapsedRealtimeNanos < 30_000_000_000L) return g
+        return lastNetFix ?: g
+    }
+
+    private val locListener = LocationListener { raw: Location ->
+        if (_b == null) return@LocationListener
+        val loc = LocGate.normalize(raw)
+        if (LocGate.isNetwork(raw)) lastNetFix = loc else lastGpsFix = loc
+        bestFix()?.let {
+            showMyLocation(it.latitude, it.longitude, it.accuracy, LocGate.isNetwork(it))
+        }
     }
 
     private fun setRouteVisible(on: Boolean) {
@@ -189,22 +221,26 @@ class MapFragment : Fragment() {
         b.map.invalidate()
     }
 
-    private fun addCpOverlays(cp: Checkpoint) {
-        // 存储的 WGS-84 中心 → GCJ-02 显示中心
-        val g = GeoKit.wgs2gcj(cp.lat, cp.lon)
-        val cLat = g[0]; val cLon = g[1]
-
-        // 半径圈（在显示坐标系里画，半径换算误差 < 1 cm，可忽略）
-        val poly = Polygon(b.map)
+    /** 以 (cLat,cLon) 为中心、r 米为半径的圆周点（显示坐标系内画，半径误差 < 1cm 可忽略） */
+    private fun circlePts(cLat: Double, cLon: Double, r: Double): ArrayList<GeoPoint> {
         val pts = ArrayList<GeoPoint>(49)
-        val r = cp.radius.toDouble()
         val dLat = r / 111320.0
         val dLon = r / (111320.0 * cos(Math.toRadians(cLat)))
         for (i in 0..48) {
             val ang = 2 * Math.PI * i / 48
             pts.add(GeoPoint(cLat + dLat * sin(ang), cLon + dLon * cos(ang)))
         }
-        poly.points = pts
+        return pts
+    }
+
+    private fun addCpOverlays(cp: Checkpoint) {
+        // 存储的 WGS-84 中心 → GCJ-02 显示中心
+        val g = GeoKit.wgs2gcj(cp.lat, cp.lon)
+        val cLat = g[0]; val cLon = g[1]
+
+        // 半径圈
+        val poly = Polygon(b.map)
+        poly.points = circlePts(cLat, cLon, cp.radius.toDouble())
         poly.outlinePaint.color = ContextCompat.getColor(requireContext(), R.color.md_secondary)
         poly.outlinePaint.strokeWidth = 2.5f
         poly.fillPaint.color = Color.argb(26, 17, 81, 255)
@@ -237,6 +273,56 @@ class MapFragment : Fragment() {
         b.map.overlays.add(mk)
     }
 
+    // ---------- 选点（准星）流程 ----------
+
+    /** 在地图上放置/移动选点准星，并弹出确认栏 */
+    private fun placePick(p: GeoPoint) {
+        val bb = _b ?: return
+        bb.tvMapHint.visibility = View.GONE
+        if (pickMarker == null) {
+            val mk = Marker(bb.map)
+            mk.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)   // 准星几何中心 = 精确坐标
+            mk.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_crosshair)
+            mk.isDraggable = true
+            mk.setOnMarkerClickListener { _, _ -> true }               // 消费点击，不弹窗
+            mk.setOnMarkerDragListener(object : Marker.OnMarkerDragListener {
+                override fun onMarkerDrag(marker: Marker) { updatePickCoords(marker.position) }
+                override fun onMarkerDragEnd(marker: Marker) { updatePickCoords(marker.position) }
+                override fun onMarkerDragStart(marker: Marker) { }
+            })
+            pickMarker = mk
+            bb.map.overlays.add(mk)
+        }
+        pickMarker?.position = p
+        bb.pickBar.visibility = View.VISIBLE
+        updatePickCoords(p)
+        bb.map.invalidate()
+    }
+
+    private fun updatePickCoords(p: GeoPoint) {
+        val bb = _b ?: return
+        val w = fromDisplay(p)
+        pickWgs = w
+        bb.tvPickCoords.text = getString(
+            R.string.map_pick_coords, GeoKit.fmt6(w[0]), GeoKit.fmt6(w[1])
+        )
+    }
+
+    private fun confirmPick() {
+        val w = pickWgs
+        clearPick()
+        if (w != null) openAddSheet(w[0], w[1])
+    }
+
+    private fun clearPick() {
+        val bb = _b ?: return
+        pickMarker?.let { bb.map.overlays.remove(it) }
+        pickMarker = null
+        pickWgs = null
+        bb.pickBar.visibility = View.GONE
+        bb.map.invalidate()
+    }
+
     private fun openAddSheet(lat: Double, lon: Double) {
         CheckpointSheet.show(this, store, null, lat, lon) { rebuild() }
     }
@@ -245,17 +331,32 @@ class MapFragment : Fragment() {
         CheckpointSheet.show(this, store, cp) { rebuild() }
     }
 
-    /** 把 WGS-84 定位画到地图（蓝点，自动创建） */
-    private fun showMyLocation(lat: Double, lon: Double) {
+    /** 把 WGS-84 定位画到地图：GPS 蓝点 / 网络灰点 + 精度圈 */
+    private fun showMyLocation(lat: Double, lon: Double, acc: Float, network: Boolean) {
         val bb = _b ?: return
         val dp = toDisplay(lat, lon)
+
+        // 精度圈（数值有效时）
+        if (acc > 0f && acc < 500f) {
+            val circle = myAccCircle ?: Polygon(bb.map).also { p ->
+                p.outlinePaint.color = Color.argb(170, 33, 150, 243)
+                p.outlinePaint.strokeWidth = 1.2f
+                p.fillPaint.color = Color.argb(22, 33, 150, 243)
+                myAccCircle = p
+                bb.map.overlays.add(p)
+            }
+            circle.points = circlePts(dp.latitude, dp.longitude, acc.toDouble())
+        }
+
         val mk = myLocMarker ?: Marker(bb.map).also { m ->
             m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-            m.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_myloc)
             m.isDraggable = false
             myLocMarker = m
             bb.map.overlays.add(m)
         }
+        mk.icon = ContextCompat.getDrawable(
+            requireContext(), if (network) R.drawable.ic_myloc_net else R.drawable.ic_myloc
+        )
         mk.position = dp
         bb.map.invalidate()
     }
@@ -263,7 +364,7 @@ class MapFragment : Fragment() {
     override fun onResume() {
         super.onResume()
         rebuild()
-        // 不开跑步服务也能看到自身位置：独立监听系统定位
+        // 不开跑步服务也能看到自身位置：独立监听系统定位（坐标经 LocGate 归一）
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
             == PackageManager.PERMISSION_GRANTED) {
             try {
@@ -282,6 +383,15 @@ class MapFragment : Fragment() {
 
     override fun onDestroyView() {
         _b = null
+        // 视图销毁：清空所有绑定旧 MapView 的覆盖物引用，视图重建后全部重画
+        // （否则蓝点/精度圈/准星持有已销毁地图的 Marker，切页返回后不再显示）
+        routeLine = null
+        circles.clear()
+        markers.clear()
+        myLocMarker = null
+        myAccCircle = null
+        pickMarker = null
+        pickWgs = null
         super.onDestroyView()
     }
 }

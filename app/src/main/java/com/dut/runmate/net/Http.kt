@@ -63,7 +63,8 @@ object Http {
     }
 
     /**
-     * 按 dot 路径提取数值，支持数组下标：data.0.distance / data.runDistance / distance
+     * 按 dot 路径提取数值，支持数组下标：data.0.distance / data.runDistance / distance。
+     * 字符串值先直接转数，失败则提取首个数字（兼容实测的 "2700米"、"3.5km" 等格式）。
      */
     fun extractDouble(body: String, path: String): Double? {
         if (body.isBlank() || path.isBlank()) return null
@@ -82,11 +83,16 @@ object Http {
             }
             when (cur) {
                 is Number -> cur.toDouble()
-                is String -> cur.toDoubleOrNull()
+                is String -> parseNum(cur)
                 else -> null
             }
         } catch (_: Exception) { null }
     }
+
+    /** "2700米"/"2700"→2700.0；"无"/""→null */
+    private fun parseNum(s: String): Double? =
+        s.trim().toDoubleOrNull()
+            ?: Regex("[-+]?\\d+(?:\\.\\d+)?").find(s.trim())?.value?.toDoubleOrNull()
 
     fun pretty(body: String): String {
         if (body.isBlank()) return "(空)"

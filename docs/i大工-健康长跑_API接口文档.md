@@ -2,17 +2,21 @@
 
 > 适用对象：本人调试用途（配合《跑伴 RunMate》App 的「接口」页）
 > 逆向基线：i大工 3.3.12.75026（`cn.edu.dlut.ws`，微哨 Ruijie Whistle 平台）
-> 文档日期：2026-10-08
+> 文档日期：2026-10-08 · **v1.2.0 更新：已接入实机抓包验证（§3 全部为实测数据，敏感 ID 已脱敏）**
 
 ---
 
 ## 0. 一句话结论（先读这里）
 
-**健康长跑的「业务接口」（查询跑步距离/打卡点列表/成绩）不在 APK 静态代码里。**
-该模块是运行时从服务器下发的 **H5 页面**（微哨 WebView 架构），8 个打卡点坐标、跑步距离等数据全部由 H5 页面通过 **XHR** 在运行时请求。因此：
+**健康长跑的「业务接口」已通过实机抓包 100% 确认（§3）**：核心是
+`POST /service/mobile/extExercise/findExtExercise`，一次调用即返回本次跑步的全部状态（官方距离/打卡明细/规则参数），且**健康长跑的打卡机制是「田径场 RFID 读卡器计圈」，不是 GPS 轨迹**——官方距离随经过读卡器（E/F/G/H）每次 +100m 阶跃累计。
 
-- ✅ APK 内**能 100% 确认**的，是「基础设施 API」：认证、RPC 通道、域名、Cookie 注入机制 —— 本文 §2/§3 全部给出；
-- ⚠️ 健康长跑的「业务 API」需要**一次抓包**（10 分钟，步骤见 §5），抓到后按 §6 填进跑伴 App 即可完成「查询跑步距离接口」的调试与联动。
+因此：
+
+- ✅ 跑伴 App 的「API 判定」完全可行：进圈后轮询 `pmDel.distance`，**距离出现阶跃增量（≥100m）即打卡成功**；
+- ✅ 距离字段是字符串（如 `"2700米"`），跑伴 v1.2.0 起已支持自动提取；
+- ⚠️ 接口在内网 `202.118.65.138:8081`：**校内 Wi-Fi 可直连（明文 HTTP）**；校外须走 WebVPN 隐道（§3.4）；
+- ⚠️ 实时推送另有 WebSocket 通道，但帧体为二进制（不可直接解析），轮询 findExtExercise 更实用。
 
 ---
 
@@ -90,25 +94,122 @@ GET /whistlenew/index.php?m=confInfo&a=getDlutAddress&stage=
 
 ---
 
-## 3. 健康长跑业务 API（待抓包项，按此格式记录）
+## 3. 健康长跑业务 API（v1.2.0 实测抓包确认）
 
-抓包时把每个请求按下面模板登记（示例为占位，**以你实抓为准**）：
+> 以下全部来自 2026-10-08 晚跑实机抓包（HttpCanary，Android 14，i大工 3.3.12.75026）。
+> userId / tagId / Authorization 令牌已脱敏（保留前 8 位），完整值在你自己的抓包里。
+
+### 3.1 核心接口：findExtExercise
+
+**一次调用返回本次跑步全部状态**（跑步中每分钟级轮询即可）：
 
 ```
-【接口 N：查询跑步距离】
-方法：GET/POST
-URL：https://？（预期在 service.m.dlut.edu.cn / lightapp.m.dlut.edu.cn / 其他校内域）
-请求头：Cookie: skey=...; TGT=...（或 Authorization: Bearer ...）
-参数：学生ID/记录ID/学期 等
-响应示例：{ "code":0, "data": { "distance": 1234.5, "checkPoints": [...] , ... } }
-距离字段路径：data.distance        ← 跑伴 App「接口」页的「距离字段路径」填这个
+【接口 1：查询跑步状态/距离（核心）】
+方法：POST
+内网真实地址：http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise
+（校外 WebVPN 隐道地址见 §3.4）
+
+请求头（实抓）：
+  Authorization: 721b86ba…:2072f587…   ← 格式为「userId:accessToken」（微哨令牌）
+  Content-Type:  application/json;charset=UTF-8
+  User-Agent:    Mozilla/5.0 (Linux; Android 14; …) … weishao(3.3.12.75026)
+  X-Requested-With: cn.edu.dlut.ws
+  Cookie:        wengine_vpn_ticket=…;（走 WebVPN 时必需，见 §3.4）
+
+请求体（JSON）：
+{"userId":"721b86ba…","amId":"0dc11c41…","pmId":"87fd7843…","sign":"A549594F…"}
+  · amId / pmId：早操/晚跑两条规则的 ID（响应里 amDel/pmDel 一一对应）
+  · sign：40 位大写十六进制（SHA-1 样式），由 H5 计算后携带；会话内多次调用值相同，
+    直接照抄实抓值即可使用
+
+距离字段路径（跑伴 App 填这个）：pmDel.distance
 ```
 
-**识别特征**（抓包时怎么认出它）：
-1. 打开 i大工 → 体质测评 → 健康长跑，进入跑步页面；
-2. 出现频率最高、响应里带 **数值型 `distance`/`length`/`mileage`（单位米，持续增长）** 的 XHR 就是「查询跑步距离」接口；
-3. 响应里若带 **打卡点数组**（含 lat/lng 成对出现），就是点位配置接口 —— 顺带抄下 8 个点位坐标（注意 §4 坐标系）；
-4. 通常还有「开始跑步/提交跑步」的 POST，**调试时可只读不写**（不要主动提交，避免污染成绩数据）。
+**响应结构（实测，已脱敏）：**
+
+```json
+{
+  "tagNumber": "0580a022…",              // 用户 RFID 标签号（WebSocket 通道也用它）
+  "pmDel": {                              // 晚跑规则（pm）本次状态
+    "start_time": "2026-10-08 21:15:13",
+    "end_time":   "2026-10-08 21:48:34",
+    "time": "00时33分21秒",                // 已用时
+    "distance": "2700米",                 // ★ 官方距离（字符串！随打卡 +100m 阶跃）
+    "requireDistance": 3000,              // 达标距离（米，数值型）
+    "require_time": "00:50:00",           // 限时
+    "exercise_run_status": "1",           // 1=跑步中 0=未在跑
+    "issuccess": "0",                     // 本次是否达标
+    "reason": "距离不满足要求",
+    "pass_status": "-1",
+    "area_name": "西部校区田径场",          // 本次场地
+    "path": "FFGHEFGHEFGHEFGHEGEFGEGHE",  // ★ 打卡序列（每字符=一次读卡器命中）
+    "tag_path": [                          // ★ 打卡明细数组（每命中一条）
+      {"reader_id":"E","date_time":"2026-10-08 21:48:34",
+       "data_value":"aaE10580a022…0001…FS","tag_id":"0580a022…"},
+      …
+    ],
+    "ischeat": "0",                       // 作弊标记
+    "ruleStartTime": "13:30:00", "ruleEndTime": "22:00:00",  // 有效时段
+    "running_countdown_time": 298,        // （结束前）倒计时秒数
+    "gender": "m", "grade": "3", "schoolyear": "2026", "term": "first"
+  },
+  "amDel": { … },                          // 早操规则状态（本次为空）
+  "message": "获取信息成功", "status": "PASS"
+}
+```
+
+### 3.2 打卡机制实锤（重要，修正先前推断）
+
+- **不是 GPS 轨迹判定**：全程请求里没有任何坐标上传；官方距离由 **田径场 RFID 读卡器** 驱动；
+- 西部田径场共观测到 4 台读卡器（`reader_id` = E/F/G/H），佩戴的 RFID 标签（`tag_id`，即 `tagNumber`）
+  每经过一台 +100m：本次 27 次命中 = 2700 米，与 `distance:"2700米"` 严格一致；
+- `data_value` 为读卡器原始帧：`aa` + `E1/E2/F2/F3/G0/H2`（读卡器号+方向号） + 标签号 + 序号 + 时间戳 + `FS` 帧尾；
+- 对跑伴用户的含义：**检测圈应设在操场跑道边读卡器附近**，打卡成功的判据就是
+  `pmDel.distance` 出现 +100m 阶跃（默认阈值 3m 即可，阶跃必然触发）；
+- 不同规则（早操/晚跑/其他场地）的读卡器布设可能不同，以自己抓包的 `area_name` 为准。
+
+### 3.3 WebSocket 实时通道（记录，暂不利用）
+
+```
+GET(wss) https://webvpn.dlut.edu.cn/ws-8081/<加密前缀>/service/webSocket/<tagNumber>
+→ 101 Switching Protocols，后续帧为二进制（压缩/加密），无法直接解析。
+```
+
+官方 App 用它接收实时推送；跑伴采用轮询 findExtExercise，实测信息完全够用。
+
+### 3.4 WebVPN 隧道（校外访问必读）
+
+实测抓包环境为 **WebVPN 隧道**（不在校园网）：
+
+```
+https://webvpn.dlut.edu.cn/http-8081/<用户专属加密前缀>/service/mobile/extExercise/findExtExercise?vpn-12-o1-202.118.65.138:8081
+```
+
+- `<加密前缀>`：与账号绑定的长十六串（含 `key@` 字样），每个用户不同；
+- 必须携带 Cookie：`wengine_vpn_ticket=…`（有效期有限，过期重抓）；
+- **校园网内（dlut Wi-Fi）可无视上述一切，直接明文 HTTP 访问 `http://202.118.65.138:8081/...`**；
+- 跑伴「接口」页两种都支持：校内直连填内网 URL；校外把 WebVPN 隐道 URL 整条粘进去，
+  请求头 JSON 里带上 `Authorization` 与 `Cookie`（`{token}` 占位符会替换令牌）。
+
+### 3.5 跑伴 App 推荐配置（照抄即可）
+
+```
+方法：POST
+URL：http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise
+     （校外换成 WebVPN 隐道 URL）
+请求头 JSON：
+{
+  "Authorization": "<userId>:<accessToken>",
+  "Content-Type": "application/json;charset=UTF-8",
+  "User-Agent": "Mozilla/5.0 (Linux; Android 14) … weishao(3.3.12.75026)"
+}
+请求体 JSON：{"userId":"…","amId":"…","pmId":"…","sign":"…"}
+距离字段路径：pmDel.distance
+```
+
+> 以上 userId/amId/pmId/sign/Authorization 全部照抄你自己抓包里的值
+>（抓包方法见 §5）。`pmDel.distance` 为 `"2700米"` 样式字符串，跑伴 v1.2.0
+> 起自动提取首个数字，无需处理。
 
 ---
 
@@ -116,10 +217,13 @@ URL：https://？（预期在 service.m.dlut.edu.cn / lightapp.m.dlut.edu.cn / �
 
 | 坐标系 | 谁在用 | 说明 |
 |---|---|---|
-| **WGS-84** | 手机 GPS 原始定位、osmdroid/Esri 卫星图、OSM | 跑伴 App 内部一律用 WGS-84 存储与检测 |
-| **GCJ-02** | 高德系 SDK/地图（i大工 App 使用高德定位 SDK）、国测局加密 | 与 WGS-84 在大连有 **约 300~500m 系统偏移** |
+| **WGS-84** | 手机 GPS 原始定位、osmdroid | 跑伴 App 内部一律用 WGS-84 存储与检测 |
+| **GCJ-02** | 高德系 SDK/地图（i大工 App 使用高德定位 SDK）、国测局加密 | 与 WGS-84 在大连有 **约 300~500m 系统偏移**（实测校区中心约 450m） |
 
-- 若从抓包里拿到官方打卡点坐标（很可能 GCJ-02），**不能直接**喂给跑伴：跑伴的「编辑打卡点」弹窗里切到 **GCJ-02** 制式输入，App 会自动转换为 WGS-84 再存储（双向换算已内置，显示时两种制式同时展示）。
+- 实抓确认：健康长跑**服务端不收坐标**（RFID 计圈），因此不存在「官方打卡点坐标」可抄；
+  跑伴的检测圈位置由你自己在地图上选点或现场 GPS 标定，坐标系自洽即可；
+- 若从其他渠道拿到 GCJ-02 坐标，在跑伴「编辑打卡点」面板切到 **GCJ-02** 制式输入，
+  App 会自动转换为 WGS-84 再存储（双向换算已内置，显示时两种制式同时展示）；
 - 你现场用 GPS 标定的点位天然就是 WGS-84，与跑伴检测体系自洽，无需换算。
 
 ---
@@ -152,13 +256,9 @@ URL：https://？（预期在 service.m.dlut.edu.cn / lightapp.m.dlut.edu.cn / �
 
 ## 6. 抓到之后：把「查询跑步距离」填进跑伴 App
 
-1. 跑伴 → **接口**页 → 顶部「令牌 Token/Cookie」粘贴你抓包里的 **Cookie 整行**（或 Authorization 值），保存；
-2. 点「跑步距离查询」卡片的 **编辑**：
-   - 方法：GET/POST 按实抓；
-   - URL：粘贴完整 URL（若含学号等固定参数一并粘上）；
-   - 请求头 JSON：如 `{"Cookie":"{token}","User-Agent":"..."}` —— **`{token}` 占位符会被上一步保存的令牌替换**；
-   - 距离字段路径：响应里数值所在位置，如 `data.distance` / `data.runInfo.mileage`（支持数组下标 `data.0.distance`）；
-3. 点 **发送测试**：查看 HTTP 状态、耗时、格式化响应与「提取距离」结果 —— **这一步就是你要的「单独调试查询跑步距离接口」**；
+1. 跑伴 → **接口**页 → 顶部「令牌 Token/Cookie」粘贴你抓包里的 **Authorization 整行**（或 Cookie），保存；
+2. 点「跑步距离查询」卡片的 **编辑**：按 §3.5 模板填方法/URL/请求头/请求体/距离字段路径（`pmDel.distance`），**`{token}` 占位符会被上一步保存的令牌替换**；
+3. 点 **发送测试**：查看 HTTP 状态、耗时、格式化响应与「提取距离」结果 —— **这一步就是你要的「单独调试查询跑步距离接口」**（跑步中反复点，能看到距离从 2700→2800 阶跃）；
 4. 调试通过后：**设置**页 → 打开「API 判定」。此后跑步进入检测圈时，服务自动按该接口轮询距离增量并判定打卡成败（见使用说明）。
 
 ---
@@ -177,5 +277,7 @@ URL：https://？（预期在 service.m.dlut.edu.cn / lightapp.m.dlut.edu.cn / �
 - jadx/apktool 反编译产物：`/home/z/my-project/case/`
 - `CloudConfig.DEFAULT_RELEASE_CONFIG`（com.ruijie.whistle.common.entity）
 - `p004b.p212k.p213a.C1952a`（whistlenew RPC 实例）
-- `LangQi99/dlut-FakeRun`（H5 使用系统定位的佐证 + 操场 KML 路线）
-- 瓦片实测：Esri World Imagery 大工校区可用至 z20（≈0.09m/px）
+- **v1.2.0 实机抓包**（2026-10-08 晚跑，HttpCanary .hcy 原始报文 5 组）：
+  findExtExercise 请求/响应全量、WebSocket 101 握手、wengine-vpn/cookie 会话刷新；
+  打卡机制（RFID 读卡器 E/F/G/H 计圈，+100m/次）即由本次抓包的 `tag_path`×`distance` 交叉验证得出
+- 瓦片实测：高德卫星 webst（实测至 z18）/ 高德矢量 wprd（实测至 z20）

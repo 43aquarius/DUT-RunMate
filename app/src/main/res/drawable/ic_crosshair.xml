@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 选点准星：橙色（与红色打卡图钉、蓝色定位点区分），图标几何中心即精确坐标点 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="46dp"
+    android:height="46dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- 白色底衬（提高卫星图上的对比度） -->
+    <path
+        android:pathData="M12,12 m-9.2,0 a9.2,9.2 0 1,1 18.4,0 a9.2,9.2 0 1,1 -18.4,0"
+        android:strokeColor="#66FFFFFF"
+        android:strokeWidth="3.4"
+        android:fillColor="#00000000" />
+
+    <!-- 外圈 -->
+    <path
+        android:pathData="M12,12 m-8,0 a8,8 0 1,1 16,0 a8,8 0 1,1 -16,0"
+        android:strokeColor="#FF7A00"
+        android:strokeWidth="1.5"
+        android:fillColor="#00000000" />
+
+    <!-- 十字瞄准线（四段，中心留空） -->
+    <path
+        android:pathData="M12,1.6 L12,5.6 M12,18.4 L12,22.4 M1.6,12 L5.6,12 M18.4,12 L22.4,12"
+        android:strokeColor="#FF7A00"
+        android:strokeWidth="1.7"
+        android:strokeLineCap="round" />
+
+    <!-- 中心精确点 -->
+    <path
+        android:pathData="M12,12 m-1.9,0 a1.9,1.9 0 1,1 3.8,0 a1.9,1.9 0 1,1 -3.8,0"
+        android:fillColor="#FF7A00"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0.8" />
+</vector>

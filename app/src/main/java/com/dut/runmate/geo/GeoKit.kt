@@ -16,6 +16,22 @@ object GeoKit {
         lon < 72.004 || lon > 137.8347 || lat < 0.8293 || lat > 55.8271
 
     private fun delta(lat: Double, lon: Double): DoubleArray {
+        // 标准算法：dlat 用 transformLat（-100 式），dlon 用 transformLon（300 式），分母不可互换。
+        // v1.1.0 及之前此处两个函数/分母被互换，导致显示偏移约 570m（大连实测），v1.2.0 修正。
+        var dLat = transformLat(lon - 105.0, lat - 35.0)
+        var dLon = transformLon(lon - 105.0, lat - 35.0)
+        val radLat = lat / 180.0 * PI
+        var magic = sin(radLat)
+        magic = 1 - EE * magic * magic
+        val sqrtMagic = sqrt(magic)
+        dLat = (dLat * 180.0) / ((A * (1 - EE)) / (magic * sqrtMagic) * PI)
+        dLon = (dLon * 180.0) / (A / sqrtMagic * cos(radLat) * PI)
+        return doubleArrayOf(dLat, dLon)
+    }
+
+    /** v1.1.0 及之前的错误 wgs2gcj（仅用于历史点位一次性迁移，勿作他用） */
+    fun legacyBrokenWgs2gcj(lat: Double, lon: Double): DoubleArray {
+        if (outOfChina(lat, lon)) return doubleArrayOf(lat, lon)
         var dLat = transformLon(lon - 105.0, lat - 35.0)
         var dLon = transformLat(lon - 105.0, lat - 35.0)
         val radLat = lat / 180.0 * PI
@@ -24,7 +40,17 @@ object GeoKit {
         val sqrtMagic = sqrt(magic)
         dLat = (dLat * 180.0) / ((A / sqrtMagic) * cos(radLat) * PI)
         dLon = (dLon * 180.0) / (A / sqrtMagic * PI)
-        return doubleArrayOf(dLat, dLon)
+        return doubleArrayOf(lat + dLat, lon + dLon)
+    }
+
+    /**
+     * 历史错误存储坐标 → 正确 WGS-84（v1.2.0 数据迁移专用）。
+     * 旧版点选坐标 q 满足 legacyBrokenWgs2gcj(q) = 用户当时点选的 GCJ 位置，
+     * 故先用旧算法还原当时位置，再用修正后的 gcj2wgs 求真 WGS-84。
+     */
+    fun migrateLegacyWgs(lat: Double, lon: Double): DoubleArray {
+        val tapGcj = legacyBrokenWgs2gcj(lat, lon)
+        return gcj2wgs(tapGcj[0], tapGcj[1])
     }
 
     private fun transformLat(x: Double, y: Double): Double {

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 我的位置（网络定位源）：灰色圆点带白描边，与 GPS 蓝点区分 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#3378909C" />
+            <size android:width="28dp" android:height="28dp" />
+        </shape>
+    </item>
+    <item android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="#78909C" />
+            <stroke android:width="2dp" android:color="#FFFFFF" />
+            <size android:width="14dp" android:height="14dp" />
+        </shape>
+    </item>
+</layer-list>

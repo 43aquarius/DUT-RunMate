@@ -1,5 +1,6 @@
 package com.dut.runmate.data
 
+import com.dut.runmate.geo.GeoKit
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -74,8 +75,33 @@ class CheckpointStore private constructor(private val file: File) {
                 inst ?: CheckpointStore(File(dir, "checkpoints.json")).also { s ->
                     inst = s
                     s.load()
+                    s.migrateGeoV2()
                 }
             }
+
+        /**
+         * v1.2.0 一次性迁移：v1.1.0 及之前 GCJ-02 换算实现有误，
+         * 地图点选录入（source=map/manual）的存储坐标是「假 WGS」（实际偏移约 450~570m）。
+         * 现场标定（source=gps）直接存 GPS 原始值，不受影响。
+         * 迁移公式（已在脚本中验证，残差 0.0cm）：真WGS = gcj2wgs(旧算法还原出的点选位置)。
+         */
+        private fun CheckpointStore.migrateGeoV2() {
+            val marker = File(file.parentFile, "geo_migration_v2.done")
+            if (marker.exists()) return
+            try {
+                var changed = 0
+                list.forEach { cp ->
+                    if (cp.source == "map" || cp.source == "manual") {
+                        val w = GeoKit.migrateLegacyWgs(cp.lat, cp.lon)
+                        cp.lat = w[0]
+                        cp.lon = w[1]
+                        changed++
+                    }
+                }
+                if (changed > 0) persist()
+            } catch (_: Exception) { }
+            try { marker.createNewFile() } catch (_: Exception) { }
+        }
 
         private fun CheckpointStore.load() {
             if (!file.exists()) return
