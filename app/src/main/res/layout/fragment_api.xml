@@ -85,6 +85,24 @@
                     android:layout_height="wrap_content" android:layout_marginTop="6dp"
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant" android:text="" />
+
+                <!-- v1.7.0 多账号：已保存账号 chips（点击切换为当前账号；长按删除；「＋」清空输入框录入新账号） -->
+                <HorizontalScrollView
+                    android:id="@+id/scrollAccounts"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp" android:scrollbars="none"
+                    android:visibility="gone">
+                    <LinearLayout
+                        android:id="@+id/layAccounts" android:orientation="horizontal"
+                        android:layout_width="wrap_content" android:layout_height="wrap_content" />
+                </HorizontalScrollView>
+
+                <!-- v1.7.0 多账号：逐个用各账号自己的令牌/接口快照查询距离，汇总展示 -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnQueryAll" style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:visibility="gone"
+                    android:text="@string/acct_btn_query_all" />
             </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout

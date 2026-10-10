@@ -76,6 +76,15 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         get() = sp.getString("casTgt", "") ?: ""
         set(v) = sp.edit().putString("casTgt", v).apply()
 
+    /**
+     * v1.7.0：多账号列表（JSON 数组，主键 = 学号，结构见 data/Accounts.kt）。
+     * 活跃账号仍存于上方旧字段（wsNumber/apiToken/…），切换 = 快照回列表 + 写入目标，
+     * 既有跑步轮询/发送测试/H5 捕获逻辑零改动。
+     */
+    var accountsJson: String
+        get() = sp.getString("accountsJson", "") ?: ""
+        set(v) = sp.edit().putString("accountsJson", v).apply()
+
     var tileSat: Boolean
         get() = sp.getBoolean("tileSat", true)
         set(v) = sp.edit().putBoolean("tileSat", v).apply()

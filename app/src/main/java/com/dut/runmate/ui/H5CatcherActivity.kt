@@ -604,6 +604,23 @@ class H5CatcherActivity : AppCompatActivity() {
         // 4) 回填微哨会话（H5 换来的 userId 与登录一致时仅刷新显示）
         if (prefs.wsUserId.isBlank()) prefs.wsUserId = userId
 
+        // 4.5) v1.7.0 多账号入库：当前登录者整套配置快照保存（学号为主键，
+        //      重复捕获自动合并更新）——「查询全部账号距离」与账号切换的数据源
+        try {
+            val accNumber = number.ifBlank { prefs.wsNumber }.trim()
+            if (accNumber.isNotBlank()) {
+                com.dut.runmate.data.Accounts.upsert(prefs, store, com.dut.runmate.data.WsAccount(
+                    number = accNumber, name = prefs.wsName, pwdB64 = prefs.wsPwdSaved,
+                    wsUserId = prefs.wsUserId, wsSkey = prefs.wsSkey, casTgt = prefs.casTgt,
+                    apiToken = prefs.apiToken, apiCookie = prefs.apiCookie,
+                    apiUrl = absUrl, apiHeaders = p.headers, apiBody = body.toString(),
+                    apiDistPath = ApiStore.DIST_PATH,
+                    capturedAt = System.currentTimeMillis()
+                ))
+            }
+        } catch (_: Exception) {
+        }
+
         vibrate()
         setStatus(getString(R.string.h5_status_captured))
         log(getString(R.string.h5_log_captured, userId.take(8), amId.take(8), pmId.take(8), sign.take(8)))

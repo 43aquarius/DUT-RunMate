@@ -2,7 +2,7 @@
 
 > 适用对象：本人调试用途（配合《跑伴 RunMate》App 的「接口」页）
 > 逆向基线：i大工 3.3.12.75026（`cn.edu.dlut.ws`，微哨 Ruijie Whistle 平台）
-> 文档日期：2026-10-08 · **v1.2.0 更新：已接入实机抓包验证（§3 全部为实测数据，敏感 ID 已脱敏）**
+> 文档日期：2026-10-10 · **v1.7.0 更新：服务器 202.118.65.138:8081 角色详解（§2.1）、WebSocket 通道实锤（§3.3）、WebVPN 隧道机制补全（§3.4）、常见错误对照表（§11）、多账号使用说明（§12）**
 
 ---
 
@@ -15,7 +15,8 @@
 
 - ✅ 跑伴 App 的「API 判定」完全可行：进圈后轮询 `pmDel.distance`，**距离出现阶跃增量（≥100m）即打卡成功**；
 - ✅ 距离字段是字符串（如 `"2700米"`），跑伴 v1.2.0 起已支持自动提取；
-- ⚠️ 接口在内网 `202.118.65.138:8081`：**校内 Wi-Fi 可直连（明文 HTTP）**；校外须走 WebVPN 隐道（§3.4）；
+- ✅ 跑伴 v1.7.0 起支持**多账号**：每人一套配置，一键切换、一键查全部人距离（§12）；
+- ⚠️ 接口在内网 `202.118.65.138:8081`（服务器角色详解见 §2.1）：**校内 Wi-Fi 可直连（明文 HTTP）**；校外须走 WebVPN 隧道（§3.4），直连会报 `failed to connect` 超时（§11）；
 - ⚠️ 实时推送另有 WebSocket 通道，但帧体为二进制（不可直接解析），轮询 findExtExercise 更实用。
 
 ---
@@ -48,7 +49,7 @@
 
 ## 2. 已确认的基础设施 API 清单（硬编码提取，100% 确定）
 
-### 2.1 域名与服务器（CloudConfig.DEFAULT_RELEASE_CONFIG）
+### 2.1 域名与服务器（CloudConfig.DEFAULT_RELEASE_CONFIG + 实测补充）
 
 | 用途 | URL | 备注 |
 |---|---|---|
@@ -64,6 +65,34 @@
 | 图标 CDN | `http://whistle.ruijie.com.cn:50202/...` | 明文 HTTP |
 | 内网 API | `http://172.16.56.183:8080/dlutlinkshare/NewsClient.do?` | 明文+内网 |
 | 测试环境 | `https://servicetest.dlut.edu.cn/whistlenew/index.php` 等 | 随生产包分发（信息泄露） |
+| **健康长跑后端**（实测补充，不在 APK 硬编码内） | `http://202.118.65.138:8081` | 见下方「服务器角色详解」 |
+
+**服务器角色详解：202.118.65.138:8081 是什么、负责什么（v1.7.0 增补）**
+
+这是一台**大连理工大学校内教育网服务器**（202.118.65.0/24 为大工地址段），是「体质测评-健康长跑」的**独立后端**，同一台机器上跑着三套东西：
+
+| 路径 | 用途 |
+|---|---|
+| `/mobilenew/` | 健康长跑 H5 前端页面（App 内 WebView 加载的跑步页） |
+| `/service/mobile/extExercise/findExtExercise` 等业务 API | 跑步状态/距离查询、打卡数据（本档主角） |
+| `/service/webSocket/<tagNumber>` | 跑步实时推送（RFID 命中即时下发，见 §3.3） |
+
+服务指纹（实测）：`Server: none`（版本信息抹除）、HTTP/1.1 chunked + gzip、CORS 允许自身 origin
+（`Access-Control-Allow-Origin: http://202.118.65.138:8081` + credentials + Authorization 头）。
+
+**为什么校外请求会异常**：该 IP 只在校园网内可达（教育网内部路由，无公网出口）。手机不在校园网时，
+TCP 连接根本建立不起来，跑伴报：
+
+```
+✗ 请求异常：failed to connect to /202.118.65.138 (port 8081) from /10.31.39.64 (port 47084) after 10000ms
+```
+
+错误里的 `from /10.31.39.64` 是手机本机的出口地址（私网/运营商 NAT 段）——出现它就说明人在校外。
+随后的「未能按路径提取到数值」只是连带现象（响应体为空，`pmDel.distance` 无从提取，路径本身没问题）。
+处置见 §11 表格第一行：连校园网，或用账号登录重新捕获换 WebVPN 隧道地址。
+
+它不在 §2 硬编码清单里的原因：i大工 原生代码里**根本没有这个 IP**——健康长跑业务全部在 H5 里，
+入口链路是 微哨门户 → lightapp H5（mobilenew）→ 校内后端，App 只是个壳（详见逆向报告 §12 增补）。
 
 ### 2.2 RPC 调用模式（i大工自定义，全 APK 唯一一处）
 
@@ -107,7 +136,7 @@ GET /whistlenew/index.php?m=confInfo&a=getDlutAddress&stage=
 【接口 1：查询跑步状态/距离（核心）】
 方法：POST
 内网真实地址：http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise
-（校外 WebVPN 隐道地址见 §3.4）
+（校外 WebVPN 隧道地址见 §3.4）
 
 请求头（实抓）：
   Authorization: 721b86ba…:2072f587…   ← 格式为「userId:accessToken」（微哨令牌）
@@ -168,14 +197,18 @@ GET /whistlenew/index.php?m=confInfo&a=getDlutAddress&stage=
   `pmDel.distance` 出现 +100m 阶跃（默认阈值 3m 即可，阶跃必然触发）；
 - 不同规则（早操/晚跑/其他场地）的读卡器布设可能不同，以自己抓包的 `area_name` 为准。
 
-### 3.3 WebSocket 实时通道（记录，暂不利用）
+### 3.3 WebSocket 实时通道（实测补全，暂不利用）
 
 ```
-GET(wss) https://webvpn.dlut.edu.cn/ws-8081/<加密前缀>/service/webSocket/<tagNumber>
-→ 101 Switching Protocols，后续帧为二进制（压缩/加密），无法直接解析。
+校内真实地址：ws://202.118.65.138:8081/service/webSocket/<tagNumber 前 12 位>
+校外隧道形态：wss://webvpn.dlut.edu.cn/ws-8081/<用户加密前缀>/service/webSocket/<tagNumber 前 12 位>
+→ 101 Switching Protocols（Server: none，permessage-deflate 压缩）
+→ 后续帧为二进制（RFC7692 压缩 + 私有封装），无法直接解析
 ```
 
-官方 App 用它接收实时推送；跑伴采用轮询 findExtExercise，实测信息完全够用。
+实测锚点（2026-10-08 抓包）：隧道 WS 路径标识 `0580a0224f67` 恰为响应里 `tagNumber`
+「0580a022…」的前 12 位 —— **WS 通道按 RFID 标签号寻址**，读卡器命中即经此推送，
+无需鉴权头（仅靠隧道 Cookie / 校内源 IP）。跑伴采用轮询 findExtExercise，实测信息完全够用。
 
 ### 3.4 WebVPN 隧道（校外访问必读）
 
@@ -185,18 +218,30 @@ GET(wss) https://webvpn.dlut.edu.cn/ws-8081/<加密前缀>/service/webSocket/<ta
 https://webvpn.dlut.edu.cn/http-8081/<用户专属加密前缀>/service/mobile/extExercise/findExtExercise?vpn-12-o1-202.118.65.138:8081
 ```
 
-- `<加密前缀>`：与账号绑定的长十六串（含 `key@` 字样），每个用户不同；
-- 必须携带 Cookie：`wengine_vpn_ticket=…`（有效期有限，过期重抓）；
+**隧道机制（wengine 网瑞门户，实测拆解 2026-10）**：
+
+- **路由规则**：`/http-8081/<前缀>/<原始路径>?vpn-12-o1-<host:port>` —— 路由由查询参数
+  `vpn-12-o1-202.118.65.138:8081` 决定；前缀段是与账号绑定的长十六进制加密串（含 `key@` 字样），
+  门户改写 H5 内部请求时自动携带用户真实前缀（沙箱实测：任意前缀也能路由，但建议照抄真实值）。
+  WebSocket 隧道形态为 `/ws-8081/…`；
+- **会话 Cookie**（校外请求必须整行携带）：
+  `show_vpn=0; whistlekey=<微哨skey>; wengine_vpn_ticket=<门户票据>; refresh=0|1`，
+  其中 `wengine_vpn_ticket` 有效期有限，过期后隧道 302 → `/login`（需重新过一遍统一认证）；
+- **H5 侧身份获取**（隐式环节）：H5 会先请求
+  `GET /wengine-vpn/cookie?method=get&host=202.118.65.138&scheme=http&path=/mobilenew/&vpn_timestamp=<毫秒>`，
+  门户返回 `200 text/plain: userid=<32位hex>` —— 即把隧道会话映射回内网系统的 userId，
+  H5 再用它拼 findExtExercise 请求体与 Authorization；
 - **校园网内（dlut Wi-Fi）可无视上述一切，直接明文 HTTP 访问 `http://202.118.65.138:8081/...`**；
-- 跑伴「接口」页两种都支持：校内直连填内网 URL；校外把 WebVPN 隐道 URL 整条粘进去，
-  请求头 JSON 里带上 `Authorization` 与 `Cookie`（`{token}` 占位符会替换令牌）。
+- 跑伴「接口」页两种都支持：校内直连填内网 URL；校外把 WebVPN 隧道 URL 整条粘进去，
+  请求头 JSON 里带上 `Authorization` 与 `Cookie`（`{token}`/`{cookie}` 占位符会替换）。
+  跑伴 v1.4.0+ 的「账号登录 → H5 捕获」会根据校内/校外自动选择并填好整套配置。
 
 ### 3.5 跑伴 App 推荐配置（照抄即可）
 
 ```
 方法：POST
 URL：http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise
-     （校外换成 WebVPN 隐道 URL）
+     （校外换成 WebVPN 隧道 URL）
 请求头 JSON：
 {
   "Authorization": "<userId>:<accessToken>",
@@ -214,7 +259,7 @@ URL：http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise
 > **跑伴 v1.3.0 起**：「接口」页的「健康长跑距离」模板已按上述推荐配置**预填**
 >（含内网直连 URL、Authorization/Content-Type 请求头、pmDel.distance 路径），
 > 只需把抓包的 userId/amId/pmId/sign 填进请求体、令牌粘到令牌栏即可；
-> 校外把 URL 换成 §3.4 的 WebVPN 隐道地址并在请求头补 Cookie。
+> 校外把 URL 换成 §3.4 的 WebVPN 隧道地址并在请求头补 Cookie。
 > 打卡核对判定 = **服务端距离较进区前基线出现增长（≥3m）且此刻正在打卡区域内**；
 > 基线取「进区前最后一次轮询距离」（每 15s 锚点轮询维持新鲜），确保 RFID 注册
 > 先于 App 轮询时也能立即判出 +100m 阶跃。
@@ -289,6 +334,10 @@ URL：http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise
   findExtExercise 请求/响应全量、WebSocket 101 握手、wengine-vpn/cookie 会话刷新；
   打卡机制（RFID 读卡器 E/F/G/H 计圈，+100m/次）即由本次抓包的 `tag_path`×`distance` 交叉验证得出
 - 瓦片实测：高德卫星 webst（实测至 z18）/ 高德矢量 wprd（实测至 z20）
+- **v1.7.0 增补实测**（2026-10-09/10）：沙箱 WebVPN 隧道路由实验（`/http-8081/<任意前缀>` 可路由，
+  未登录 302 → /login，登录后直达）；`/wengine-vpn/cookie` 明文返回 userid 的身份映射实测；
+  WS 路径标识与 tagNumber 前 12 位的对应关系（同一批 .hcy 抓包交叉比对，§3.3）；
+  校外直连 202.118.65.138:8081 TCP 超时实测（跑伴用户报错样本，出口 10.31.39.64，§2.1/§11）
 
 ---
 
@@ -382,3 +431,47 @@ H5 免密通过 → 嗅探器捕获 findExtExercise 全套参数。CAS 页面出
 | 连续 3 次失败（微哨 userLoginCas） | 均返回 94003，不触发验证码（排除验证码假说） |
 | 微哨 + app_version=3.3.12.75026 | 401 {"errcode":8011002,"errmsg":"a is empty"} |
 | 微哨 /n/index.php（云配置 url_main_server） | 404（Spring Boot 网关），/whistlenew 为唯一存活路径 |
+
+---
+
+## 11. 常见错误对照表（实测汇总，v1.7.0）
+
+> 跑伴「发送测试 / 查询距离」报错时按此表对号入座；第一行为本次用户实际遇到的问题。
+
+| 现象（结果卡片显示） | 根因 | 处置 |
+|---|---|---|
+| `✗ 请求异常：failed to connect to /202.118.65.138 (port 8081) from /10.x.x.x … after 10000ms` | **人在校园网外**（from 为私网/运营商 NAT 地址），校内服务器无公网路由，TCP 连不上（§2.1） | 连校园网 Wi-Fi；或校外用「账号登录」重新登录一次，H5 捕获自动换 WebVPN 隧道 URL。v1.7.0 起此场景会自动附根因提示 |
+| `未能按路径提取到数值，请调整路径`（伴随上一条） | 连带现象：请求失败响应体为空，`pmDel.distance` 无从提取；**路径本身没问题** | 先解决连接问题，再谈提取 |
+| `✗ HTTP 401` | Authorization 令牌（userId:token）过期/失效 | 切到该账号 → 「重新捕获 H5 参数」 |
+| HTTP 302 / 响应体是 HTML（含 login 字样） | WebVPN 隧道会话过期（wengine_vpn_ticket 失效被弹回 /login） | 重新登录 + 捕获一次 |
+| HTTP 200 但提取失败 | 响应结构变化（amDel/pmDel 键变化、学期切换、无跑步记录时 pmDel 为空） | 编辑模板「距离字段路径」对照响应体调整；无记录属正常 |
+| 登录报 94003 | 学号或密码错误（统一身份） | 核对密码；改过密码先去 sso.dlut.edu.cn 网页验证 |
+| 登录报 8011002 "a is empty" | 网关拒绝请求参数（带 app_version 的旧客户端特征，§9） | 用跑伴 v1.5.0+（参数集已修正） |
+
+---
+
+## 12. 多账号使用说明（跑伴 v1.7.0+）
+
+场景：帮室友/同学代查健康长跑距离（打卡核对），无需反复改配置。
+
+**数据结构**：每个账号 = 学号（主键）+ 姓名 + 密码（Base64 本机混淆）+ CAS/微哨会话
++ 完整接口快照（URL / 请求头 / 请求体 / 距离路径 / Authorization / 隧道 Cookie），
+全部只存在本机 SharedPreferences，不上传任何服务器。
+
+**操作流程**：
+
+1. 接口页输入对方学号密码 → 「登录并自动配置」→ H5 捕获成功后该账号自动进入账号列表
+   （✓ 为当前账号，未捕获的会标注）；
+2. 点账号 chip 即整套配置秒切（令牌/请求体/会话/令牌框同步刷新，跑步页轮询也跟着切）；
+3. 长按 chip 删除该账号；「＋添加」清空输入框录入下一个同学；
+4. 「查询全部账号距离」：逐账号用自己的快照请求 findExtExercise，汇总弹窗展示各人
+   ✓ 距离 / ✗ 原因（校外直连失败会特别标注），可一键复制结果。
+
+**注意事项**：
+
+- 令牌有有效期——某账号持续报 401 就切过去重新捕获一次；
+- 对方修改过统一身份密码后需用新密码重新登录该账号；
+- 校外查询的前提：每个账号都在校外网络下完成过一次捕获（拿到 WebVPN 隧道 URL + Cookie）。
+  在校内捕获的直连快照，拿到校外同样会 failed to connect（反之亦然，隧道地址在校内也能用，
+  只是多一跳）；
+- 多人凭据集中存在一部手机上，注意保管；官方令牌每次捕获独立，删除账号即删除其全部凭据。

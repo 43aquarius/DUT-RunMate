@@ -1,20 +1,26 @@
 {
   "repo": "43aquarius/DUT-RunMate",
   "latest": {
-    "versionName": "1.6.2",
-    "versionCode": 11,
+    "versionName": "1.7.0",
+    "versionCode": 12,
     "date": "2026-10-10",
-    "apkFile": "DUT-RunMate_v1.6.2.apk",
-    "sha256": "d64a1254b5f7babb95c205aac12533175a55c5942de7f58c490a0efecab36275",
-    "sizeBytes": 5959981,
+    "apkFile": "DUT-RunMate_v1.7.0.apk",
+    "sha256": "2277b92e0bf498d119ef5dbc0209c6c6de2337f9b794b28081fc31a0cb171934",
+    "sizeBytes": 5976553,
     "minSdk": 24,
     "targetSdk": 34,
-    "notes": "【修复】接口测试报错正则异常 · 登录后令牌不自动填充\n\n- 修复「发送测试 / 查询服务端距离」全部报「请求异常 PatternSyntaxException」：旧版在 Cookie 为空时用含 \\{ 转义的正则拼接删除空请求头，该写法在 Android 14+ 的 ICU 正则引擎上无法编译（请求根本没发出去，与网络无关）；本版改为 JSON 解析后逐值替换，彻底移除正则拼接，顺带消除 Cookie 含特殊字符时的注入风险\n- 修复「统一身份登录后令牌不自动填充」：实测 H5 页面一加载就发出 findExtExercise，旧版嗅探器在页面加载完成后才注入、永远错过请求（登录成功但配置不入库的根因）；本版改为拦截 H5 主文档、在任何页面脚本运行前预注入嗅探器，并只采纳 HTTP 200（会话有效）的请求，捕获后回到「接口」页令牌立即刷新\n- 其他：URL 中占位符无值时直接提示「先登录自动配置或手动填令牌」；WebVPN 隧道地址自动修正为用户专属前缀",
-    "githubTag": "v1.6.2",
-    "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.6.2",
-    "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.6.2.apk"
+    "notes": "【新功能】多账号登录：同时保存多个同学账号，一键切换、一键查全部人跑步距离\n\n- 多账号：输入学号密码登录并完成一次 H5 捕获，该账号即自动进入账号列表（✓ 为当前账号）。点击账号切换整套配置（令牌/请求体/会话），长按删除，「＋添加」录入新同学；给室友/同学代查打卡进度从此不用反复改配置\n- 「查询全部账号距离」：一次请求所有已捕获账号的 findExtExercise（每人用自己的令牌与接口快照），汇总弹窗展示 ✓/✗ 与原因，可一键复制\n- 新增校外直连根因提示：测试报「failed to connect to /202.118.65.138 (port 8081)」 时明确告知——该地址是校内服务器，校园网外不可达；校外用账号登录重新捕获即可自动换用 WebVPN 隧道地址（webvpn.dlut.edu.cn）\n- 修复：登录失败不再覆盖本机已保存的账号信息（旧版输错一次新学号会把当前账号的回填信息挤掉）；换账号登录前会自动快照当前账号配置\n- 文档：接口文档新增服务器角色说明 / 常见错误对照表 / 多账号使用说明；逆向报告增补健康长跑后端（202.118.65.138:8081）识别、WebVPN 隧道机制与WebSocket 实时通道章节"
   },
   "history": [
+    {
+      "versionName": "1.6.2",
+      "versionCode": 11,
+      "date": "2026-10-10",
+      "apkFile": "DUT-RunMate_v1.6.2.apk",
+      "sha256": "d64a1254b5f7babb95c205aac12533175a55c5942de7f58c490a0efecab36275",
+      "sizeBytes": 5959981,
+      "notes": "【修复】接口测试报错正则异常 · 登录后令牌不自动填充\n\n- 修复「发送测试 / 查询服务端距离」全部报「请求异常 PatternSyntaxException」：旧版在 Cookie 为空时用含 \\{ 转义的正则拼接删除空请求头，该写法在 Android 14+ 的 ICU 正则引擎上无法编译（请求根本没发出去，与网络无关）；本版改为 JSON 解析后逐值替换，彻底移除正则拼接，顺带消除 Cookie 含特殊字符时的注入风险\n- 修复「统一身份登录后令牌不自动填充」：实测 H5 页面一加载就发出 findExtExercise，旧版嗅探器在页面加载完成后才注入、永远错过请求（登录成功但配置不入库的根因）；本版改为拦截 H5 主文档、在任何页面脚本运行前预注入嗅探器，并只采纳 HTTP 200（会话有效）的请求，捕获后回到「接口」页令牌立即刷新\n- 其他：URL 中占位符无值时直接提示「先登录自动配置或手动填令牌」；WebVPN 隧道地址自动修正为用户专属前缀"
+    },
     {
       "versionName": "1.6.1",
       "versionCode": 10,
