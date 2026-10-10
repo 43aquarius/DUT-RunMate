@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?android:colorBackground">
+
+    <!-- 顶部状态 -->
+    <LinearLayout android:orientation="vertical"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:background="?attr/colorSurfaceVariant"
+        android:paddingHorizontal="16dp" android:paddingVertical="10dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:text="@string/h5_title" />
+        <TextView android:id="@+id/tvStatus" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="2dp"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:text="@string/h5_status_init" />
+    </LinearLayout>
+
+    <!-- URL 导航条 -->
+    <LinearLayout android:orientation="horizontal" android:gravity="center_vertical"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingHorizontal="12dp" android:paddingVertical="6dp">
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content">
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etUrl" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:inputType="textUri"
+                android:imeOptions="actionGo" android:singleLine="true"
+                android:textAppearance="?attr/textAppearanceBodySmall" />
+        </com.google.android.material.textfield.TextInputLayout>
+        <com.google.android.material.button.MaterialButton
+            style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnGo"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginStart="8dp" android:minWidth="64dp"
+            android:text="@string/h5_go" />
+    </LinearLayout>
+
+    <!-- 快捷入口 -->
+    <HorizontalScrollView android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingHorizontal="12dp" android:scrollbars="none">
+        <LinearLayout android:orientation="horizontal"
+            android:layout_width="wrap_content" android:layout_height="wrap_content">
+            <com.google.android.material.chip.Chip android:id="@+id/btnH5Direct"
+                style="@style/Widget.Material3.Chip.Suggestion"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/h5_chip_direct" />
+            <com.google.android.material.chip.Chip android:id="@+id/btnWebvpn"
+                style="@style/Widget.Material3.Chip.Suggestion"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="8dp" android:text="@string/h5_chip_webvpn" />
+            <com.google.android.material.chip.Chip android:id="@+id/btnSniffAgain"
+                style="@style/Widget.Material3.Chip.Suggestion"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="8dp" android:text="@string/h5_chip_sniff" />
+        </LinearLayout>
+    </HorizontalScrollView>
+
+    <!-- H5 页面 -->
+    <WebView android:id="@+id/web"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- 请求日志（嗅探透明度） -->
+    <ScrollView android:id="@+id/scrollLog"
+        android:layout_width="match_parent" android:layout_height="96dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:paddingHorizontal="12dp" android:paddingVertical="6dp">
+        <TextView android:id="@+id/tvLog" android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:fontFamily="monospace"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:text="" />
+    </ScrollView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnClose" style="@style/Widget.RunMate.PillButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp" android:layout_marginVertical="10dp"
+        android:text="@string/h5_done" />
+</LinearLayout>

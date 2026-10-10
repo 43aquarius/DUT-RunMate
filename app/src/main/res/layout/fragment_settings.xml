@@ -222,44 +222,35 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="24dp" android:text="@string/pref_update" />
 
-            <LinearLayout android:orientation="horizontal" android:gravity="center_vertical"
+            <!-- v1.6.0：按需求精简 —— 更新区块只保留一个「检查更新」按钮；
+                 服务器地址已内置（主 dut-runmate.space-z.ai，不可达自动转 GitHub）
+                 不再展示；自动检查保持默认开启（每天启动静默一次）。 -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnUpdCheck" style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
-                android:paddingHorizontal="16dp" android:paddingVertical="8dp">
-                <LinearLayout android:orientation="vertical" android:layout_width="0dp"
-                    android:layout_weight="1" android:layout_height="wrap_content">
+                android:layout_marginTop="12dp" android:text="@string/pref_upd_check_now" />
+
+            <!-- v1.6.0：GitHub 开源仓库入口（点击跳转浏览器） -->
+            <LinearLayout android:id="@+id/rowGithub"
+                android:orientation="horizontal" android:gravity="center_vertical"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="?attr/colorSurfaceVariant"
+                android:paddingHorizontal="16dp" android:paddingVertical="12dp">
+                <ImageView android:layout_width="22dp" android:layout_height="22dp"
+                    android:src="@drawable/ic_github" android:contentDescription="@string/pref_github"
+                    app:tint="?attr/colorOnSurface" />
+                <LinearLayout android:orientation="vertical"
+                    android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:layout_marginStart="12dp">
                     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                        android:textAppearance="?attr/textAppearanceTitleMedium" android:text="@string/pref_upd_auto" />
+                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:text="@string/pref_github" />
                     <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                         android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/pref_upd_auto_sub" />
+                        android:textColor="?attr/colorOnSurfaceVariant"
+                        android:text="@string/pref_github_sub" />
                 </LinearLayout>
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/swUpdAuto" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-            </LinearLayout>
-
-            <LinearLayout android:orientation="vertical"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:background="?attr/colorSurfaceVariant" android:layout_marginTop="8dp"
-                android:padding="16dp">
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" android:text="@string/pref_upd_server" />
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp" android:hint="@string/pref_upd_server_hint">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etUpdServer" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:inputType="textUri"
-                        android:imeOptions="actionDone" android:singleLine="true" />
-                </com.google.android.material.textfield.TextInputLayout>
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp" android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/pref_upd_server_sub" />
-                <com.google.android.material.button.MaterialButton
-                    style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnUpdCheck"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp" android:text="@string/pref_upd_check_now" />
             </LinearLayout>
 
             <TextView style="@style/TextAppearance.RunMate.Label"
@@ -275,6 +266,10 @@
                 style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnExport"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" android:text="@string/pref_export" />
+            <com.google.android.material.button.MaterialButton
+                style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnCrashLog"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:text="@string/pref_crash_log" />
 
             <TextView android:id="@+id/tvAbout" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:layout_marginTop="24dp"

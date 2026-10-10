@@ -36,21 +36,26 @@ class AlertManager(private val ctx: Context, private val prefs: Prefs) {
 
     fun initTts() {
         if (tts != null) return
-        tts = TextToSpeech(ctx) { status ->
-            if (status == TextToSpeech.SUCCESS) {
-                try {
-                    tts?.language = Locale.SIMPLIFIED_CHINESE
-                    tts?.setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                            .build()
-                    )
-                    ttsReady = true
-                } catch (_: Exception) {
-                    ttsReady = false
+        // v1.6.0：TTS 引擎初始化整体隔离——无 TTS 引擎/引擎损坏的 ROM 上仅静默降级为提示音
+        tts = try {
+            TextToSpeech(ctx) { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    try {
+                        tts?.language = Locale.SIMPLIFIED_CHINESE
+                        tts?.setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build()
+                        )
+                        ttsReady = true
+                    } catch (_: Exception) {
+                        ttsReady = false
+                    }
                 }
             }
+        } catch (_: Throwable) {
+            null
         }
     }
 
@@ -65,7 +70,13 @@ class AlertManager(private val ctx: Context, private val prefs: Prefs) {
         if (!prefs.ttsEnabled) return
         val t = tts
         if (t != null && ttsReady) {
-            t.speak(text, TextToSpeech.QUEUE_ADD, null, "runmate_${System.nanoTime()}")
+            // v1.6.0：部分 ROM 的 TTS 引擎在中途死亡时 speak() 会抛异常，降级为提示音
+            try {
+                t.speak(text, TextToSpeech.QUEUE_ADD, null, "runmate_${System.nanoTime()}")
+            } catch (_: Throwable) {
+                ttsReady = false
+                chime(Kind.INFO)
+            }
         } else {
             chime(Kind.INFO)
         }

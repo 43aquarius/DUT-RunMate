@@ -1,6 +1,7 @@
 package com.dut.runmate.net
 
 import com.dut.runmate.data.api.ApiProfile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -28,25 +29,41 @@ object Http {
         val error: String? = null
     )
 
-    private fun render(s: String, token: String): String =
-        if (token.isBlank()) s else s.replace("{token}", token)
+    private fun render(s: String, token: String, cookie: String): String {
+        var r = if (token.isBlank()) s else s.replace("{token}", token)
+        if (cookie.isBlank()) {
+            // 无 Cookie 时移除 {cookie} 空值头并修复 JSON 逗号
+            r = r.replace(Regex("\"Cookie\"\\s*:\\s*\"\\{cookie}\"\\s*,?"), "")
+            r = r.replace(Regex(",\\s*,"), ",").replace("{,", "{").replace(Regex(",\\s*}"), "}")
+        } else {
+            r = r.replace("{cookie}", cookie)
+        }
+        return r
+    }
 
-    suspend fun call(profile: ApiProfile, token: String): Resp = withContext(Dispatchers.IO) {
+    /** v1.4.0：token 之外增加 cookie（WebVPN 隧道场景）
+     *  v1.5.0：不再吞 CancellationException——否则页面销毁后协程继续跑，
+     *  会触摸已置空的 ViewBinding（_b!!）导致闪退（发送测试/登录偶发崩溃根因）。 */
+    suspend fun call(profile: ApiProfile, token: String, cookie: String = ""): Resp = withContext(Dispatchers.IO) {
         val t0 = System.nanoTime()
         try {
-            val url = render(profile.url, token)
+            val url = render(profile.url, token, cookie)
             val b = Request.Builder().url(url)
-            val headers = render(if (profile.headers.isBlank()) "{}" else profile.headers, token)
+            val headers = render(if (profile.headers.isBlank()) "{}" else profile.headers, token, cookie)
             try {
                 val h = JSONObject(headers)
-                for (k in h.keys()) b.header(k, h.getString(k))
+                for (k in h.keys()) {
+                    val v = h.optString(k, "")
+                    if (v.isBlank()) continue
+                    b.header(k, v)
+                }
             } catch (_: Exception) { }
             val method = profile.method.uppercase()
             if (method == "POST") {
-                val bodyStr = render(profile.body, token)
+                val bodyStr = render(profile.body, token, cookie)
                 b.post((if (bodyStr.isBlank()) "{}" else bodyStr).toRequestBody(JSON_MEDIA))
             } else if (method == "PUT") {
-                val bodyStr = render(profile.body, token)
+                val bodyStr = render(profile.body, token, cookie)
                 b.put((if (bodyStr.isBlank()) "{}" else bodyStr).toRequestBody(JSON_MEDIA))
             }
             client.newCall(b.build()).execute().use { r ->
@@ -57,8 +74,10 @@ object Http {
                     url = url
                 )
             }
+        } catch (e: CancellationException) {
+            throw e                     // 页面已销毁：让协程静默终止，绝不触摸 UI
         } catch (e: Exception) {
-            Resp(0, ((System.nanoTime() - t0) / 1_000_000).toInt(), "", render(profile.url, token), e.message)
+            Resp(0, ((System.nanoTime() - t0) / 1_000_000).toInt(), "", render(profile.url, token, cookie), e.message)
         }
     }
 

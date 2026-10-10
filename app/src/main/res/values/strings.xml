@@ -82,6 +82,11 @@
     <string name="api_token_label">令牌 Token（从抓包获取，支持 {token} 占位）</string>
     <string name="api_token_hint">findExtExercise 填「userId:accessToken」整串</string>
     <string name="api_test">发送测试</string>
+    <string name="api_testing">测试中…</string>
+    <string name="api_test_toast">正在发送「%1$s」请求…</string>
+    <string name="api_test_ok">✓ 测试通过 · HTTP %1$d · %2$d ms</string>
+    <string name="api_test_fail">✗ 测试失败 · HTTP %1$d · %2$d ms</string>
+    <string name="api_test_error">✗ 请求异常：%1$s</string>
     <string name="api_edit">编辑</string>
     <string name="api_url">请求 URL</string>
     <string name="api_method">方法</string>
@@ -92,7 +97,58 @@
     <string name="api_result_fmt">HTTP %1$d · %2$d ms</string>
     <string name="api_extracted">提取距离：%1$s</string>
     <string name="api_extract_fail">未能按路径提取到数值，请调整路径</string>
-    <string name="api_usage_hint">「健康长跑距离」模板已预填实测接口（校内直连地址，校外换 WebVPN 隐道 URL）：把抓包到的 userId/amId/pmId/sign 填进请求体、Authorization 令牌粘到上方令牌栏，发送测试能提取距离即配置成功，开启 API 判定后跑步自动核对打卡。</string>
+    <string name="api_usage_hint">「健康长跑距离」模板已预填实测接口（校内直连地址，校外换 WebVPN 隐道 URL）：把抓包到的 userId/amId/pmId/sign 填进请求体、Authorization 令牌粘到上方令牌栏，发送测试能提取距离即配置成功，开启 API 判定后跑步自动核对打卡。\nv1.4.0 起推荐直接用下方「账号登录 · 一键配置」，自动完成以上全部填写。</string>
+
+    <!-- v1.4.0 账号登录 · 一键配置 -->
+    <string name="ws_card_title">账号登录 · 一键配置</string>
+    <string name="ws_card_hint">输入 i大工（校园统一身份）学号与密码：登录微哨服务后自动打开健康长跑页面并捕获接口参数，自动填好下方全部配置。登录信息保存在本机（方便下次直接使用），长按密码框可清除。</string>
+    <string name="ws_number_hint">学号</string>
+    <string name="ws_pwd_hint">密码（统一身份）</string>
+    <string name="ws_btn_login">登录并自动配置</string>
+    <string name="ws_btn_open_h5">重新捕获 H5 参数（换学期/令牌失效时用）</string>
+    <string name="ws_status_none">未登录。登录后自动填写 userId/令牌/amId/pmId/sign，无需抓包。</string>
+    <string name="ws_status_need_input">请先输入学号和密码</string>
+    <string name="ws_status_logging">正在登录 i大工 服务…</string>
+    <string name="ws_status_saved">会话已过期。登录信息（%1$s）已保存，点击上方按钮一键重新登录。</string>
+    <string name="ws_status_logged">已登录：%1$s（userId %2$s…）。到「H5 捕获」页完成一次自动配置即可。</string>
+    <string name="ws_login_ok">登录成功，欢迎 %1$s。正在打开自动配置…</string>
+    <string name="ws_login_fail">登录失败：%1$s</string>
+    <string name="ws_status_cas_only">CAS 统一认证已登录（%1$s）。微哨通道未通过，H5 捕获将走 CAS 鉴权，点「打开H5捕获」完成自动配置。</string>
+    <string name="ws_login_cas_ok">CAS 统一认证成功，正在打开自动配置…（微哨通道未通过，不影响使用）</string>
+
+    <!-- v1.4.0 H5 捕获页 -->
+    <string name="h5_title">H5 捕获 · 自动配置</string>
+    <string name="h5_status_init">正在初始化…</string>
+    <string name="h5_status_direct">校内直连模式：正在打开健康长跑页面，等待接口出现…</string>
+    <string name="h5_status_webvpn">校外 WebVPN 模式：自动走统一身份认证（如需验证码请在页面手动完成）</string>
+    <string name="h5_status_captured">✓ 已捕获 findExtExercise 参数并写入配置，API 判定已开启</string>
+    <string name="h5_chip_direct">健康长跑（校内直连）</string>
+    <string name="h5_chip_webvpn">WebVPN 登录</string>
+    <string name="h5_chip_sniff">重新注入嗅探器</string>
+    <string name="h5_go">前往</string>
+    <string name="h5_done">完成，返回</string>
+    <string name="h5_no_session">请先在「接口」页登录账号</string>
+    <string name="h5_sniff_reinjected">嗅探器已重新注入</string>
+    <string name="h5_log_start">捕获页启动</string>
+    <string name="h5_log_cookie">已注入 whistlekey 会话 Cookie</string>
+    <string name="h5_log_cookie_cas">已注入 CAS 统一认证会话 Cookie（CASTGC）</string>
+    <string name="h5_log_cas_fill">CAS 自动填表：%1$s（如页面要求扫码/验证码请手动完成）</string>
+    <string name="h5_log_direct_ok">校内直连可达，直接打开健康长跑 H5</string>
+    <string name="h5_log_direct_fail">校内直连不可达，走 WebVPN 隧道（校外）</string>
+    <string name="h5_log_webvpn_fill">WebVPN 自动填表：%1$s（如需验证码/短信请在页面手动完成）</string>
+    <!-- v1.6.0 WebVPN 自动流程日志 -->
+    <string name="h5_log_webvpn_cas_click">已自动点击「统一身份认证登录」，等待跳转 CAS…</string>
+    <string name="h5_log_cas_page">已进入统一身份认证页，自动填表提交…</string>
+    <string name="h5_log_webvpn_ok">WebVPN 登录成功，正在重新进入健康长跑 H5…</string>
+    <string name="h5_log_webvpn_retry">WebVPN 会话未完全建立，自动重试登录流程…</string>
+    <string name="h5_log_portal_link">已从门户资源列表进入：%1$s</string>
+    <string name="h5_log_tunnel_h5">正在通过 WebVPN 隧道打开健康长跑 H5…</string>
+    <string name="h5_log_captured">捕获成功 userId=%1$s… amId=%2$s… pmId=%3$s… sign=%4$s…</string>
+    <string name="h5_log_cookie_saved">已保存 WebVPN 隧道 Cookie（后台轮询用）</string>
+    <string name="h5_log_test_ok">自动测试通过：服务端距离 %1$s m</string>
+    <string name="h5_log_test_fail">自动测试未通过：%1$s（可在接口页手动测试排查）</string>
+    <string name="h5_test_ok">配置成功！当前服务端距离 %1$s m</string>
+    <string name="h5_test_fail">已写入配置，但测试请求未通过；请检查网络后到「接口」页重试</string>
     <string name="api_enabled_title">API 判定（进区后轮询距离增量）</string>
     <string name="api_enabled_off">关闭：出区即提示（无法判定漏卡）</string>
 
@@ -142,10 +198,12 @@
     <string name="pref_update">更新</string>
     <string name="pref_upd_auto">自动检查更新</string>
     <string name="pref_upd_auto_sub">每天启动时静默检查一次</string>
-    <string name="pref_upd_server">更新服务器地址</string>
-    <string name="pref_upd_server_hint">https://…/api/latest</string>
-    <string name="pref_upd_server_sub">填发布中心页面显示的地址，留空则仅使用 GitHub</string>
-    <string name="pref_upd_check_now">立即检查更新</string>
+    <string name="pref_upd_server">更新服务器</string>
+    <string name="pref_upd_server_fixed">https://dut-runmate.space-z.ai（内置固定）\n检查失败时自动改用 GitHub Release</string>
+    <string name="pref_upd_check_now">检查更新</string>
+    <!-- v1.6.0 GitHub 开源仓库入口 -->
+    <string name="pref_github">GitHub 开源仓库</string>
+    <string name="pref_github_sub">43aquarius/DUT-RunMate · 源码 / Issue 反馈 / 版本发布</string>
     <string name="upd_uptodate">已是最新版本</string>
     <string name="upd_failed">检查更新失败：%1$s</string>
     <string name="upd_found_title">发现新版本 v%1$s</string>
@@ -163,4 +221,9 @@
     <string name="upd_perm_msg">Android 8 及以上需授予本应用「安装未知应用」权限才能安装更新。\n\n前往系统设置 → 找到「跑伴」→ 允许安装未知应用，返回后将自动继续。</string>
     <string name="upd_perm_go">去授权</string>
     <string name="upd_perm_manual">请到系统设置中手动允许「安装未知应用」后重试</string>
+    <string name="pref_crash_log">查看崩溃日志（反馈问题用）</string>
+    <string name="pref_crash_title">最近一次崩溃</string>
+    <string name="pref_crash_none">暂无崩溃记录</string>
+    <string name="pref_crash_copy">复制完整日志</string>
+    <string name="pref_crash_copied">已复制到剪贴板</string>
 </resources>

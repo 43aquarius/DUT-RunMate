@@ -107,10 +107,14 @@ class RunFragment : Fragment() {
     }
 
     private val pvListener = LocationListener { raw ->
-        if (RunBus.state.value.running) return@LocationListener   // 跑步中由前台服务负责
-        val loc = LocGate.normalize(raw)
-        if (LocGate.isNetwork(raw)) pvNet = loc else pvGps = loc
-        bestPreviewFix()?.let { pushPreview(it) }
+        // v1.6.0：预览定位回调隔离，防止异常元数据闪退
+        try {
+            if (RunBus.state.value.running) return@LocationListener   // 跑步中由前台服务负责
+            val loc = LocGate.normalize(raw)
+            if (LocGate.isNetwork(raw)) pvNet = loc else pvGps = loc
+            bestPreviewFix()?.let { pushPreview(it) }
+        } catch (_: Throwable) {
+        }
     }
 
     private fun pushPreview(loc: Location) {
@@ -172,7 +176,7 @@ class RunFragment : Fragment() {
             }
             Toast.makeText(requireContext(), R.string.verify_querying, Toast.LENGTH_SHORT).show()
             viewLifecycleOwner.lifecycleScope.launch {
-                val resp = Http.call(prof, prefs.apiToken)
+                val resp = Http.call(prof, prefs.apiToken, prefs.apiCookie)
                 if (_b == null) return@launch
                 if (resp.error != null || resp.code !in 200..299) {
                     RunBus.update { it.copy(apiErr = resp.error ?: "HTTP ${resp.code}") }
@@ -212,6 +216,15 @@ class RunFragment : Fragment() {
         else getString(R.string.loc_src_gps_fmt, (acc ?: 0f).toInt())
 
     private fun render(st: RunBus.UiState) {
+        if (_b == null) return
+        // v1.6.0：渲染隔离——状态流回调里的任何异常都不再冒泡杀死 collect 协程/进程
+        try {
+            renderInner(st)
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun renderInner(st: RunBus.UiState) {
         if (_b == null) return
 
         // 按钮
@@ -291,14 +304,17 @@ class RunFragment : Fragment() {
         val sum = st.summary
         if (sum != null && !summaryShown) {
             summaryShown = true
-            val ok = sum.confirmed.joinToString("、").ifEmpty { "无" }
-            val miss = sum.missed.joinToString("、").ifEmpty { "无" }
-            val body = "已确认：$ok\n未确认（漏卡）：$miss\n用时 ${sum.stats.timeStr} · 自测 ${String.format("%.2f km", sum.stats.meters / 1000.0)}"
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle("本次跑步小结")
-                .setMessage(body)
-                .setPositiveButton(R.string.save, null)
-                .show()
+            try {
+                val ok = sum.confirmed.joinToString("、").ifEmpty { "无" }
+                val miss = sum.missed.joinToString("、").ifEmpty { "无" }
+                val body = "已确认：$ok\n未确认（漏卡）：$miss\n用时 ${sum.stats.timeStr} · 自测 ${String.format("%.2f km", sum.stats.meters / 1000.0)}"
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("本次跑步小结")
+                    .setMessage(body)
+                    .setPositiveButton(R.string.save, null)
+                    .show()
+            } catch (_: Throwable) {
+            }
         }
     }
 

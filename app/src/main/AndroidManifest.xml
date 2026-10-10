@@ -33,6 +33,12 @@
             </intent-filter>
         </activity>
 
+        <!-- v1.4.0：H5 捕获自动配置页 -->
+        <activity
+            android:name=".ui.H5CatcherActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
         <service
             android:name=".service.RunTrackerService"
             android:exported="false"

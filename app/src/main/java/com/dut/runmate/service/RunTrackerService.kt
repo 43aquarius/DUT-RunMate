@@ -27,10 +27,18 @@ import com.dut.runmate.net.Http
 import com.dut.runmate.run.DetectEngine
 import com.dut.runmate.run.RunBus
 import kotlinx.coroutines.*
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
 import kotlin.math.roundToInt
 
 /**
  * 前台定位服务：GPS 跟踪 + 检测状态机 + 接口轮询 + 语音/震动/提示音提醒。
+ *
+ * v1.6.0 防闪退加固：开始跑步后的全部异步回调（定位/轮询/通知/语音）逐段
+ * try/catch 隔离——任何一段抛异常只丢弃该次回调并落盘 crash_log，绝不冒泡到
+ * 主线程杀死进程（v1.5.1 用户反馈「开始跑步 1~2 秒后闪退」的防御性修复：
+ * 闪退窗口恰好是首个定位回调/TTS 初始化/首次轮询三者的触发时机）。
  */
 class RunTrackerService : Service() {
 
@@ -59,14 +67,53 @@ class RunTrackerService : Service() {
     // 定位源缓存（坐标已归一 WGS-84）：GPS 优先，网络仅兑底
     private var lastGpsFix: Location? = null
 
-    private val locListener = LocationListener { loc -> onFix(loc) }
+    private val locListener = LocationListener { loc ->
+        // v1.6.0：定位回调全隔离——部分 ROM 的网络定位带异常元数据时仅跳过该次，不闪退
+        try {
+            onFix(loc)
+        } catch (e: Throwable) {
+            logSoft("onFix", e)
+        }
+    }
+
+    /** v1.6.0：非致命异常落盘（与 App 崩溃日志同文件），便于远程定位闪退根因 */
+    private fun logSoft(where: String, e: Throwable) {
+        try {
+            val sw = StringWriter()
+            e.printStackTrace(PrintWriter(sw))
+            val f = File(filesDir, "crash_log.txt")
+            val head = "\n[SOFT] time=${System.currentTimeMillis()} svc=$where\n"
+            val old = if (f.exists()) f.readText() else ""
+            val keep = (old + head + sw.toString()).takeLast(64 * 1024)
+            f.writeText(keep)
+        } catch (_: Throwable) {
+        }
+    }
 
     override fun onBind(intent: Intent?) = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACT_STOP -> { stopRun(); return START_NOT_STICKY }
-            else -> if (!RunBus.state.value.running) startRun()
+            else -> if (!RunBus.state.value.running) {
+                // v1.6.0：启动全隔离——任何异常（含部分 ROM 的 startForeground 限制）
+                // 都降级为「停止服务 + Toast 提示」，绝不让进程闪退
+                try {
+                    startRun()
+                } catch (e: Throwable) {
+                    logSoft("startRun", e)
+                    RunBus.update { it.copy(running = false, apiErr = "启动失败：${e.javaClass.simpleName}") }
+                    try {
+                        android.widget.Toast.makeText(
+                            applicationContext,
+                            "跑步服务启动异常：${e.javaClass.simpleName}，已记录到崩溃日志",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    } catch (_: Throwable) {
+                    }
+                    try { stopSelf() } catch (_: Throwable) {}
+                }
+            }
         }
         return START_NOT_STICKY
     }
@@ -97,11 +144,22 @@ class RunTrackerService : Service() {
         sessionMeters = 0.0; fixCount = 0; lastFix = null; lastGpsFix = null
 
         // 前台服务 + 常驻通知
+        // v1.6.0：部分 ROM 对 startForeground(带类型) 有私有限制，失败时逐级降级
         val n = buildNotification("定位中…")
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } else {
-            startForeground(NID, n)
+        try {
+            if (Build.VERSION.SDK_INT >= 29) {
+                startForeground(NID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+            } else {
+                startForeground(NID, n)
+            }
+        } catch (e: Throwable) {
+            logSoft("startForeground(typed)", e)
+            try {
+                startForeground(NID, n)     // 降级：不带类型重试
+            } catch (e2: Throwable) {
+                logSoft("startForeground", e2)
+                throw e2                    // 仍失败交给外层 onStartCommand 兜底
+            }
         }
 
         // WakeLock：息屏后 GPS 与逻辑仍运行
@@ -155,7 +213,13 @@ class RunTrackerService : Service() {
                 val anchorDue = now - lastAnchor > 15_000L
                 if (!zoneDue && !anchorDue && !manual) continue
 
-                val resp = Http.call(prof, prefs.apiToken)
+                // v1.6.0：单次轮询失败只记日志，不中断循环
+                val resp = try {
+                    Http.call(prof, prefs.apiToken, prefs.apiCookie)
+                } catch (e: Throwable) {
+                    logSoft("poll", e)
+                    continue
+                }
                 val doneAt = SystemClock.elapsedRealtime()
                 if (resp.error != null) {
                     RunBus.update { it.copy(apiErr = "网络错误: ${resp.error}") }
@@ -170,7 +234,12 @@ class RunTrackerService : Service() {
                 val v = Http.extractDouble(resp.body, prof.distPath)
                 if (v != null) {
                     RunBus.update { it.copy(apiDistance = v, apiErr = null) }
-                    eng.onApiDistance(v, doneAt)
+                    try {
+                        eng.onApiDistance(v, doneAt)
+                    } catch (e: Throwable) {
+                        logSoft("onApiDistance", e)
+                    }
+                    refreshNotification()      // v1.5.0：打卡距离阶跃立即上锁屏通知
                 } else {
                     RunBus.update { it.copy(apiErr = "未能提取: ${prof.distPath}") }
                 }
@@ -227,21 +296,25 @@ class RunTrackerService : Service() {
 
     private fun onEvent(ev: DetectEngine.Ev) {
         val a = alert ?: return
-        when (ev) {
-            is DetectEngine.Ev.Approach -> {
-                a.speak(getString(R.string.tts_approach, "${ev.distM}", ev.r.cp.name))
-                a.chime(AlertManager.Kind.INFO)
+        try {
+            when (ev) {
+                is DetectEngine.Ev.Approach -> {
+                    a.speak(getString(R.string.tts_approach, "${ev.distM}", ev.r.cp.name))
+                    a.chime(AlertManager.Kind.INFO)
+                }
+                is DetectEngine.Ev.EnterZone -> a.speak(getString(R.string.tts_enter, ev.r.cp.name))
+                is DetectEngine.Ev.Confirmed -> {
+                    a.speak(getString(R.string.tts_confirmed, ev.r.cp.name))
+                    a.chime(AlertManager.Kind.OK); a.vibrate(AlertManager.Kind.OK)
+                }
+                is DetectEngine.Ev.Missed -> {
+                    a.speak(getString(R.string.tts_missed, ev.r.cp.name))
+                    a.chime(AlertManager.Kind.WARN); a.vibrate(AlertManager.Kind.WARN)
+                }
+                is DetectEngine.Ev.PassedGps -> a.speak(getString(R.string.tts_pass_gps, ev.r.cp.name))
             }
-            is DetectEngine.Ev.EnterZone -> a.speak(getString(R.string.tts_enter, ev.r.cp.name))
-            is DetectEngine.Ev.Confirmed -> {
-                a.speak(getString(R.string.tts_confirmed, ev.r.cp.name))
-                a.chime(AlertManager.Kind.OK); a.vibrate(AlertManager.Kind.OK)
-            }
-            is DetectEngine.Ev.Missed -> {
-                a.speak(getString(R.string.tts_missed, ev.r.cp.name))
-                a.chime(AlertManager.Kind.WARN); a.vibrate(AlertManager.Kind.WARN)
-            }
-            is DetectEngine.Ev.PassedGps -> a.speak(getString(R.string.tts_pass_gps, ev.r.cp.name))
+        } catch (e: Throwable) {
+            logSoft("onEvent", e)   // v1.6.0：语音/提醒失败不影响跟踪
         }
     }
 
@@ -255,23 +328,52 @@ class RunTrackerService : Service() {
             .setSmallIcon(R.drawable.ic_run)
             .setContentTitle(getString(R.string.notif_title))
             .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
+            // v1.5.0 锁屏显示：VISIBILITY_PUBLIC 在锁屏完整展示；
+            // CATEGORY_WORKOUT 在 Android 12+ 归入「锻炼」分组（锁屏顶部胶囊入口）。
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setContentIntent(pi)
-            .addAction(0, getString(R.string.notif_stop), stopPi)
+            .addAction(R.drawable.ic_stop, getString(R.string.notif_stop), stopPi)
             .build()
     }
 
+    /** v1.5.0：通知文本 = 官方打卡距离 + 自测 GPS 里程 + 点位状态（锁屏可见） */
     private fun updateNotificationText(nearest: RunBus.CpSnap?, snaps: List<RunBus.CpSnap>) {
         val ok = snaps.count { it.state == RunBus.CpState.CONFIRMED }
-        val text = when {
+        val st = RunBus.state.value
+        val apiTxt = st.apiDistance
+            ?.let { "官方打卡 %d m".format(it.roundToInt()) }
+            ?: "官方打卡：待接口"
+        val gpsTxt = if (st.stats.meters >= 10)
+            "GPS %.2f km".format(st.stats.meters / 1000.0)
+        else "GPS 累积中"
+        val zoneTxt = when {
             snaps.any { it.state == RunBus.CpState.MISSED } -> "⚠ 有点位未确认，请留意"
             snaps.any { it.state == RunBus.CpState.IN_ZONE } -> "检测区内，等待打卡确认…"
             nearest != null -> "最近：${nearest.cp.name} ${nearest.distM} m · 已确认 $ok/${snaps.size}"
             else -> "定位中…"
         }
-        notifMgr?.notify(NID, buildNotification(text))
+        notifMgr?.let { nm ->
+            try {
+                nm.notify(NID, buildNotification("$apiTxt · $gpsTxt\n$zoneTxt"))
+            } catch (e: Throwable) {
+                logSoft("notify", e)
+            }
+        }
+    }
+
+    /** v1.5.0：官方距离变化（RFID 命中）时立即刷新通知，息屏/锁屏也能看到最新打卡距离 */
+    private fun refreshNotification() {
+        val eng = engine ?: return
+        val snaps = eng.snapshot()
+        val nearest = snaps
+            .filter { it.state != RunBus.CpState.CONFIRMED && it.distM >= 0 }
+            .minByOrNull { it.distM }
+        updateNotificationText(nearest, snaps)
     }
 
     private fun stopRun() {

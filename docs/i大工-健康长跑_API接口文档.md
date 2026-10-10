@@ -289,3 +289,96 @@ URL：http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise
   findExtExercise 请求/响应全量、WebSocket 101 握手、wengine-vpn/cookie 会话刷新；
   打卡机制（RFID 读卡器 E/F/G/H 计圈，+100m/次）即由本次抓包的 `tag_path`×`distance` 交叉验证得出
 - 瓦片实测：高德卫星 webst（实测至 z18）/ 高德矢量 wprd（实测至 z20）
+
+---
+
+## 9. 微哨账号登录协议（v1.5.0 实测修正）
+
+跑伴 v1.4.0 的「账号登录」在真机上返回 `errcode 8011002, errmsg "a is empty."`。2026-10-09 从本沙箱对
+`https://service.m.dlut.edu.cn/whistlenew/index.php` 逐参数二分实测，结论如下：
+
+### 9.1 根因：网关拒绝 app_version 参数
+
+| 请求参数 | 结果 |
+|---|---|
+| 基础参数集（m/user/a/student_number/password/client_id/device_type/school） | 正常返回 94003（密码错误） |
+| 基础集 + `uid=0` / `platform=android` / `city_id=10` | 正常 94003 |
+| 基础集 + `app_version=3.3.12` | **8011002 "a is empty."** |
+| 基础集 + `app_version=3.3.12.75026` | **8011002 "a is empty."** |
+| 基础集 + `app_version=1.0` | 正常 94003 |
+
+即：whistlenew 网关对 `app_version` 的取值有内部校验（非白名单值直接拒绝且报错误导性的 "a is empty"）。
+v1.4.0 的 WhistleAuth 多传了 `app_version/uid/platform/city_id`（后三个实测无害），根因是 app_version。
+
+### 9.2 正确的登录参数集（对齐 i大工 原生）
+
+对照 jadx：`ViewOnClickListenerC1102i.m360a`（登录参数）+ `C1093z2.m356a`（公共参数）：
+
+```
+GET https://service.m.dlut.edu.cn/whistlenew/index.php
+  ?m=user&a=userLoginCas
+  &student_number=<学号>
+  &password=<RSA-1024/ECB/PKCS1 公钥加密 → Base64 → URL 编码>
+  &client_id=<任意客户端id，如 runmate-xxxxxx>
+  &device_type=android
+  &verfiy_image_code=&identity=          ← 空值实测无害
+  &equipment_type=phone                  ← C1093z2 公共参数
+  &os_version=<Build.VERSION.RELEASE>
+  &phone_type=<Build.MODEL>
+  &school=dlut
+```
+
+- RSA 公钥：i大工 3.3.12.75026 内置（jadx: ViewOnClickListenerC1102i），1024 位；
+- 先 GET 一次 `?m=confInfo&a=getDlutAddress&stage=` 拿 `PHPSESSID`（对齐官方首次建连；实测不拿也能登录）；
+- 成功：`errcode=0`，`data.my_info.{user_id, skey, name, student_number}`；`skey` 即 whistlekey Cookie 值；
+- 失败码：94003/60002/60056 学号或密码错；60057 禁用；60061 需图形验证码（响应 `data.image` 为 base64 PNG）；
+  60092 统一身份认证失败；**8011002 = 网关拒绝参数（别再传 app_version！）**。
+
+## 10. CAS 统一认证登录协议（v1.5.1 实测，主登录通道）
+
+> 背景：§9 的微哨 userLoginCas 通道实测已不可靠——网关对携带 `app_version=3.3.12.75026`
+> 的请求一律 401 `a is empty`（旧版 i大工 客户端疑似被服务端下线）；去掉该参数虽可达，
+> 但真实凭据校验同样失败（正确学号密码仍返回 94003）。学校现行标准登录是网页端
+> `sso.dlut.edu.cn/cas/login`（统一身份认证，CAS），v1.5.1 以其为主通道。
+
+### 10.1 协议流程（逆向自 /cas/comm/js/login12.js + des.js）
+
+```
+1) GET https://sso.dlut.edu.cn/cas/login
+   ← Set-Cookie: JSESSIONIDCAS=…; devInfo=…; Language=zh_CN
+   ← 表单隐藏域：lt=LT-439618-xxxx-cas、execution=e1s1
+   ← <form id="loginForm" action="/cas/login;JSESSIONIDCAS=…">
+
+2) POST <action>（application/x-www-form-urlencoded）
+   lt=<lt>&execution=<execution>&_eventId=submit
+   &ul=<len(学号)>&pl=<len(密码)>&sl=0
+   &rsa=strEnc(学号+密码+lt, "1","2","3")
+   （#un/#pd 输入框 disabled——凭据只藏在 rsa 字段）
+
+3) 成功 → 302 + Set-Cookie: CASTGC=TGT-xxx（CAS 全局会话）
+   失败 → 200 登录页，<span id="errormsghide">用户名密码错误</span>
+```
+
+### 10.2 des.js 加密（非标准 DES！）
+
+`strEnc(data,'1','2','3')` = DESCore（自定义置换）：数据按 4 字符分块，**每字符占
+16bit（大端）**，不足 4 字符用 0x0000 填充；每块依次 DES("1")→DES("2")→DES("3")
+（三次加密，非 EDE）；输出大写 HEX 拼接。与标准 DES/JCE 输出**不同**，只能逐行移植
+（App 内 `DesCore.kt`，已用浏览器基准向量 100% 校验）。
+
+### 10.3 与健康长跑 H5 的衔接
+
+i大工 原生 `synCookies` 同时注入 whistlekey（微哨 skey）**和** TGT（CAS 会话）到
+`.dlut.edu.cn` 域；健康长跑 H5 两种鉴权任取其一即可。故 RunMate v1.5.1：
+CAS 登录拿 CASTGC → 注入 H5 捕获页 WebView（sso.dlut.edu.cn / .dlut.edu.cn）→
+H5 免密通过 → 嗅探器捕获 findExtExercise 全套参数。CAS 页面出现时另有 JS 自动
+填表兜底（页面自带 des.js 计算 rsa，行为与真人完全一致）。
+
+### 10.4 实测记录（2026-10-09）
+
+| 场景 | 结果 |
+|---|---|
+| 假学号+假密码 | 200 + errormsghide「用户名密码错误」✓ 协议被正确处理 |
+| 连续 3 次失败（微哨 userLoginCas） | 均返回 94003，不触发验证码（排除验证码假说） |
+| 微哨 + app_version=3.3.12.75026 | 401 {"errcode":8011002,"errmsg":"a is empty"} |
+| 微哨 /n/index.php（云配置 url_main_server） | 404（Spring Boot 网关），/whistlenew 为唯一存活路径 |

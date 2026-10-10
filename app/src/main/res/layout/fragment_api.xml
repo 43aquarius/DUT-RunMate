@@ -6,6 +6,7 @@
     android:orientation="vertical">
 
     <ScrollView
+        android:id="@+id/scrollApi"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true">
@@ -23,6 +24,58 @@
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/api_usage_hint" />
+
+            <!-- v1.4.0 账号登录 · 一键配置 -->
+            <LinearLayout android:orientation="vertical"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="?attr/colorSurfaceVariant" android:padding="16dp">
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:text="@string/ws_card_title" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp" android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:text="@string/ws_card_hint" />
+                <LinearLayout android:orientation="horizontal"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp">
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                        android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_height="wrap_content" android:hint="@string/ws_number_hint">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etWsNumber" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:inputType="text"
+                            android:singleLine="true"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                        android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_height="wrap_content" android:layout_marginStart="8dp"
+                        android:hint="@string/ws_pwd_hint" app:endIconMode="password_toggle">
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/etWsPwd" android:layout_width="match_parent"
+                            android:layout_height="wrap_content" android:inputType="textPassword"
+                            android:imeOptions="actionDone" android:singleLine="true"
+                            android:textAppearance="?attr/textAppearanceBodySmall" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnWsLogin" style="@style/Widget.RunMate.PillButton"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp" android:text="@string/ws_btn_login" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOpenH5" style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:visibility="gone"
+                    android:text="@string/ws_btn_open_h5" />
+                <TextView android:id="@+id/tvWsStatus" android:layout_width="match_parent"
+                    android:layout_height="wrap_content" android:layout_marginTop="6dp"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" android:text="" />
+            </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/tilToken" android:layout_width="match_parent"
@@ -57,11 +110,8 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvProfiles" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginTop="12dp"
-                android:nestedScrollingEnabled="false" />
-
+            <!-- v1.6.0：结果卡片提前到接口列表上方 —— 点击「发送测试」立即可见反馈，
+                 不再需要等响应后滚动到底部（旧版反馈不可见问题修复） -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardResult" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:layout_marginTop="12dp"
@@ -85,6 +135,11 @@
                     </ScrollView>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvProfiles" android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginTop="12dp"
+                android:nestedScrollingEnabled="false" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

@@ -19,7 +19,7 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         get() = sp.getInt("pollInterval", 3)
         set(v) = sp.edit().putInt("pollInterval", v).apply()
     var graceSec: Int
-        get() = sp.getInt("graceSec", 12)
+        get() = sp.getInt("graceSec", 15)
         set(v) = sp.edit().putInt("graceSec", v).apply()
 
     var ttsEnabled: Boolean
@@ -38,6 +38,43 @@ class Prefs private constructor(private val sp: SharedPreferences) {
     var apiToken: String
         get() = sp.getString("token", "") ?: ""
         set(v) = sp.edit().putString("token", v).apply()
+    /** v1.4.0：{cookie} 占位符（WebVPN 隧道场景携带 wengine_vpn_ticket 等 Cookie） */
+    var apiCookie: String
+        get() = sp.getString("apiCookie", "") ?: ""
+        set(v) = sp.edit().putString("apiCookie", v).apply()
+
+    /** v1.4.0：微哨（i大工）账号会话 —— 登录后自动配置用 */
+    var wsUserId: String
+        get() = sp.getString("wsUserId", "") ?: ""
+        set(v) = sp.edit().putString("wsUserId", v).apply()
+    var wsSkey: String
+        get() = sp.getString("wsSkey", "") ?: ""
+        set(v) = sp.edit().putString("wsSkey", v).apply()
+    var wsName: String
+        get() = sp.getString("wsName", "") ?: ""
+        set(v) = sp.edit().putString("wsName", v).apply()
+    var wsNumber: String
+        get() = sp.getString("wsNumber", "") ?: ""
+        set(v) = sp.edit().putString("wsNumber", v).apply()
+
+    /**
+     * v1.5.0：登录信息本地保存 —— 密码随会话一起落盘（Base64 混淆，仅存本机），
+     * 下次打开「接口」页自动回填，会话过期时一键重新登录。
+     * 通过 wsPwdBlank 清除（长按密码框清空）。
+     */
+    var wsPwdSaved: String
+        get() = sp.getString("wsPwd", "") ?: ""
+        set(v) = sp.edit().putString("wsPwd", v).apply()
+    fun wsPwdDecoded(): String = try {
+        if (wsPwdSaved.isBlank()) ""
+        else String(android.util.Base64.decode(wsPwdSaved, android.util.Base64.NO_WRAP), Charsets.UTF_8)
+    } catch (_: Exception) { "" }
+
+    /** v1.5.1：CAS 统一认证会话（CASTGC=TGT-xxx，sso.dlut.edu.cn 全局会话）。
+     *  主登录通道产物，注入 H5 捕获页 WebView 实现 CAS 域免密。 */
+    var casTgt: String
+        get() = sp.getString("casTgt", "") ?: ""
+        set(v) = sp.edit().putString("casTgt", v).apply()
 
     var tileSat: Boolean
         get() = sp.getBoolean("tileSat", true)
@@ -50,13 +87,10 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         get() = sp.getBoolean("mapHintShown", false)
         set(v) = sp.edit().putBoolean("mapHintShown", v).apply()
 
-    // 更新
+    // 更新（v1.5.0：服务器地址改为内置常量，见 Updater.SERVER_BASE；不再可自定义）
     var updAutoCheck: Boolean
         get() = sp.getBoolean("updAutoCheck", true)
         set(v) = sp.edit().putBoolean("updAutoCheck", v).apply()
-    var updServerUrl: String
-        get() = sp.getString("updServerUrl", "") ?: ""
-        set(v) = sp.edit().putString("updServerUrl", v).apply()
     var updLastCheckMs: Long
         get() = sp.getLong("updLastCheckMs", 0L)
         set(v) = sp.edit().putLong("updLastCheckMs", v).apply()

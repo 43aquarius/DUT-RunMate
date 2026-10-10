@@ -6,7 +6,6 @@ import android.net.Uri
 import android.os.Build
 import androidx.core.content.FileProvider
 import com.dut.runmate.BuildConfig
-import com.dut.runmate.data.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -19,9 +18,12 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
- * 应用内更新：双通道检查（自建服务器 → GitHub Release 兜底）+ 下载 + 安装。
+ * 应用内更新：双通道检查（发布中心服务器 → GitHub Release 兜底）+ 下载 + 安装。
  *
- * 服务器清单格式（本仓库配套发布中心 /api/latest）：
+ * v1.5.0：服务器地址为内置常量（用户指定的发布中心），不再支持自定义；
+ * 服务器不可达时自动改走 GitHub Release。
+ *
+ * 服务器清单格式（配套发布中心 /api/latest）：
  * { ok, latest: { versionName, versionCode, apkUrl|apkPath, sha256, sizeBytes, notes, ... } }
  *
  * GitHub：GET /repos/{repo}/releases/latest，tag_name 形如 v1.1.0，
@@ -30,6 +32,10 @@ import java.util.concurrent.TimeUnit
 object Updater {
 
     const val GITHUB_REPO = "43aquarius/DUT-RunMate"
+
+    /** v1.5.0：发布中心固定地址（用户指定），不再从设置读取 */
+    const val SERVER_BASE = "https://dut-runmate.space-z.ai"
+
     private const val GITHUB_API = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
 
     data class UpdateInfo(
@@ -57,16 +63,13 @@ object Updater {
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    /** 检查更新：服务器优先，GitHub 兜底；任一通道有新版本即返回 */
+    /** 检查更新：发布中心服务器优先，GitHub 兜底；任一通道有新版本即返回 */
     suspend fun check(ctx: Context): CheckResult = withContext(Dispatchers.IO) {
-        val prefs = Prefs.get(ctx)
-        val serverUrl = prefs.updServerUrl.trim()
-
         var serverResult: CheckResult? = null
-        if (serverUrl.isNotBlank()) {
-            serverResult = try { checkServer(serverUrl) } catch (e: Exception) {
-                CheckResult.Failed("服务器通道: ${e.message}")
-            }
+        serverResult = try {
+            checkServer(SERVER_BASE)
+        } catch (e: Exception) {
+            CheckResult.Failed("服务器通道: ${e.message}")
         }
         if (serverResult is CheckResult.HasUpdate) return@withContext serverResult
 
@@ -78,9 +81,8 @@ object Updater {
         serverResult?.takeIf { it is CheckResult.UpToDate } ?: ghResult
     }
 
-    /** 自建服务器通道 */
+    /** 发布中心服务器通道：SERVER_BASE 自动补全 /api/latest */
     private fun checkServer(rawUrl: String): CheckResult {
-        // 用户可能只粘贴了站点根地址：自动补全 /api/latest
         var url = rawUrl.trim().trimEnd('/')
         if (!url.contains("/api/latest") && !url.endsWith(".json")) url = "$url/api/latest"
 
