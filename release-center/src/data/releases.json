@@ -1,20 +1,34 @@
 {
   "repo": "43aquarius/DUT-RunMate",
   "latest": {
-    "versionName": "1.6.1",
-    "versionCode": 10,
+    "versionName": "1.6.2",
+    "versionCode": 11,
     "date": "2026-10-10",
-    "apkFile": "DUT-RunMate_v1.6.1.apk",
-    "sha256": "75d8b628e942b00e4fb11c0f8a8350b6c732203cef0d8b7d452ffd7efecd0702",
-    "sizeBytes": 5956961,
+    "apkFile": "DUT-RunMate_v1.6.2.apk",
+    "sha256": "d64a1254b5f7babb95c205aac12533175a55c5942de7f58c490a0efecab36275",
+    "sizeBytes": 5959981,
     "minSdk": 24,
     "targetSdk": 34,
-    "notes": "【修复】应用内更新 · 查询服务端距离闪退 · 测试结果可复制\n\n- 修复应用内更新「连接失败」：旧版清单里的下载地址被平台内部转发域名污染（公网不可达），本版一律以「服务器域名 + 路径」重建下载地址，不再信任清单外链\n- 更新反馈改造：检查失败 / 下载失败改为持久弹窗，完整显示两个通道（服务器 / GitHub）的具体错误，并提供「重试 / 浏览器下载 / 复制链接 / 打开发布中心」兜底；服务器通道自动重试 2 次\n- 修复跑步页「查询服务端距离」闪退：点击链路全程隔离加固（与接口页同款），任何异常只记入崩溃日志、不再闪退；结果改为持久弹窗展示，支持一键复制\n- 修复测试反馈弹窗一闪而过：接口页「发送测试」与 H5 自动测试的结果全部改为持久展示（卡片 / 弹窗），文本可长按选中，新增「复制完整结果」按钮\n- 跑步服务轮询循环整段隔离 + 协程异常处理器：轮询中任何一段异常不再可能杀死进程\n- 接口页新增「说明」按钮、H5 捕获页新增「使用说明」入口：令牌 Token、自定义接口、三个快捷入口（校内直连 / WebVPN / 重新注入嗅探）的用途一查即知",
-    "githubTag": "v1.6.1",
-    "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.6.1",
-    "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.6.1.apk"
+    "notes": "【修复】接口测试报错正则异常 · 登录后令牌不自动填充\n\n- 修复「发送测试 / 查询服务端距离」全部报「请求异常 PatternSyntaxException」：旧版在 Cookie 为空时用含 \\{ 转义的正则拼接删除空请求头，该写法在 Android 14+ 的 ICU 正则引擎上无法编译（请求根本没发出去，与网络无关）；本版改为 JSON 解析后逐值替换，彻底移除正则拼接，顺带消除 Cookie 含特殊字符时的注入风险\n- 修复「统一身份登录后令牌不自动填充」：实测 H5 页面一加载就发出 findExtExercise，旧版嗅探器在页面加载完成后才注入、永远错过请求（登录成功但配置不入库的根因）；本版改为拦截 H5 主文档、在任何页面脚本运行前预注入嗅探器，并只采纳 HTTP 200（会话有效）的请求，捕获后回到「接口」页令牌立即刷新\n- 其他：URL 中占位符无值时直接提示「先登录自动配置或手动填令牌」；WebVPN 隧道地址自动修正为用户专属前缀",
+    "githubTag": "v1.6.2",
+    "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.6.2",
+    "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.6.2.apk"
   },
   "history": [
+    {
+      "versionName": "1.6.1",
+      "versionCode": 10,
+      "date": "2026-10-10",
+      "apkFile": "DUT-RunMate_v1.6.1.apk",
+      "sha256": "75d8b628e942b00e4fb11c0f8a8350b6c732203cef0d8b7d452ffd7efecd0702",
+      "sizeBytes": 5956961,
+      "minSdk": 24,
+      "targetSdk": 34,
+      "notes": "【修复】应用内更新 · 查询服务端距离闪退 · 测试结果可复制\n\n- 修复应用内更新「连接失败」：旧版清单里的下载地址被平台内部转发域名污染（公网不可达），本版一律以「服务器域名 + 路径」重建下载地址，不再信任清单外链\n- 更新反馈改造：检查失败 / 下载失败改为持久弹窗，完整显示两个通道（服务器 / GitHub）的具体错误，并提供「重试 / 浏览器下载 / 复制链接 / 打开发布中心」兜底；服务器通道自动重试 2 次\n- 修复跑步页「查询服务端距离」闪退：点击链路全程隔离加固（与接口页同款），任何异常只记入崩溃日志、不再闪退；结果改为持久弹窗展示，支持一键复制\n- 修复测试反馈弹窗一闪而过：接口页「发送测试」与 H5 自动测试的结果全部改为持久展示（卡片 / 弹窗），文本可长按选中，新增「复制完整结果」按钮\n- 跑步服务轮询循环整段隔离 + 协程异常处理器：轮询中任何一段异常不再可能杀死进程\n- 接口页新增「说明」按钮、H5 捕获页新增「使用说明」入口：令牌 Token、自定义接口、三个快捷入口（校内直连 / WebVPN / 重新注入嗅探）的用途一查即知",
+      "githubTag": "v1.6.1",
+      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.6.1",
+      "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.6.1.apk"
+    },
     {
       "versionName": "1.6.0",
       "versionCode": 9,

@@ -29,15 +29,26 @@ object Http {
         val error: String? = null
     )
 
-    private fun render(s: String, token: String, cookie: String): String {
-        var r = if (token.isBlank()) s else s.replace("{token}", token)
-        if (cookie.isBlank()) {
-            // 无 Cookie 时移除 {cookie} 空值头并修复 JSON 逗号
-            r = r.replace(Regex("\"Cookie\"\\s*:\\s*\"\\{cookie}\"\\s*,?"), "")
-            r = r.replace(Regex(",\\s*,"), ",").replace("{,", "{").replace(Regex(",\\s*}"), "}")
-        } else {
-            r = r.replace("{cookie}", cookie)
-        }
+    /**
+     * v1.6.2：占位符替换全面去正则化。
+     *
+     * 旧版在 Cookie 为空时用 Regex("\"Cookie\"\\s*:\\s*\"\\{cookie}\"...") 删除空值头，
+     * 该模式含 `\{` 转义——OpenJDK 接受，但 Android 14+ 的 ICU 正则
+     * （com.android.icu.util.regex）拒绝编译，报 PatternSyntaxException，
+     * 导致「发送测试/查询服务端距离/登录后自动验证」全部失败（请求根本没发出去）。
+     * 新方案：请求头先 JSONObject 解析再逐值替换，占位符无值时丢弃该头，
+     * 同时消除 Cookie 值含引号时破坏 JSON 的注入风险。 */
+    private fun renderPlain(s: String, token: String, cookie: String): String {
+        var r = s
+        if (token.isNotBlank()) r = r.replace("{token}", token)
+        if (cookie.isNotBlank()) r = r.replace("{cookie}", cookie)
+        return r
+    }
+
+    /** 请求头专用：替换后若仍含占位符（令牌/Cookie 未配置）→ 返回 null 丢弃该头 */
+    private fun renderHeader(s: String, token: String, cookie: String): String? {
+        val r = renderPlain(s, token, cookie)
+        if (r.isBlank() || r.contains("{token}") || r.contains("{cookie}")) return null
         return r
     }
 
@@ -46,24 +57,29 @@ object Http {
      *  会触摸已置空的 ViewBinding（_b!!）导致闪退（发送测试/登录偶发崩溃根因）。 */
     suspend fun call(profile: ApiProfile, token: String, cookie: String = ""): Resp = withContext(Dispatchers.IO) {
         val t0 = System.nanoTime()
+        var url = profile.url
         try {
-            val url = render(profile.url, token, cookie)
+            url = renderPlain(profile.url, token, cookie)
+            // 占位符无值时提前失败并给出明确原因（旧版会拿着含 {token} 的 URL 发出晦涩报错）
+            if (url.contains("{token}") || url.contains("{cookie}")) {
+                return@withContext Resp(0, 0, "", url,
+                    "URL 中 {token}/{cookie} 占位符无值：请先在「接口」页登录自动配置，或手动填写令牌")
+            }
             val b = Request.Builder().url(url)
-            val headers = render(if (profile.headers.isBlank()) "{}" else profile.headers, token, cookie)
             try {
-                val h = JSONObject(headers)
+                val h = JSONObject(if (profile.headers.isBlank()) "{}"
+                    else renderPlain(profile.headers, token, cookie))
                 for (k in h.keys()) {
-                    val v = h.optString(k, "")
-                    if (v.isBlank()) continue
+                    val v = renderHeader(h.optString(k, ""), token, cookie) ?: continue
                     b.header(k, v)
                 }
             } catch (_: Exception) { }
             val method = profile.method.uppercase()
             if (method == "POST") {
-                val bodyStr = render(profile.body, token, cookie)
+                val bodyStr = renderPlain(profile.body, token, cookie)
                 b.post((if (bodyStr.isBlank()) "{}" else bodyStr).toRequestBody(JSON_MEDIA))
             } else if (method == "PUT") {
-                val bodyStr = render(profile.body, token, cookie)
+                val bodyStr = renderPlain(profile.body, token, cookie)
                 b.put((if (bodyStr.isBlank()) "{}" else bodyStr).toRequestBody(JSON_MEDIA))
             }
             client.newCall(b.build()).execute().use { r ->
@@ -77,7 +93,7 @@ object Http {
         } catch (e: CancellationException) {
             throw e                     // 页面已销毁：让协程静默终止，绝不触摸 UI
         } catch (e: Exception) {
-            Resp(0, ((System.nanoTime() - t0) / 1_000_000).toInt(), "", render(profile.url, token, cookie), e.message)
+            Resp(0, ((System.nanoTime() - t0) / 1_000_000).toInt(), "", url, e.message)
         }
     }
 

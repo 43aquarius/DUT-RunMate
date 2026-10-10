@@ -11,6 +11,7 @@ import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -23,7 +24,11 @@ import com.dut.runmate.data.api.ApiStore
 import com.dut.runmate.databinding.ActivityH5CatcherBinding
 import com.dut.runmate.net.Http
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONObject
+import java.nio.charset.Charset
+import java.util.concurrent.TimeUnit
 
 /**
  * v1.4.0 · H5 捕获配置页（一键登录配置的第二步）。
@@ -59,6 +64,12 @@ class H5CatcherActivity : AppCompatActivity() {
          */
         const val H5_TUNNEL =
             "https://webvpn.dlut.edu.cn/http-8081/0/mobilenew/?vpn-12-o1-202.118.65.138:8081"
+
+        /**
+         * v1.6.2 · 嗅探器升级：响应完成后再上报（附 HTTP 状态码），
+         * 只有 200 的 findExtExercise 才会被采纳——避免抓到过期令牌的 401 请求后
+         * 把 captured 标记一锤定音，后续有效请求反而不入库。
+         */
         private const val SNIFFER_JS = """
 (function(){
   if (window.__rmSniff) return; window.__rmSniff = 1;
@@ -78,8 +89,11 @@ class H5CatcherActivity : AppCompatActivity() {
     try {
       if (this.__rm) {
         var r = this.__rm;
+        var x = this;
         r.body = (b && typeof b === 'string') ? b : '';
-        send(r);
+        x.addEventListener('load', function(){
+          try { r.status = x.status; send(r); } catch(e){}
+        });
       }
     } catch(e){}
     return os.apply(this, arguments);
@@ -87,6 +101,7 @@ class H5CatcherActivity : AppCompatActivity() {
   if (window.fetch) {
     var of = window.fetch;
     window.fetch = function(input, init){
+      var meta = null;
       try {
         var u = (typeof input === 'string') ? input : (input && input.url);
         var h = {};
@@ -94,10 +109,15 @@ class H5CatcherActivity : AppCompatActivity() {
           if (init.headers.forEach) { init.headers.forEach(function(v,k){ h[k]=v; }); }
           else { h = init.headers; }
         }
-        send({method:(init&&init.method)||'GET', url:String(u), headers:h,
-              body:(init && typeof init.body==='string') ? init.body : ''});
+        meta = {method:(init&&init.method)||'GET', url:String(u), headers:h,
+                body:(init && typeof init.body==='string') ? init.body : ''};
       } catch(e){}
-      return of.apply(this, arguments);
+      var p = of.apply(this, arguments);
+      if (meta) {
+        p.then(function(resp){ try { meta.status = resp.status; send(meta); } catch(e){} },
+               function(){});
+      }
+      return p;
     };
   }
 })();
@@ -113,6 +133,16 @@ class H5CatcherActivity : AppCompatActivity() {
     private var captured = false
     private var webvpnTriedFill = false
     private var casTriedFill = false
+
+    /** v1.6.2：门户资源列表里拿到的用户真实隧道前缀（H5_TUNNEL 常量用的 "0" 是占位段） */
+    private var tunnelPrefix = ""
+
+    /** v1.6.2：拦截主文档用的独立 HTTP 客户端（不跟随重定向，3xx 原样交回 WebView） */
+    private val fetchClient = OkHttpClient.Builder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .followRedirects(false)
+        .build()
 
     // v1.6.0 WebVPN 自动流程状态：
     //   0 = 未走隧道；1 = 已加载隧道 H5（未登录被重定向到 /login）；
@@ -155,9 +185,37 @@ class H5CatcherActivity : AppCompatActivity() {
                 return !(u.startsWith("http://") || u.startsWith("https://"))
             }
 
+            /**
+             * v1.6.2 · 核心修复：拦截 H5 主文档并预注入嗅探器（document-start）。
+             *
+             * 旧版只在 onPageStarted/onPageFinished 注入——onPageStarted 时 evaluateJavascript
+             * 落在【旧】文档里（导航后即丢失），onPageFinished 时 H5 的 findExtExercise
+             * 早已发出（实测抓包：H5 加载即查询），两次注入全都错过请求 →
+             * 「登录成功但令牌不自动填充」的根因。
+             * 现改为：主框架 HTML 响应在返回 WebView 前由 OkHttp 取回，把嗅探器
+             * <script> 插到 <head> 最前面——任何页面脚本运行前 XHR/fetch 已被接管。
+             */
+            override fun shouldInterceptRequest(
+                v: WebView, req: WebResourceRequest
+            ): WebResourceResponse? {
+                if (!req.isForMainFrame) return null
+                val u = req.url.toString()
+                if (!u.contains("mobilenew", ignoreCase = true)) return null
+                return try {
+                    interceptH5Document(v, u, req.requestHeaders)
+                } catch (_: Exception) {
+                    null      // 拦截失败 → 交回 WebView 默认加载（回到旧行为，页面仍可用）
+                }
+            }
+
             override fun onPageStarted(v: WebView, url: String, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(v, url, favicon)
                 injectSniffer()
+            }
+
+            override fun onPageCommitVisible(v: WebView, url: String) {
+                super.onPageCommitVisible(v, url)
+                injectSniffer()   // v1.6.2：比 onPageFinished 更早的兑底注入时机
             }
 
             override fun onPageFinished(v: WebView, url: String) {
@@ -228,6 +286,75 @@ class H5CatcherActivity : AppCompatActivity() {
 
     private fun injectSniffer() {
         b.web.evaluateJavascript(SNIFFER_JS, null)
+    }
+
+    /** v1.6.2：从 Content-Type 提取字符集（默认 UTF-8），非法名回退 */
+    private fun charsetOf(contentType: String): String {
+        val m = Regex("charset=([A-Za-z0-9_\\-]+)", RegexOption.IGNORE_CASE).find(contentType)
+        val name = m?.groupValues?.get(1) ?: "UTF-8"
+        return try { Charset.forName(name).name() } catch (_: Exception) { "UTF-8" }
+    }
+
+    /** v1.6.2：把嗅探器 <script> 插到 <head> 之后（无 head 则 <html> 后/文首） */
+    private fun injectIntoHtml(html: String): String {
+        val tag = "<script>" + SNIFFER_JS + "</script>"
+        Regex("<head[^>]*>", RegexOption.IGNORE_CASE).find(html)?.let {
+            return html.substring(0, it.range.last + 1) + tag + html.substring(it.range.last + 1)
+        }
+        Regex("<html[^>]*>", RegexOption.IGNORE_CASE).find(html)?.let {
+            return html.substring(0, it.range.last + 1) + tag + html.substring(it.range.last + 1)
+        }
+        return tag + html
+    }
+
+    /**
+     * v1.6.2：取回 H5 主文档并预注入嗅探器（在 WebViewClient.shouldInterceptRequest
+     * 的后台线程里执行，同步返回改造后的响应）。
+     * - Cookie（whistlekey / wengine_vpn_ticket 等）从 CookieManager 原样转发
+     * - 3xx/非 200：状态码+响应头+字节流原样交回 WebView 自行处理
+     * - 200 HTML：嗅探器 <script> 插入 <head> 顶部后返回
+     * - 任何异常由调用方兑底返回 null → WebView 默认加载
+     */
+    private fun interceptH5Document(
+        v: WebView, url: String, reqHeaders: Map<String, String>
+    ): WebResourceResponse {
+        val cookie = try { CookieManager.getInstance().getCookie(url) } catch (_: Exception) { null }
+        val rb = Request.Builder().url(url)
+            .header("User-Agent", v.settings.userAgentString)
+            .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .header("Accept-Language", "zh-CN,zh;q=0.9")
+        reqHeaders["Referer"]?.takeIf { it.isNotBlank() }?.let { rb.header("Referer", it) }
+        if (!cookie.isNullOrBlank()) rb.header("Cookie", cookie)
+
+        fetchClient.newCall(rb.build()).execute().use { r ->
+            val ct = r.header("Content-Type") ?: ""
+            // 转发原始响应头（剔除随体长度/编码变化的项与 CSP，避免拦截注入的内联脚本被拦）
+            val fwd = linkedMapOf<String, String>()
+            val skip = setOf("content-encoding", "content-length", "content-type",
+                "content-security-policy", "content-security-policy-report-only")
+            r.headers.forEach { (k, vv) ->
+                if (k.lowercase() !in skip)
+                    fwd[k] = if (fwd.containsKey(k)) fwd[k] + ", " + vv else vv
+            }
+            val bytes = r.body?.bytes() ?: ByteArray(0)
+            val reason = r.message.ifBlank { "HTTP ${r.code}" }
+            if (r.code != 200 || !ct.contains("html", ignoreCase = true)) {
+                // 非成功/非 HTML：字节流透传，跳转由 WebView 自行跟随（会再次进入拦截器）
+                return WebResourceResponse(
+                    ct.substringBefore(';').trim().ifBlank { "text/html" },
+                    charsetOf(ct), r.code, reason, fwd, java.io.ByteArrayInputStream(bytes)
+                )
+            }
+            val enc = charsetOf(ct)
+            val patched = injectIntoHtml(String(bytes, Charset.forName(enc)))
+            runOnUiThread {
+                log(getString(R.string.h5_log_intercept, patched.length))
+            }
+            return WebResourceResponse(
+                "text/html", enc, 200, "OK", fwd,
+                java.io.ByteArrayInputStream(patched.toByteArray(Charset.forName(enc)))
+            )
+        }
     }
 
     private fun syncCookies() {
@@ -366,8 +493,9 @@ class H5CatcherActivity : AppCompatActivity() {
                   var t = (links[i].innerText || '') + (links[i].getAttribute('title') || '');
                   if (/长跑|体质|锻炼|运动/.test(t) || kw.some(function(k){return h.indexOf(k) >= 0;})) {
                     if (h.indexOf('/http-8081/') >= 0 || h.indexOf('8081') >= 0) {
+                      var m = h.match(/\/http-8081\/([^\/?#]+)/);
                       links[i].click();
-                      return 'res:' + h.slice(0, 80);
+                      return 'res:' + (m ? m[1] : h.slice(0, 80));
                     }
                   }
                 }
@@ -377,6 +505,9 @@ class H5CatcherActivity : AppCompatActivity() {
         """.trimIndent()
         v.evaluateJavascript(js) { r ->
             if (r != null && r.contains("res:")) {
+                // v1.6.2：提取用户真实隧道前缀（applyCapture 兑底修正 /http-8081/0/ 占位段）
+                val pref = r.trim('"').substringAfter("res:", "")
+                if (pref.length in 8..128 && !pref.contains('/') && pref != "0") tunnelPrefix = pref
                 log(getString(R.string.h5_log_portal_link, r))
             } else {
                 log(getString(R.string.h5_log_tunnel_h5))
@@ -399,12 +530,19 @@ class H5CatcherActivity : AppCompatActivity() {
             val url = o.optString("url")
             if (url.isBlank()) return
             val method = o.optString("method", "GET")
-            log("→ $method ${url.take(110)}")
+            val status = o.optInt("status", 0)
+            log("→ $method [$status] ${url.take(100)}")
 
-            // 目标：findExtExercise（含全部四个值 + Authorization）
+            // 目标：findExtExercise（含全部四个值 + Authorization，且响应 200 = 会话有效）
             if (url.contains("findExtExercise", ignoreCase = true)) {
                 val bodyStr = o.optString("body")
                 if (bodyStr.isBlank()) return
+                if (captured) return
+                // v1.6.2：非 200（401/302 等）说明 H5 会话未生效，等它重新发起再抓
+                if (status != 200) {
+                    log(getString(R.string.h5_log_skip_status, status))
+                    return
+                }
                 val body = JSONObject(bodyStr)
                 val userId = body.optString("userId")
                 val amId = body.optString("amId")
@@ -414,7 +552,6 @@ class H5CatcherActivity : AppCompatActivity() {
                 var auth = headers?.optString("Authorization") ?: ""
                 if (auth.isBlank()) auth = headers?.optString("authorization") ?: ""
                 if (userId.isBlank() || sign.isBlank()) return
-                if (captured) return
                 captured = true
                 applyCapture(url, auth, body, userId, amId, pmId, sign)
             }
@@ -427,9 +564,20 @@ class H5CatcherActivity : AppCompatActivity() {
         reqUrl: String, auth: String, body: JSONObject,
         userId: String, amId: String, pmId: String, sign: String
     ) {
+        // v1.6.2：捕获到的可能是相对路径（H5 内部请求）→ 以当前文档 URL 绝对化；
+        // H5_TUNNEL 常量的 "0" 占位前缀若未被门户改写，换成真实用户前缀
+        var absUrl = reqUrl
+        if (!absUrl.startsWith("http", ignoreCase = true)) {
+            absUrl = try {
+                java.net.URI(b.web.url).resolve(reqUrl).toString()
+            } catch (_: Exception) { reqUrl }
+        }
+        if (tunnelPrefix.isNotBlank() && absUrl.contains("/http-8081/0/"))
+            absUrl = absUrl.replace("/http-8081/0/", "/http-8081/$tunnelPrefix/")
+
         // 1) 令牌：Authorization（userId:token）；WebVPN 场景还需隧道 Cookie
         prefs.apiToken = auth.ifBlank { "$userId:" }
-        if (reqUrl.contains("webvpn.dlut.edu.cn")) {
+        if (absUrl.contains("webvpn.dlut.edu.cn")) {
             val ck = try {
                 CookieManager.getInstance().getCookie("https://webvpn.dlut.edu.cn")
             } catch (_: Exception) { null }
@@ -441,7 +589,7 @@ class H5CatcherActivity : AppCompatActivity() {
         // 2) 距离模板：URL / 请求头 / 请求体（原样复刻 H5 实际使用的请求）
         val p = store.distanceProfile() ?: return
         p.method = "POST"
-        p.url = reqUrl
+        p.url = absUrl
         p.headers = if (prefs.apiCookie.isBlank())
             "{\"Authorization\":\"{token}\",\"Content-Type\":\"application/json;charset=UTF-8\"}"
         else

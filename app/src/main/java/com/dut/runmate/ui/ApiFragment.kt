@@ -319,6 +319,18 @@ class ApiFragment : Fragment() {
         dialog.show()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // v1.6.2：从 H5 捕获页返回后刷新令牌/开关/登录状态。
+        // MainActivity 用 replace() 管理 Fragment、捕获页是覆盖其上的独立 Activity，
+        // 返回时 View 不重建——旧版令牌框不刷新，即使捕获成功用户也以为「没自动填充」。
+        if (_b != null) {
+            b.etToken.setText(prefs.apiToken)
+            b.swApiMode.isChecked = prefs.apiEnabled
+            renderWsStatus()
+        }
+    }
+
     override fun onDestroyView() { _b = null; super.onDestroyView() }
 }
 

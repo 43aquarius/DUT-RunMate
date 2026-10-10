@@ -159,6 +159,8 @@
     <string name="h5_log_webvpn_retry">WebVPN 会话未完全建立，自动重试登录流程…</string>
     <string name="h5_log_portal_link">已从门户资源列表进入：%1$s</string>
     <string name="h5_log_tunnel_h5">正在通过 WebVPN 隧道打开健康长跑 H5…</string>
+    <string name="h5_log_intercept">已拦截 H5 文档并预注入嗅探器（%1$d 字节，页面脚本运行前生效）</string>
+    <string name="h5_log_skip_status">findExtExercise 返回 HTTP %1$d（会话未生效），等待 H5 重新发起…</string>
     <string name="h5_log_captured">捕获成功 userId=%1$s… amId=%2$s… pmId=%3$s… sign=%4$s…</string>
     <string name="h5_log_cookie_saved">已保存 WebVPN 隧道 Cookie（后台轮询用）</string>
     <string name="h5_log_test_ok">自动测试通过：服务端距离 %1$s m</string>
