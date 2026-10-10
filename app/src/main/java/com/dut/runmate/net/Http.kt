@@ -21,6 +21,24 @@ object Http {
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * v1.8.1：WebVPN 用户真实隧道前缀（App 启动时从 Prefs 恢复，H5 捕获/门户扫描时更新）。
+     *
+     * 背景：wengine 路径 /http-8081/<前缀>/ 的前缀段与登录用户绑定。实测登录会话存在时
+     * 占位段 "0" 不被网关接受——门户把 0 当作目标 host 解析，代理 http://0/... 不可达
+     * （用户实报「无法访问此网站 http://0/mobilenew/」）。「前缀不参与校验」仅在
+     * 未登录阶段（固定 302 /login）成立。此处请求时统一把 URL 中的 0 占位段替换成
+     * 真实前缀，覆盖发送测试 / 跑步轮询 / 批量查询全部调用点，模板存储值不受影响。
+     */
+    @Volatile var tunnelPrefixHint: String = ""
+
+    /** v1.8.1：/http-8081/0/…/ 占位段 → 用户真实前缀（无前缀或非占位 URL 原样返回） */
+    fun fixTunnelPlaceholder(url: String, prefix: String = tunnelPrefixHint): String {
+        if (prefix.isBlank() || prefix == "0") return url
+        if (!url.contains("/http-8081/0/")) return url
+        return url.replace("/http-8081/0/", "/http-8081/$prefix/")
+    }
+
     data class Resp(
         val code: Int,
         val ms: Int,
@@ -63,7 +81,8 @@ object Http {
         val t0 = System.nanoTime()
         var url = profile.url
         try {
-            url = renderPlain(profile.url, token, cookie)
+            // v1.8.1：0 占位前缀在 wengine 已登录会话下不可达（被当 host），请求前替换成真实前缀
+            url = fixTunnelPlaceholder(renderPlain(profile.url, token, cookie))
             // 占位符无值时提前失败并给出明确原因（旧版会拿着含 {token} 的 URL 发出晦涩报错）
             if (url.contains("{token}") || url.contains("{cookie}")) {
                 return@withContext Resp(0, 0, "", url,

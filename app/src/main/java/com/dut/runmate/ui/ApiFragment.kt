@@ -103,6 +103,27 @@ class ApiFragment : Fragment() {
                 }
             }
         }
+
+        // v1.8.1：修复响应体区域无法内部滚动的问题。
+        // 根因：整页 ScrollView(scrollApi，外层) 与结果卡片内 240dp ScrollView(svApiBody，
+        // 内层) 同向嵌套，外层 onInterceptTouchEvent 在 MOVE 超阈值后抢走手势（Android
+        // 经典嵌套滚动冲突），tvApiBody 的 textIsSelectable 又会先消费 DOWN——内层
+        // 永远滚不动，用户实报「结果很长显示不全，上下滑动时外部窗口在动」。
+        // 修法：按下时按内容是否可滚动态禁止外层拦截（能滚→内层独享手势；
+        // 不能滚→交还外层正常滚动整页），抬起/取消时恢复。
+        b.svApiBody.setOnTouchListener { v, ev ->
+            when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN,
+                android.view.MotionEvent.ACTION_POINTER_DOWN -> {
+                    val canScroll = v.canScrollVertically(1) || v.canScrollVertically(-1)
+                    v.parent.requestDisallowInterceptTouchEvent(canScroll)
+                }
+                android.view.MotionEvent.ACTION_UP,
+                android.view.MotionEvent.ACTION_CANCEL ->
+                    v.parent.requestDisallowInterceptTouchEvent(false)
+            }
+            false
+        }
     }
 
     private fun renderWsStatus() {

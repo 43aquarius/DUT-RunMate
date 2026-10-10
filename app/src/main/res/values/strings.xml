@@ -167,7 +167,10 @@
     <string name="h5_log_cookie">已注入 whistlekey 会话 Cookie</string>
     <string name="h5_log_cookie_cas">已注入 CAS 统一认证会话 Cookie（CASTGC）</string>
     <string name="h5_log_cas_fill">CAS 自动填表：%1$s（如页面要求扫码/验证码请手动完成）</string>
-    <string name="h5_log_tunnel_default">v1.8.0 默认走 WebVPN 隧道（webvpn.dlut.edu.cn 公网可达，不依赖校园网，校内校外通用）</string>
+    <string name="h5_log_tunnel_default">默认走 WebVPN 隧道（webvpn.dlut.edu.cn 公网可达，不依赖校园网，校内校外通用）；已记录隧道前缀时直达，否则经门户登录进入</string>
+    <string name="h5_log_prefix_rejected">⚠ 占位隧道前缀被网关拒绝（被当成目标主机 http://0/…），自动转回门户登录页重新获取…</string>
+    <string name="h5_log_portal_prefix">已从门户提取隧道前缀 %1$s…，正在用真实前缀直达健康长跑 H5…</string>
+    <string name="h5_log_portal_manual">门户里没有找到健康长跑链接：请在门户中手动点击「健康长跑」入口，捕获器会自动接管</string>
     <string name="h5_log_webvpn_fill">WebVPN 自动填表：%1$s（如需验证码/短信请在页面手动完成）</string>
     <!-- v1.6.0 WebVPN 自动流程日志 -->
     <string name="h5_log_webvpn_cas_click">已自动点击「统一身份认证登录」，等待跳转 CAS…</string>

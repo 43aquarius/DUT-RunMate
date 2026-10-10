@@ -85,6 +85,17 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         get() = sp.getString("accountsJson", "") ?: ""
         set(v) = sp.edit().putString("accountsJson", v).apply()
 
+    /**
+     * v1.8.1：WebVPN 用户真实隧道前缀（wengine 路径 /http-8081/<前缀>/ 中的前缀段）。
+     * 实测（用户报 http://0/mobilenew/ 错误页）：门户登录会话存在时，占位段 "0"
+     * 不被网关接受，会被当作目标 host 解析（→ http://0/mobilenew/ 不可达）。
+     * 「前缀段不参与校验」的旧结论只在未登录（固定 302 /login）阶段成立。
+     * 前缀在门户资源列表扫描 / H5 捕获成功时自动记录，供下次直达与请求时替换。
+     */
+    var tunnelPrefix: String
+        get() = sp.getString("tunnelPrefix", "") ?: ""
+        set(v) = sp.edit().putString("tunnelPrefix", v).apply()
+
     var tileSat: Boolean
         get() = sp.getBoolean("tileSat", true)
         set(v) = sp.edit().putBoolean("tileSat", v).apply()

@@ -64,9 +64,24 @@ class H5CatcherActivity : AppCompatActivity() {
          * 实抓包的真实请求形如
          *   /http-8081/<用户加密前缀>/service/mobile/extExercise/findExtExercise?vpn-12-o1-202.118.65.138:8081
          * （见 docs API 文档 §3.4），H5 内部请求由门户改写自动携带正确前缀。
+         *
+         * ⚠ v1.8.1 勘误：上面的「前缀段不参与校验」只在【未登录】阶段成立。
+         * 登录会话建立后前缀段与登录用户绑定——占位段 "0" 会被 wengine 当作
+         * 目标 host 解析，代理 http://0/mobilenew/ → 不可达（用户实报错误页
+         * 「对不起，无法访问此网站 http://0/mobilenew/」）。已登录场景必须使用
+         * 用户真实前缀（见 tunnelH5Url() / Prefs.tunnelPrefix / adoptTunnelPrefix）。
          */
         const val H5_TUNNEL =
             "https://webvpn.dlut.edu.cn/http-8081/0/mobilenew/?vpn-12-o1-202.118.65.138:8081"
+
+        /** v1.8.1：WebVPN 门户登录页（未登录显示认证入口；已登录 302 门户首页） */
+        const val WEBVPN_LOGIN = "https://webvpn.dlut.edu.cn/login"
+
+        /** v1.8.1：带用户真实前缀的隧道 H5 直达 URL；无前缀时退回 0 占位版（仅未登录可达） */
+        fun tunnelH5Url(prefix: String): String =
+            if (prefix.isNotBlank() && prefix != "0")
+                "https://webvpn.dlut.edu.cn/http-8081/$prefix/mobilenew/?vpn-12-o1-202.118.65.138:8081"
+            else H5_TUNNEL
 
         /**
          * v1.6.2 · 嗅探器升级：响应完成后再上报（附 HTTP 状态码），
@@ -137,8 +152,14 @@ class H5CatcherActivity : AppCompatActivity() {
     private var webvpnTriedFill = false
     private var casTriedFill = false
 
-    /** v1.6.2：门户资源列表里拿到的用户真实隧道前缀（H5_TUNNEL 常量用的 "0" 是占位段） */
+    /**
+     * v1.6.2：门户资源列表里拿到的用户真实隧道前缀（H5_TUNNEL 常量用的 "0" 是占位段）。
+     * v1.8.1：随 Prefs 持久化（onCreate 恢复）——已登录场景的隧道直达必须用它。
+     */
     private var tunnelPrefix = ""
+
+    /** v1.8.1：0 占位前缀被网关拒绝后的自动重试次数（防 /login ↔ 隧道死循环） */
+    private var prefixFallbackCount = 0
 
     /** v1.6.2：拦截主文档用的独立 HTTP 客户端（不跟随重定向，3xx 原样交回 WebView） */
     private val fetchClient = OkHttpClient.Builder()
@@ -161,6 +182,8 @@ class H5CatcherActivity : AppCompatActivity() {
 
         number = intent.getStringExtra(EXTRA_NUMBER) ?: prefs.wsNumber
         password = intent.getStringExtra(EXTRA_PASSWORD) ?: ""
+        // v1.8.1：恢复持久化的用户真实隧道前缀（上次门户扫描 / H5 捕获时记录）
+        if (tunnelPrefix.isBlank()) tunnelPrefix = prefs.tunnelPrefix
 
         // v1.5.1：不再强制要求 whistlekey——CAS 会话（CASTGC）同样可以完成
         // H5 鉴权（对齐官方 synCookies 注入 skey+TGT 的行为），两者至少有其一即可。
@@ -229,6 +252,28 @@ class H5CatcherActivity : AppCompatActivity() {
                 maybeWebvpnPostLogin(v, url)
                 syncCookies()
             }
+
+            /**
+             * v1.8.1 自愈：0 占位前缀在 wengine 已登录会话下被网关拒绝——门户把 0
+             * 当作目标 host 解析并重定向到 http://0/mobilenew/ → 不可达（即用户
+             * 实报的错误页）。检测到该失败时自动转回门户 /login 重新走登录流程
+             * 拿真实前缀，最多重试 2 次防循环。
+             */
+            override fun onReceivedError(
+                v: WebView, req: WebResourceRequest, err: android.webkit.WebResourceError
+            ) {
+                super.onReceivedError(v, req, err)
+                if (!req.isForMainFrame) return
+                val u = req.url.toString()
+                val badPrefix = u.startsWith("http://0/") || u.contains("/http-8081/0/")
+                if (badPrefix && prefixFallbackCount < 2) {
+                    prefixFallbackCount++
+                    log(getString(R.string.h5_log_prefix_rejected))
+                    webvpnStage = 1
+                    portalScanned = false
+                    load(WEBVPN_LOGIN)
+                }
+            }
         }
         // JS 桥（嗅探器回传捕获的请求）
         b.web.addJavascriptInterface(SniffBridge(), "RunMate")
@@ -239,10 +284,11 @@ class H5CatcherActivity : AppCompatActivity() {
             load(H5_DIRECT)
         }
         b.btnWebvpn.setOnClickListener {
-            // v1.8.0：直接进隧道 H5（未登录会被门户 302 到 /login，自动流程接管），
-            // 不再停在裸登录页
+            // v1.8.1：有真实前缀直达隧道 H5；无前缀走门户 /login。
+            // （v1.8.0 直接载 0 占位版 H5_TUNNEL——已登录会话下占位段被网关当
+            //   host 解析 → http://0/mobilenew/ 不可达，即用户实报的错误页，本次修复）
             setStatus(getString(R.string.h5_status_webvpn))
-            load(H5_TUNNEL)
+            enterTunnel()
         }
         b.btnSniffAgain.setOnClickListener { injectSniffer(); toast(R.string.h5_sniff_reinjected) }
         // v1.6.1：入口用途说明（健康长跑直连 / WebVPN / 重新注入嗅探都是干什么的）
@@ -282,12 +328,22 @@ class H5CatcherActivity : AppCompatActivity() {
         cm.flush()
         log(getString(if (prefs.wsSkey.isNotBlank()) R.string.h5_log_cookie else R.string.h5_log_cookie_cas))
 
-        // v1.8.0：默认 WebVPN 隧道 —— 未登录会被门户 302 到 /login，
-        // 后续自动点击统一认证 → CAS 自动填表 → 回门户后自动重进 H5。
+        // v1.8.1：默认 WebVPN 隧道。已记录真实前缀 → 直达 H5（会话过期则 302 /login
+        // 自动重登）；无前缀 → 门户 /login（未登录自动走统一认证；已登录 302 门户首页）。
+        // 两种落地均由 maybeWebvpnPostLogin 扫描资源列表接管，不再用 0 占位直达。
         setStatus(getString(R.string.h5_status_webvpn))
         log(getString(R.string.h5_log_tunnel_default))
         webvpnStage = 1
-        load(H5_TUNNEL)
+        enterTunnel()
+    }
+
+    /**
+     * v1.8.1：进入隧道的统一入口（start() 与「WebVPN 隧道」按钮共用）。
+     * 有用户真实前缀 → 前缀版直达；无前缀 → 门户 /login（v1.8.0 起 0 占位版
+     * 直达被移除：已登录会话下占位段被 wengine 当 host 解析 → 不可达错误页）。
+     */
+    private fun enterTunnel() {
+        load(tunnelH5Url(tunnelPrefix))
     }
 
     private fun load(url: String) {
@@ -480,11 +536,15 @@ class H5CatcherActivity : AppCompatActivity() {
     /**
      * v1.6.0：WebVPN 登录完成后的自动导航。
      * 统一认证回跳后（门户首页 / 任意已登录页），自动重新加载隧道 H5；
-     * 首选在门户资源列表里找「健康长跑」链接（携带用户专属隧道前缀，最可靠），
-     * 找不到再退回 H5_TUNNEL 常量 URL（路由由 vpn-12-o1 查询参数决定，实测可达）。
+     * 首选在门户资源列表里找「健康长跑」链接（携带用户专属隧道前缀，最可靠）。
+     *
+     * v1.8.1：①触发条件放宽为 stage>=1——从 /login 进入且已登录时会直接 302
+     * 门户首页，旧条件（stage>=2）会把这种落地当成「没走过认证」而跳过扫描，
+     * 卡在门户页进不了 H5；②找不到长跑链接时从任意隧道链接提取用户前缀，
+     * 用真实前缀直达（不再盲目载 0 占位版——已登录会话下必失败）。
      */
     private fun maybeWebvpnPostLogin(v: WebView, url: String) {
-        if (webvpnStage < 2 || webvpnStage >= 3) return
+        if (webvpnStage < 1 || webvpnStage >= 3) return
         if (!url.contains("webvpn.dlut.edu.cn")) return
         val path = url.substringAfter("webvpn.dlut.edu.cn")
         // 纯登录页不算；但 cas_login=true 回跳（票据验证中/已登录）视为登录完成
@@ -493,7 +553,8 @@ class H5CatcherActivity : AppCompatActivity() {
         log(getString(R.string.h5_log_webvpn_ok))
         if (portalScanned) return
         portalScanned = true
-        // 门户页：优先点击资源列表里的健康长跑链接（拿到用户专属前缀的隧道 URL）
+        // 门户页：①点击资源列表里的健康长跑链接（用户专属前缀，最可靠）；
+        // ②没有长跑链接时从任意隧道链接提取前缀，真实前缀直达（v1.8.1 新增）
         val js = """
             (function(){
               try {
@@ -510,20 +571,65 @@ class H5CatcherActivity : AppCompatActivity() {
                     }
                   }
                 }
+                for (var j = 0; j < links.length; j++) {
+                  var h2 = links[j].getAttribute('href') || '';
+                  var m2 = h2.match(/\/http-8081\/([A-Za-z0-9+=_-]{6,128})\//);
+                  if (m2) return 'prefix:' + m2[1];
+                }
                 return 'no_resource';
               } catch(e) { return 'err:' + e.message; }
             })()
         """.trimIndent()
         v.evaluateJavascript(js) { r ->
-            if (r != null && r.contains("res:")) {
-                // v1.6.2：提取用户真实隧道前缀（applyCapture 兑底修正 /http-8081/0/ 占位段）
-                val pref = r.trim('"').substringAfter("res:", "")
-                if (pref.length in 8..128 && !pref.contains('/') && pref != "0") tunnelPrefix = pref
-                log(getString(R.string.h5_log_portal_link, r))
-            } else {
-                log(getString(R.string.h5_log_tunnel_h5))
-                load(H5_TUNNEL)
+            when {
+                r != null && r.contains("res:") -> {
+                    // v1.6.2 提取真实前缀；v1.8.1 起持久化 + 同步 Http（请求时替换 0 占位）
+                    val pref = r.trim('"').substringAfter("res:", "")
+                    if (pref.length in 8..128 && !pref.contains('/') && pref != "0")
+                        adoptTunnelPrefix(pref)
+                    log(getString(R.string.h5_log_portal_link, r))
+                }
+                r != null && r.contains("prefix:") -> {
+                    val pref = r.trim('"').substringAfter("prefix:", "")
+                    if (pref.length in 6..128 && !pref.contains('/') && pref != "0") {
+                        adoptTunnelPrefix(pref)
+                        log(getString(R.string.h5_log_portal_prefix, pref.take(12)))
+                        load(tunnelH5Url(pref))
+                    } else {
+                        log(getString(R.string.h5_log_portal_manual))
+                    }
+                }
+                else -> {
+                    // v1.8.1：不再盲目载 0 占位版——有前缀用前缀直达，无前缀提示手动
+                    if (tunnelPrefix.isNotBlank()) {
+                        log(getString(R.string.h5_log_tunnel_h5))
+                        load(tunnelH5Url(tunnelPrefix))
+                    } else {
+                        log(getString(R.string.h5_log_portal_manual))
+                    }
+                }
             }
+        }
+    }
+
+    /**
+     * v1.8.1：采纳用户真实隧道前缀——持久化到 Prefs、同步 Http.tunnelPrefixHint
+     * （发送测试/跑步轮询/批量查询请求时自动替换 URL 中 0 占位段），
+     * 并就地修正当前距离模板 URL 里的 0 占位段。
+     */
+    private fun adoptTunnelPrefix(pref: String) {
+        if (pref.isBlank() || pref == "0") return
+        tunnelPrefix = pref
+        prefs.tunnelPrefix = pref
+        Http.tunnelPrefixHint = pref
+        try {
+            store.distanceProfile()?.let { p ->
+                if (p.url.contains("/http-8081/0/")) {
+                    p.url = Http.fixTunnelPlaceholder(p.url, pref)
+                    store.update(p)
+                }
+            }
+        } catch (_: Exception) {
         }
     }
 
@@ -585,6 +691,12 @@ class H5CatcherActivity : AppCompatActivity() {
         }
         if (tunnelPrefix.isNotBlank() && absUrl.contains("/http-8081/0/"))
             absUrl = absUrl.replace("/http-8081/0/", "/http-8081/$tunnelPrefix/")
+        // v1.8.1：从捕获 URL 反向提取真实前缀并持久化（门户链接没扫到时的兑底来源），
+        // 后续 H5 捕获直达与全部距离查询请求都使用真实前缀
+        Regex("/http-8081/([^/]+?)/").find(absUrl)?.let { m ->
+            val pref = m.groupValues[1]
+            if (pref != "0" && pref.length in 6..128 && !pref.contains('/')) adoptTunnelPrefix(pref)
+        }
 
         // 1) 令牌：Authorization（userId:token）；WebVPN 场景还需隧道 Cookie
         prefs.apiToken = auth.ifBlank { "$userId:" }

@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.0-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.1-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.0.apk`（约 5.9 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.1.apk`（约 5.9 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,11 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.1（2026-10-10）**
+  - 🐛 **修复点击「webvpn隧道」报「对不起，无法访问此网站（http://0/mobilenew/）」**：根因是 v1.8.0 用占位前缀 `0` 的隧道地址直达——WebVPN 登录会话存在时，wengine 网关把 0 当成目标主机解析（`http://0/mobilenew/` 不可达）；「前缀不校验」仅在未登录阶段成立。本版改为：已记录真实前缀→直达；未记录→经门户登录页进入并自动从资源列表提取前缀；前缀随本机持久化；命中错误页自动转回登录页重拿（自愈）；
+  - 🐛 **修复接口测试结果过长无法查看**：响应体区域现可独立上下滚动（旧版滑动时被外部整页滚动抢走手势），长按选中与复制不受影响；
+  - ✨ 距离查询全链路前缀兑底：发送测试/跑步轮询/批量查询请求时，URL 中的 0 占位前缀自动替换为已记录的真实前缀；
+  - 📄 文档：API 文档 §3.4 前缀行为勘误、§11 错误表新增 `http://0/mobilenew/` 行。
 - **v1.8.0（2026-10-10）**
   - 🌐 **所有连接默认不依赖校园网（重要变更）**：登录后的 H5 捕获不再探测校内直连，一律走 WebVPN 隧道（webvpn.dlut.edu.cn 公网可达，校内校外通用）——对齐 i大工 官方 App 校外行为，手机流量也能用健康长跑功能；校内直连降级为手动入口；
   - ✨ 默认模板换隧道地址：「健康长跑距离」预填 URL 改为 WebVPN 隧道（含 Cookie 占位头），校内外通用；从未捕获过配置的旧版用户升级后自动迁移，自己改过的配置不动；

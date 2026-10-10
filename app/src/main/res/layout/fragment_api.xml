@@ -157,7 +157,10 @@
                         android:textAppearance="?attr/textAppearanceBodyMedium"
                         android:textIsSelectable="true"
                         android:textColor="?attr/colorOnSurfaceVariant" android:text="" />
-                    <ScrollView android:layout_width="match_parent" android:layout_height="240dp"
+                    <!-- v1.8.1：加 id —— 同向嵌套 ScrollView（外层 scrollApi 会抢手势），
+                         在 ApiFragment 里按内容可滚性动态禁止外层拦截，修复「结果很长
+                         却无法上下滑动、一动就是外部窗口滚」的问题 -->
+                    <ScrollView android:id="@+id/svApiBody" android:layout_width="match_parent" android:layout_height="240dp"
                         android:layout_marginTop="8dp" android:background="?attr/colorSurface"
                         android:padding="8dp">
                         <TextView android:id="@+id/tvApiBody" android:layout_width="match_parent"
