@@ -182,15 +182,6 @@ object WhistleAuth {
         else -> (raw.ifBlank { "登录失败" }) + "（code $code）"
     }
 
-    /** 供 H5 捕获页判断校内直连是否可达（快速 TCP 探测） */
-    suspend fun probeDirect(): Boolean = withContext(Dispatchers.IO) {
-        try {
-            java.net.Socket().use { s ->
-                s.connect(java.net.InetSocketAddress("202.118.65.138", 8081), 1500)
-                true
-            }
-        } catch (_: Exception) {
-            false
-        }
-    }
+    // v1.8.0：probeDirect（探测 202.118.65.138:8081 校内直连）已删除——
+    // 所有连接默认不依赖校园网，一律走公网可达的 WebVPN 隧道，无需再探测。
 }

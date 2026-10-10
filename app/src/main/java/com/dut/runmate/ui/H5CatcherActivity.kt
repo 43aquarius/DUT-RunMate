@@ -39,7 +39,9 @@ import java.util.concurrent.TimeUnit
  *
  *   1. 注入会话 Cookie：whistlekey（微哨）+ CASTGC（v1.5.1 CAS 统一认证，对齐
  *      i大工 synCookies 同时注入 skey+TGT 的行为——H5 若走 CAS 鉴权即可免密通过）
- *   2. 校内直连 H5；校外自动走 WebVPN（自动填学号密码，验证码/双因素手动完成）
+ *   2. v1.8.0：默认一律走 WebVPN 隧道（webvpn.dlut.edu.cn 公网可达，校内校外
+ *      通用，不依赖校园网——对齐 i大工 官方 App 校外行为）；「校内直连」降级为
+ *      手动入口（仅校园网内可用）
  *   3. v1.5.1：sso.dlut.edu.cn/cas/login 出现时自动填表提交（页面自带 des.js 算 rsa）
  *   4. 每个页面注入 JS 嗅探器（monkey-patch XHR/fetch）
  *   5. 捕获到 findExtExercise 请求 → 自动写入「接口」页全部配置并开启 API 判定
@@ -51,8 +53,9 @@ class H5CatcherActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_NUMBER = "number"
         const val EXTRA_PASSWORD = "password"   // 仅内存传递用于自动填表，不落盘
+
+        /** 仅校园网内可达（教育网 202.118.0.0/16）；v1.8.0 起降级为手动入口 */
         const val H5_DIRECT = "http://202.118.65.138:8081/mobilenew/"
-        const val WEBVPN_LOGIN = "https://webvpn.dlut.edu.cn/login"
 
         /**
          * v1.6.0 · WebVPN 隧道直达 H5 的 URL（实测验证）：
@@ -230,8 +233,17 @@ class H5CatcherActivity : AppCompatActivity() {
         // JS 桥（嗅探器回传捕获的请求）
         b.web.addJavascriptInterface(SniffBridge(), "RunMate")
 
-        b.btnH5Direct.setOnClickListener { load(H5_DIRECT) }
-        b.btnWebvpn.setOnClickListener { load(WEBVPN_LOGIN) }
+        b.btnH5Direct.setOnClickListener {
+            // v1.8.0：校内直连降级为手动入口（仅校园网内可达；隧道才是默认）
+            setStatus(getString(R.string.h5_status_direct))
+            load(H5_DIRECT)
+        }
+        b.btnWebvpn.setOnClickListener {
+            // v1.8.0：直接进隧道 H5（未登录会被门户 302 到 /login，自动流程接管），
+            // 不再停在裸登录页
+            setStatus(getString(R.string.h5_status_webvpn))
+            load(H5_TUNNEL)
+        }
         b.btnSniffAgain.setOnClickListener { injectSniffer(); toast(R.string.h5_sniff_reinjected) }
         // v1.6.1：入口用途说明（健康长跑直连 / WebVPN / 重新注入嗅探都是干什么的）
         b.btnHelp.setOnClickListener { HelpDialog.show(this) }
@@ -245,7 +257,14 @@ class H5CatcherActivity : AppCompatActivity() {
         start()
     }
 
-    /** 入口：注入会话 Cookie → 探测校内直连 → 选择直连或 WebVPN */
+    /**
+     * 入口：注入会话 Cookie → v1.8.0 起默认一律走 WebVPN 隧道（校内外通用）。
+     *
+     * 不再探测校内直连：202.118.65.138:8081 属教育网内网地址，校园网外不可达
+     * （用户实测连接超时）；而 webvpn.dlut.edu.cn 为公网域名，校内校外都能访问，
+     * 隧道才是唯一「到哪里都能用」的路径——i大工 官方 App 校外也正是这么做的。
+     * 需要校内直连（更快）时，可手动点「校内直连」入口。
+     */
     private fun start() {
         val cm = CookieManager.getInstance()
         cm.setAcceptCookie(true)
@@ -263,20 +282,12 @@ class H5CatcherActivity : AppCompatActivity() {
         cm.flush()
         log(getString(if (prefs.wsSkey.isNotBlank()) R.string.h5_log_cookie else R.string.h5_log_cookie_cas))
 
-        lifecycleScope.launch {
-            val direct = com.dut.runmate.auth.WhistleAuth.probeDirect()
-            setStatus(getString(if (direct) R.string.h5_status_direct else R.string.h5_status_webvpn))
-            log(getString(if (direct) R.string.h5_log_direct_ok else R.string.h5_log_direct_fail))
-            if (direct) {
-                load(H5_DIRECT)
-            } else {
-                // v1.6.0：校外直接加载隧道 H5 —— 未登录会被门户 302 到 /login，
-                // 后续自动点击统一认证 → CAS 自动填表 → 回门户后自动重进 H5。
-                // （v1.5.1 直接停在 /login 且找不到本地登录表单，用户无从下手）
-                webvpnStage = 1
-                load(H5_TUNNEL)
-            }
-        }
+        // v1.8.0：默认 WebVPN 隧道 —— 未登录会被门户 302 到 /login，
+        // 后续自动点击统一认证 → CAS 自动填表 → 回门户后自动重进 H5。
+        setStatus(getString(R.string.h5_status_webvpn))
+        log(getString(R.string.h5_log_tunnel_default))
+        webvpnStage = 1
+        load(H5_TUNNEL)
     }
 
     private fun load(url: String) {

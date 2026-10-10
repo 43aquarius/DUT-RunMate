@@ -390,6 +390,8 @@ class ApiFragment : Fragment() {
             } catch (_: Exception) {
             }
             if (offCampusAny) sb.append('\n').append(getString(R.string.api_hint_offcampus))
+            if (sb.contains("【需重新捕获】"))
+                sb.append('\n').append(getString(R.string.api_hint_webvpn_expired))
             dialog.dismiss()
             if (_b == null) return@launch
             val result = sb.toString()
@@ -429,6 +431,9 @@ class ApiFragment : Fragment() {
                         !acc.apiUrl.contains("webvpn")
                 "✗ $label：${resp.error}" + if (off) "【校外直连】" else ""
             }
+            // v1.8.0：隧道会话失效被重定向到登录页（HTTP 200 但拿回的是 HTML）
+            Http.isWebvpnLoginRedirect(resp.finalUrl, resp.body, resp.url) ->
+                "✗ $label：WebVPN 会话已过期【需重新捕获】"
             resp.code == 200 -> {
                 val dv = Http.extractDouble(resp.body, prof.distPath)
                 if (dv != null) "✓ $label：${String.format("%.0f", dv)} m（${resp.ms} ms）"
@@ -466,11 +471,15 @@ class ApiFragment : Fragment() {
                     else -> getString(R.string.api_test_fail, resp.code, resp.ms)
                 }
                 b.tvApiStatus.text = statusLine
-                // v1.7.0：连接失败 + 校内直连地址 → 根因提示（校外网络访问不了 202.118.65.138）
+                // v1.8.0：根因提示（校外直连不可达 / WebVPN 会话失效重定向到登录页）
                 var statusText = statusLine
                 if (resp.error != null && resp.error.contains("connect", true) &&
                     p.url.contains("202.118.65.138") && !p.url.contains("webvpn")) {
                     statusText = statusLine + "\n" + getString(R.string.api_hint_offcampus)
+                    b.tvApiStatus.text = statusText
+                } else if (resp.error == null && Http.isWebvpnLoginRedirect(
+                        resp.finalUrl, resp.body, resp.url)) {
+                    statusText = statusLine + "\n" + getString(R.string.api_hint_webvpn_expired)
                     b.tvApiStatus.text = statusText
                 }
                 b.tvApiStatus.setTextColor(ContextCompat.getColor(requireContext(),

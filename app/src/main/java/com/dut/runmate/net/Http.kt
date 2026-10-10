@@ -26,7 +26,11 @@ object Http {
         val ms: Int,
         val body: String,
         val url: String,
-        val error: String? = null
+        val error: String? = null,
+        /** v1.8.0：跟随重定向后的终态 URL（OkHttp r.request.url）；未重定向时与 url 相同。
+         *  用于识别「WebVPN 会话失效 → 302 登录页」——否则用户看到 HTTP 200 +
+         *  登录页 HTML + 提取失败，完全不知道发生了什么。 */
+        val finalUrl: String = ""
     )
 
     /**
@@ -87,7 +91,8 @@ object Http {
                     code = r.code,
                     ms = ((System.nanoTime() - t0) / 1_000_000).toInt(),
                     body = r.body?.string() ?: "",
-                    url = url
+                    url = url,
+                    finalUrl = try { r.request.url.toString() } catch (_: Exception) { url }
                 )
             }
         } catch (e: CancellationException) {
@@ -139,4 +144,21 @@ object Http {
     }
 
     fun Double.fmtM(): String = "${roundToInt()} m"
+
+    /**
+     * v1.8.0：识别「WebVPN 隧道请求被重定向到登录页」——会话 Cookie 缺失/过期时
+     * wengine 门户返回 302 → /login，OkHttp 跟随后拿到的是登录页 HTML（HTTP 200）。
+     * 表现为「测试通过却提取不到距离」，用户完全无从排查；统一在这里识别。
+     */
+    fun isWebvpnLoginRedirect(finalUrl: String, body: String, reqUrl: String): Boolean {
+        if (!reqUrl.contains("webvpn.dlut.edu.cn")) return false
+        if (finalUrl.isNotBlank()) {
+            val path = finalUrl.substringAfter("webvpn.dlut.edu.cn", "")
+            if (path.startsWith("/login") || path.startsWith("/cas")) return true
+            return false
+        }
+        // 兑底：无终态 URL 时看登录页特征
+        val b = body.lowercase()
+        return b.contains("<html") && (b.contains("webvpn") || b.contains("统一身份认证"))
+    }
 }

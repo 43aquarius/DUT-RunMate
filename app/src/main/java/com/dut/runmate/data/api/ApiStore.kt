@@ -48,9 +48,22 @@ class ApiStore private constructor(private val file: File) {
         const val PING_ID = "p_ping"
         const val CUSTOM_ID = "p_custom"
 
-        /** 实测抓包得到的健康长跑距离接口（v1.3.0 预填，详见 docs API 文档 §3） */
-        const val DIST_TITLE = "健康长跑距离 findExtExercise（打卡核对用）"
-        const val DIST_URL = "http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise"
+        /**
+         * v1.8.0 · 默认模板改为 WebVPN 隧道地址（校内外通用，不依赖校园网）。
+         * 隧道路由由查询参数 vpn-12-o1-202.118.65.138:8081 决定，前缀段不参与校验
+         * （实测任意前缀可达，见 docs API 文档 §3.4）；需要 webvpn 会话 Cookie，
+         * 未登录时会被 302 到登录页（App 会给出明确提示）。
+         */
+        const val DIST_TITLE = "健康长跑距离 findExtExercise（WebVPN 隧道）"
+        const val DIST_URL =
+            "https://webvpn.dlut.edu.cn/http-8081/0/service/mobile/extExercise/findExtExercise?vpn-12-o1-202.118.65.138:8081"
+
+        /** v1.7.0 及之前的默认种子（校内直连，仅校园网内可达）——用于迁移识别 */
+        const val LEGACY_DIST_URL =
+            "http://202.118.65.138:8081/service/mobile/extExercise/findExtExercise"
+
+        const val DIST_HEADERS =
+            "{\"Authorization\":\"{token}\",\"Content-Type\":\"application/json;charset=UTF-8\",\"Cookie\":\"{cookie}\"}"
         const val DIST_PATH = "pmDel.distance"
 
         @Volatile private var inst: ApiStore? = null
@@ -78,7 +91,10 @@ class ApiStore private constructor(private val file: File) {
                         } catch (_: Exception) { }
                     }
                     if (s.profiles.isEmpty()) s.seed()
-                    else s.migrateBlankDist()
+                    else {
+                        s.migrateBlankDist()
+                        s.migrateLegacyDirectSeed()
+                    }
                 }
             }
 
@@ -92,7 +108,26 @@ class ApiStore private constructor(private val file: File) {
             p.title = DIST_TITLE
             p.method = "POST"
             p.url = DIST_URL
-            p.headers = "{\"Authorization\":\"{token}\",\"Content-Type\":\"application/json;charset=UTF-8\"}"
+            p.headers = DIST_HEADERS
+            p.body = "{\"userId\":\"抓包值\",\"amId\":\"抓包值\",\"pmId\":\"抓包值\",\"sign\":\"抓包值\"}"
+            p.distPath = DIST_PATH
+            persist()
+        }
+
+        /**
+         * v1.8.0 迁移：≤1.7.0 的默认种子是校内直连地址（校园网外必连接超时，
+         * 即用户实报的 failed to connect to /202.118.65.138:8081）。
+         * 识别条件 = URL 原封是旧直连种子 且 请求体仍含「抓包值」占位符（= 从未
+         * 成功捕获过）→ 升级为 WebVPN 隧道种子。用户自己改过/捕获过的配置绝不动。
+         */
+        private fun ApiStore.migrateLegacyDirectSeed() {
+            val p = profiles.firstOrNull { it.id == DIST_ID } ?: return
+            if (p.url.trim() != LEGACY_DIST_URL) return
+            if (!p.body.contains("抓包值")) return
+            p.title = DIST_TITLE
+            p.method = "POST"
+            p.url = DIST_URL
+            p.headers = DIST_HEADERS
             p.body = "{\"userId\":\"抓包值\",\"amId\":\"抓包值\",\"pmId\":\"抓包值\",\"sign\":\"抓包值\"}"
             p.distPath = DIST_PATH
             persist()
@@ -106,7 +141,7 @@ class ApiStore private constructor(private val file: File) {
                         title = DIST_TITLE,
                         method = "POST",
                         url = DIST_URL,
-                        headers = "{\"Authorization\":\"{token}\",\"Content-Type\":\"application/json;charset=UTF-8\"}",
+                        headers = DIST_HEADERS,
                         body = "{\"userId\":\"抓包值\",\"amId\":\"抓包值\",\"pmId\":\"抓包值\",\"sign\":\"抓包值\"}",
                         distPath = DIST_PATH
                     ),

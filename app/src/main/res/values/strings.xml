@@ -109,9 +109,11 @@
     <string name="api_result_fmt">HTTP %1$d · %2$d ms</string>
     <string name="api_extracted">提取距离：%1$s</string>
     <string name="api_extract_fail">未能按路径提取到数值，请调整路径</string>
-    <!-- v1.7.0：校外直连失败的根因提示（202.118.65.138 为校内服务器，校园网外不可达） -->
-    <string name="api_hint_offcampus">⚠ 校内直连地址（202.118.65.138:8081）在校园网外无法访问。请连接校园网 Wi-Fi；或在校外用下方「账号登录」重新登录一次，H5 捕获会自动改用 WebVPN 隧道地址（webvpn.dlut.edu.cn），之后校外也能查。</string>
-    <string name="api_usage_hint">「健康长跑距离」模板已预填实测接口（校内直连地址，校外换 WebVPN 隐道 URL）：把抓包到的 userId/amId/pmId/sign 填进请求体、Authorization 令牌粘到上方令牌栏，发送测试能提取距离即配置成功，开启 API 判定后跑步自动核对打卡。\nv1.4.0 起推荐直接用下方「账号登录 · 一键配置」，自动完成以上全部填写。</string>
+    <!-- v1.7.0：校外直连失败的根因提示；v1.8.0：默认已改隧道，此提示仅针对历史直连配置 -->
+    <string name="api_hint_offcampus">⚠ 该地址（202.118.65.138:8081）是校内服务器，校园网外无法访问。v1.8.0 起所有连接默认走 WebVPN 隧道（webvpn.dlut.edu.cn，校内外通用）：请用下方「账号登录」重新登录一次，自动捕获隧道地址即可。</string>
+    <!-- v1.8.0：隧道请求被重定向到登录页（会话 Cookie 缺失/过期）的根因提示 -->
+    <string name="api_hint_webvpn_expired">⚠ WebVPN 会话未建立或已过期（请求被重定向到登录页）。请在上方「账号登录」重新登录一次，自动捕获最新隧道令牌后重试。</string>
+    <string name="api_usage_hint">「健康长跑距离」模板已预填 WebVPN 隧道接口（v1.8.0 起默认，校内校外通用）：用下方「账号登录 · 一键配置」自动完成全部填写即可；手工抓包则把 userId/amId/pmId/sign 填进请求体、Authorization 令牌粘到上方令牌栏，发送测试能提取距离即配置成功，开启 API 判定后跑步自动核对打卡。</string>
 
     <!-- v1.4.0 账号登录 · 一键配置 -->
     <string name="ws_card_title">账号登录 · 一键配置</string>
@@ -147,11 +149,11 @@
     <!-- v1.4.0 H5 捕获页 -->
     <string name="h5_title">H5 捕获 · 自动配置</string>
     <string name="h5_status_init">正在初始化…</string>
-    <string name="h5_status_direct">校内直连模式：正在打开健康长跑页面，等待接口出现…</string>
-    <string name="h5_status_webvpn">校外 WebVPN 模式：自动走统一身份认证（如需验证码请在页面手动完成）</string>
+    <string name="h5_status_direct">校内直连模式（仅校园网内可用）：正在打开健康长跑页面…</string>
+    <string name="h5_status_webvpn">WebVPN 隧道模式（默认，校内校外通用）：自动统一身份认证（如需验证码请在页面手动完成）</string>
     <string name="h5_status_captured">✓ 已捕获 findExtExercise 参数并写入配置，API 判定已开启</string>
-    <string name="h5_chip_direct">健康长跑（校内直连）</string>
-    <string name="h5_chip_webvpn">WebVPN 登录</string>
+    <string name="h5_chip_direct">校内直连（仅校园网）</string>
+    <string name="h5_chip_webvpn">WebVPN 隧道（默认）</string>
     <string name="h5_chip_sniff">重新注入嗅探器</string>
     <string name="h5_chip_help">使用说明</string>
     <string name="h5_test_title_ok">配置成功</string>
@@ -165,8 +167,7 @@
     <string name="h5_log_cookie">已注入 whistlekey 会话 Cookie</string>
     <string name="h5_log_cookie_cas">已注入 CAS 统一认证会话 Cookie（CASTGC）</string>
     <string name="h5_log_cas_fill">CAS 自动填表：%1$s（如页面要求扫码/验证码请手动完成）</string>
-    <string name="h5_log_direct_ok">校内直连可达，直接打开健康长跑 H5</string>
-    <string name="h5_log_direct_fail">校内直连不可达，走 WebVPN 隧道（校外）</string>
+    <string name="h5_log_tunnel_default">v1.8.0 默认走 WebVPN 隧道（webvpn.dlut.edu.cn 公网可达，不依赖校园网，校内校外通用）</string>
     <string name="h5_log_webvpn_fill">WebVPN 自动填表：%1$s（如需验证码/短信请在页面手动完成）</string>
     <!-- v1.6.0 WebVPN 自动流程日志 -->
     <string name="h5_log_webvpn_cas_click">已自动点击「统一身份认证登录」，等待跳转 CAS…</string>
@@ -272,5 +273,5 @@
 
     <!-- v1.6.1：接口页/H5页使用说明（用户问：令牌/自定义接口/三个入口是干什么的） -->
     <string name="api_help_title">接口页使用说明</string>
-    <string name="api_help_body">【令牌 Token】\nfindExtExercise 接口的鉴权凭据（Authorization 请求头，格式「userId:accessToken」）。用「账号登录·一键配置」或 H5 捕获成功后会自动填好，通常无需手动填写；只有自己抓包时才需要手工粘贴。下方模板里所有 {token} 占位符都会替换成它。\n\n【多账号（v1.7.0 新增）】\n登录并完成一次 H5 捕获，该账号就自动进入下方账号列表（✓ 为当前账号）。点击账号即切换整套配置（令牌/请求体/会话），长按删除；「＋添加」录入新同学账号；「查询全部账号距离」一次查完所有人的距离——给室友/同学代查打卡进度用这个。\n\n【三个接口模板】\n· 健康长跑距离 findExtExercise —— 核心接口：跑步中轮询它，服务端距离出现 +100m 级增量即判定打卡成功（注意模板默认是校内直连地址，校园网外会连接失败，需用账号登录重新捕获换隧道地址）\n· 连通性测试 —— 探测校内服务 service.m.dlut.edu.cn 是否可达（校外不通属正常）\n· 自定义接口 —— 空白模板：任意填 URL/方法/请求头/请求体/距离字段路径，调试任意 HTTP 接口用，只保存在本机\n\n【登录后 H5 捕获页的三个快捷入口】\n· 健康长跑（校内直连）—— 仅校园网内可用，直连打开健康长跑页面，速度最快\n· WebVPN 登录 —— 校外用：经 webvpn.dlut.edu.cn 隧道进入，自动完成统一身份认证登录\n· 重新注入嗅探器 —— 页面跳转后监听脚本可能失效，点它重新挂上；一直捕获不到参数时先点这个试试\n\n【API 判定开关】\n开启后，跑步进入打卡检测圈时自动轮询服务端距离判定打卡；关闭则为纯 GPS 模式（出区即提示，无法判定漏卡）。</string>
+    <string name="api_help_body">【令牌 Token】\nfindExtExercise 接口的鉴权凭据（Authorization 请求头，格式「userId:accessToken」）。用「账号登录·一键配置」或 H5 捕获成功后会自动填好，通常无需手动填写；只有自己抓包时才需要手工粘贴。下方模板里所有 {token} 占位符都会替换成它。\n\n【多账号（v1.7.0 新增）】\n登录并完成一次 H5 捕获，该账号就自动进入下方账号列表（✓ 为当前账号）。点击账号即切换整套配置（令牌/请求体/会话），长按删除；「＋添加」录入新同学账号；「查询全部账号距离」一次查完所有人的距离——给室友/同学代查打卡进度用这个。\n\n【三个接口模板】\n· 健康长跑距离 findExtExercise —— 核心接口：跑步中轮询它，服务端距离出现 +100m 级增量即判定打卡成功。v1.8.0 起模板默认就是 WebVPN 隧道地址（webvpn.dlut.edu.cn，校内校外通用，不依赖校园网）；旧版本捕获的校内直连地址在校园网外会连接失败，重新登录捕获一次即换成隧道地址\n· 连通性测试 —— 探测服务 service.m.dlut.edu.cn 是否可达（公网域名，校内外均可访问）\n· 自定义接口 —— 空白模板：任意填 URL/方法/请求头/请求体/距离字段路径，调试任意 HTTP 接口用，只保存在本机\n\n【登录后 H5 捕获页的快捷入口】\n· WebVPN 隧道（默认）—— v1.8.0 起默认入口：经 webvpn.dlut.edu.cn 隧道进入（公网可达，校内校外通用，不依赖校园网），自动完成统一身份认证登录\n· 校内直连（仅校园网）—— 手动入口：直连校内服务器 202.118.65.138:8081，速度最快但仅校园网内可用\n· 重新注入嗅探器 —— 页面跳转后监听脚本可能失效，点它重新挂上；一直捕获不到参数时先点这个试试\n\n【API 判定开关】\n开启后，跑步进入打卡检测圈时自动轮询服务端距离判定打卡；关闭则为纯 GPS 模式（出区即提示，无法判定漏卡）。</string>
 </resources>
