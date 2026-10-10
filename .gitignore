@@ -19,3 +19,11 @@ Thumbs.db
 # 日志与崩溃
 *.log
 captures/
+
+# 发布中心（Next.js）
+release-center/node_modules/
+release-center/.next/
+release-center/public/apk/*.apk
+release-center/bun.lock
+release-center/db/
+release-center/dev.log

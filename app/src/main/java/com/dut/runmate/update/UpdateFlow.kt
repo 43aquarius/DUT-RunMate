@@ -1,6 +1,9 @@
 package com.dut.runmate.update
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -17,7 +20,13 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 import java.io.File
 
-/** 更新流程编排：自动检查（每天一次）/ 手动检查 → 弹窗 → 进度下载 → 安装 */
+/**
+ * 更新流程编排：自动检查（每天一次）/ 手动检查 → 弹窗 → 进度下载 → 安装。
+ *
+ * v1.6.1 反馈改造：检查失败 / 下载失败不再用一闪而过的 Toast，改用持久对话框，
+ * 完整展示错误详情，并提供「重试 / 浏览器下载 / 复制链接」兜底——应用内下载
+ * 被网络策略拦截时，浏览器直下往往仍可用。
+ */
 object UpdateFlow {
 
     private const val CHECK_INTERVAL_MS = 24 * 3600_000L
@@ -54,9 +63,21 @@ object UpdateFlow {
                 is Updater.CheckResult.UpToDate -> if (!silent)
                     Toast.makeText(activity, R.string.upd_uptodate, Toast.LENGTH_SHORT).show()
                 is Updater.CheckResult.Failed -> if (!silent)
-                    Toast.makeText(activity, activity.getString(R.string.upd_failed, r.reason), Toast.LENGTH_LONG).show()
+                    showCheckFailedDialog(activity, r.reason)
             }
         }
+    }
+
+    /** v1.6.1：检查失败 → 持久对话框（完整错误 + 打开发布中心 + 复制） */
+    private fun showCheckFailedDialog(activity: AppCompatActivity, reason: String) {
+        val msg = activity.getString(R.string.upd_check_fail_body, reason, Updater.SERVER_BASE)
+        MaterialAlertDialogBuilder(activity)
+            .setTitle(R.string.upd_check_fail_title)
+            .setMessage(msg)
+            .setPositiveButton(R.string.upd_open_site) { _, _ -> openBrowser(activity, Updater.SERVER_BASE) }
+            .setNeutralButton(R.string.pref_crash_copy) { _, _ -> copyText(activity, msg) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun showUpdateDialog(activity: AppCompatActivity, info: Updater.UpdateInfo) {
@@ -110,8 +131,34 @@ object UpdateFlow {
                 tryInstall(activity, apk)
             } catch (e: Exception) {
                 dialog.dismiss()
-                Toast.makeText(activity, activity.getString(R.string.upd_dl_err, e.message), Toast.LENGTH_LONG).show()
+                // v1.6.1：下载失败 → 持久对话框（重试 / 浏览器下载 / 复制链接）
+                val detail = "${e.message ?: e.javaClass.simpleName}\n\n${activity.getString(R.string.upd_dl_url_label)}\n${info.apkUrl}"
+                MaterialAlertDialogBuilder(activity)
+                    .setTitle(R.string.upd_dl_err_title)
+                    .setMessage(detail)
+                    .setPositiveButton(R.string.upd_retry) { _, _ -> startDownload(activity, info) }
+                    .setNeutralButton(R.string.upd_browser_dl) { _, _ -> openBrowser(activity, info.apkUrl) }
+                    .setNegativeButton(R.string.upd_copy_link) { _, _ -> copyText(activity, info.apkUrl) }
+                    .show()
             }
+        }
+    }
+
+    private fun openBrowser(activity: Activity, url: String) {
+        try {
+            activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (_: Exception) {
+            // 无浏览器可用时退回复制
+            copyText(activity, url)
+        }
+    }
+
+    private fun copyText(activity: Activity, text: String) {
+        try {
+            val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("runmate", text))
+            Toast.makeText(activity, R.string.pref_crash_copied, Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
         }
     }
 

@@ -34,6 +34,9 @@ class ApiFragment : Fragment() {
         get() = adapter.testingId
         set(v) { adapter.testingId = v }
 
+    /** v1.6.1：最近一次测试的完整结果（供一键复制） */
+    private var lastResultText = ""
+
     override fun onCreateView(i: LayoutInflater, c: ViewGroup?, s: Bundle?): View {
         _b = FragmentApiBinding.inflate(i, c, false)
         return b.root
@@ -69,6 +72,22 @@ class ApiFragment : Fragment() {
         renderWsStatus()
         b.btnWsLogin.setOnClickListener { doLogin() }
         b.btnOpenH5.setOnClickListener { openH5Catcher(prefs.wsPwdDecoded()) }
+
+        // v1.6.1：页面说明（令牌/三个模板/H5 三个入口都是干什么的）
+        b.btnHelpApi.setOnClickListener { HelpDialog.show(requireContext()) }
+        // v1.6.1：一键复制完整测试结果（旧版底部 Toast 一闪而过无法查看复制）
+        b.btnCopyResult.setOnClickListener {
+            if (lastResultText.isBlank()) {
+                Toast.makeText(requireContext(), R.string.api_result_none, Toast.LENGTH_SHORT).show()
+            } else {
+                runCatching {
+                    val cm = requireActivity().getSystemService(
+                        android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    cm.setPrimaryClip(android.content.ClipData.newPlainText("runmate", lastResultText))
+                    Toast.makeText(requireContext(), R.string.pref_crash_copied, Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private fun renderWsStatus() {
@@ -213,37 +232,48 @@ class ApiFragment : Fragment() {
         b.tvApiExtract.text = p.title
         b.tvApiBody.text = "→ ${p.method} ${p.url.take(120)}"
         b.scrollApi.post { b.scrollApi.smoothScrollTo(0, b.cardResult.top) }
-        Toast.makeText(requireContext(),
-            getString(R.string.api_test_toast, p.title), Toast.LENGTH_SHORT).show()
+        // v1.6.1：反馈只走卡片（旧版底部 Toast 显示不全且一闪而过，无法查看复制）
+        lastResultText = "${p.title}\n${p.method} ${p.url}"
         viewLifecycleOwner.lifecycleScope.launch {
             // v1.5.1：整段 runCatching 双保险——任何异常都进结果卡片，绝不崩溃白屏
             runCatching {
                 val resp = Http.call(p, prefs.apiToken, prefs.apiCookie)
                 if (_b == null) return@launch          // 页面已销毁（v1.5.0 闪退修复）
                 val ok = resp.error == null && resp.code in 200..299
-                b.tvApiStatus.text = when {
+                val statusLine = when {
                     resp.error != null -> getString(R.string.api_test_error, resp.error)
                     ok -> getString(R.string.api_test_ok, resp.code, resp.ms)
                     else -> getString(R.string.api_test_fail, resp.code, resp.ms)
                 }
+                b.tvApiStatus.text = statusLine
                 b.tvApiStatus.setTextColor(ContextCompat.getColor(requireContext(),
                     if (ok) R.color.md_success_bright else R.color.md_error))
                 b.tvApiBody.text = Http.pretty(resp.body)
+                var extractLine = p.title
                 if (p.distPath.isNotBlank()) {
                     val dv = Http.extractDouble(resp.body, p.distPath)
-                    b.tvApiExtract.text = if (dv != null)
+                    extractLine = if (dv != null)
                         getString(R.string.api_extracted, String.format("%.2f m", dv))
                     else getString(R.string.api_extract_fail)
-                } else {
-                    b.tvApiExtract.text = p.title
+                }
+                b.tvApiExtract.text = extractLine
+                // v1.6.1：完整结果落内存，供「复制完整结果」一键取用
+                lastResultText = buildString {
+                    append(p.title).append('\n')
+                    append(p.method).append(' ').append(resp.url).append("\n\n")
+                    append(statusLine).append('\n')
+                    append(extractLine).append("\n\n")
+                    append(Http.pretty(resp.body))
                 }
             }.onFailure { e ->
                 // 兜底：把异常写进结果卡片而不是闪退
                 if (_b != null) {
                     b.cardResult.visibility = View.VISIBLE
-                    b.tvApiStatus.text = getString(R.string.api_test_error,
+                    val errLine = getString(R.string.api_test_error,
                         "${e.javaClass.simpleName}: ${e.message ?: ""}")
+                    b.tvApiStatus.text = errLine
                     b.tvApiBody.text = android.util.Log.getStackTraceString(e).take(3000)
+                    lastResultText = "${p.title}\n${p.method} ${p.url}\n\n$errLine\n\n${b.tvApiBody.text}"
                 }
             }
             // v1.6.0：恢复按钮状态（页面已销毁时无需理会）

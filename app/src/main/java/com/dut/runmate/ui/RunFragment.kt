@@ -1,6 +1,8 @@
 package com.dut.runmate.ui
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -26,6 +28,7 @@ import com.dut.runmate.geo.LocGate
 import com.dut.runmate.net.Http
 import com.dut.runmate.run.RunBus
 import com.dut.runmate.service.RunTrackerService
+import com.dut.runmate.util.SoftLog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
@@ -50,6 +53,9 @@ class RunFragment : Fragment() {
 
     private var summaryShown = false
 
+    /** v1.6.1：未跑步时的「查询服务端距离」在逓中标记（防重复点击） */
+    private var querying = false
+
     // ---- 定位预览（v1.3.0） ----
     private var locMgr: LocationManager? = null
     private var pvGps: Location? = null
@@ -60,7 +66,15 @@ class RunFragment : Fragment() {
     ) { grants ->
         if (grants[Manifest.permission.ACCESS_FINE_LOCATION] == true) startService()
         else if (_b != null) {
-            Toast.makeText(requireContext(), "需要定位权限", Toast.LENGTH_SHORT).show()
+            safeToast(R.string.run_need_location)
+        }
+    }
+
+    /** v1.6.1：Toast 隔离——个别 ROM 的 Toast 渲染异常不再可能闪退整个 App */
+    private fun safeToast(resId: Int) {
+        try {
+            Toast.makeText(requireContext(), resId, Toast.LENGTH_SHORT).show()
+        } catch (_: Throwable) {
         }
     }
 
@@ -71,6 +85,7 @@ class RunFragment : Fragment() {
 
     override fun onViewCreated(v: View, savedInstanceState: Bundle?) {
         super.onViewCreated(v, savedInstanceState)
+        querying = false        // v1.6.1：页面重建时重置（防协程早退后标志卡死）
         adapter = RunPointAdapter(store)
         b.rvPoints.adapter = adapter
         b.rvPoints.layoutManager =
@@ -160,34 +175,111 @@ class RunFragment : Fragment() {
 
     // ---------- 服务端距离：点按核对 ----------
 
+    /**
+     * v1.6.1 重写（闪退修复 + 反馈改造）：
+     *  - 点击链路与协程全程 runCatching 隔离（与接口页 v1.5.1 同款加固，
+     *    任何异常只落盘崩溃日志，绝不上抛闪退）；
+     *  - 查询状态就地显示在右上角（旧版 Toast 一闪而过看不清）；
+     *  - 结果弹窗持久展示：距离 / 错误详情 + 响应体 + 复制按钮。
+     */
     private fun onApiTap() {
-        if (!prefs.apiEnabled) {
-            Toast.makeText(requireContext(), R.string.api_need_enable, Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (RunBus.state.value.running) {
-            RunBus.update { it.copy(pollReq = it.pollReq + 1) }
-            Toast.makeText(requireContext(), R.string.verify_requested, Toast.LENGTH_SHORT).show()
-        } else {
-            val prof = apiStore.distanceProfile()
-            if (prof == null || prof.url.isBlank()) {
-                Toast.makeText(requireContext(), R.string.api_not_configured, Toast.LENGTH_SHORT).show()
+        runCatching {
+            if (!prefs.apiEnabled) {
+                safeToast(R.string.api_need_enable)
                 return
             }
-            Toast.makeText(requireContext(), R.string.verify_querying, Toast.LENGTH_SHORT).show()
+            if (RunBus.state.value.running) {
+                RunBus.update { it.copy(pollReq = it.pollReq + 1) }
+                safeToast(R.string.verify_requested)
+                return
+            }
+            if (querying) return                       // 防重复点击
+            val prof = apiStore.distanceProfile()
+            if (prof == null || prof.url.isBlank()) {
+                safeToast(R.string.api_not_configured)
+                return
+            }
+            querying = true
+            // 就地显示查询状态（不再用底部 Toast）
+            if (_b != null) {
+                b.tvApiDist.text = getString(R.string.verify_querying_short)
+                b.tvApiDistVal.text = "…"
+            }
             viewLifecycleOwner.lifecycleScope.launch {
-                val resp = Http.call(prof, prefs.apiToken, prefs.apiCookie)
-                if (_b == null) return@launch
-                if (resp.error != null || resp.code !in 200..299) {
-                    RunBus.update { it.copy(apiErr = resp.error ?: "HTTP ${resp.code}") }
-                } else {
-                    val dv = Http.extractDouble(resp.body, prof.distPath)
-                    RunBus.update {
-                        it.copy(apiDistance = dv,
-                            apiErr = if (dv == null) "未能提取: ${prof.distPath}" else null)
+                runCatching {
+                    val resp = Http.call(prof, prefs.apiToken, prefs.apiCookie)
+                    if (_b == null) return@launch      // 页面已销毁：放弃 UI 更新
+                    val ok = resp.error == null && resp.code in 200..299
+                    val dv = if (ok) Http.extractDouble(resp.body, prof.distPath) else null
+                    if (ok) {
+                        RunBus.update {
+                            it.copy(apiDistance = dv,
+                                apiErr = if (dv == null) "未能提取: ${prof.distPath}" else null)
+                        }
+                    } else {
+                        RunBus.update {
+                            it.copy(apiDistance = null,
+                                apiErr = resp.error ?: "HTTP ${resp.code}")
+                        }
                     }
+                    val headline = when {
+                        ok && dv != null -> getString(R.string.run_query_ok, String.format("%.1f", dv))
+                        ok -> getString(R.string.run_query_no_extract, prof.distPath)
+                        else -> getString(R.string.run_query_http, resp.code, resp.ms)
+                    }
+                    showQueryResult(headline, ok, resp, prof)
+                }.onFailure { e ->
+                    // v1.6.1：页面仍在才展示/记录；已分离则静默丢弃（requireContext 会抛异常）
+                    if (_b == null) return@onFailure
+                    SoftLog.write(requireContext().filesDir, "run=onApiTap", e)
+                    showQueryResult(
+                        getString(R.string.api_test_error, "${e.javaClass.simpleName}: ${e.message ?: ""}"),
+                        false, null, prof)
+                }
+                querying = false
+                // 恢复右上角标签（render 也会在下次状态变化时重设）
+                if (_b != null && !RunBus.state.value.running) {
+                    b.tvApiDist.text = getString(R.string.api_dist_query)
                 }
             }
+        }.onFailure { e ->
+            // 双保险：点击瞬间同步路径上的任何异常同样只落盘不闪退
+            try {
+                SoftLog.write(requireContext().filesDir, "run=onApiTapOuter", e)
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    /** v1.6.1：查询结果持久弹窗（含完整响应 + 复制），替代一闪而过的 Toast */
+    private fun showQueryResult(headline: String, ok: Boolean, resp: Http.Resp?, prof: com.dut.runmate.data.api.ApiProfile) {
+        if (_b == null) return
+        val full = buildString {
+            append(if (ok) "✓ " else "✗ ").append(headline).append("\n\n")
+            append(getString(R.string.api_query_profile_line, prof.title)).append("\n\n")
+            if (resp != null) {
+                append(getString(R.string.api_query_req_line, resp.code, resp.ms)).append("\n")
+                append("URL: ").append(resp.url.take(180)).append("\n\n")
+                append(getString(R.string.api_query_body_title)).append("\n")
+                append(Http.pretty(resp.body).take(2500))
+            }
+        }
+        try {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.run_query_title)
+                .setMessage(full)
+                .setPositiveButton(android.R.string.ok, null)
+                .setNeutralButton(R.string.run_query_copy) { _, _ ->
+                    runCatching {
+                        val cm = requireActivity()
+                            .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("runmate", full))
+                        safeToast(R.string.pref_crash_copied)
+                    }
+                }
+                .show()
+        } catch (e: Throwable) {
+            SoftLog.write(requireContext().filesDir, "run=showQueryResult", e)
         }
     }
 

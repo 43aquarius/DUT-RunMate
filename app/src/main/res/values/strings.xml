@@ -36,6 +36,17 @@
     <string name="loc_net_education">当前为网络定位（基站/WiFi，误差几十至几百米，仅作参考）。\nGPS 需直视卫星：室内/楼宇遮挡下无法锁定，才会回落到网络定位。\n到室外开阔处静止半分钟，GPS 锁定后会自动切换为蓝点（更准）。</string>
     <string name="verify_requested">已请求立即核对，稍候…</string>
     <string name="verify_querying">查询服务端距离…</string>
+    <!-- v1.6.1：查询反馈改持久弹窗 + 就地状态 -->
+    <string name="verify_querying_short">查询中…</string>
+    <string name="run_need_location">需要定位权限</string>
+    <string name="run_query_title">服务端距离查询结果</string>
+    <string name="run_query_ok">查询成功：服务端距离 %1$s m</string>
+    <string name="run_query_no_extract">请求成功，但未按路径提取到距离（路径：%1$s）</string>
+    <string name="run_query_http">请求失败 · HTTP %1$d · %2$d ms</string>
+    <string name="run_query_copy">复制详情</string>
+    <string name="api_query_profile_line">接口：%1$s</string>
+    <string name="api_query_req_line">状态：HTTP %1$d · %2$d ms</string>
+    <string name="api_query_body_title">响应内容：</string>
     <string name="api_not_configured">距离接口未配置，请到「接口」页填写抓包参数</string>
     <string name="api_need_enable">请先在「设置」页开启 API 判定</string>
 
@@ -83,7 +94,8 @@
     <string name="api_token_hint">findExtExercise 填「userId:accessToken」整串</string>
     <string name="api_test">发送测试</string>
     <string name="api_testing">测试中…</string>
-    <string name="api_test_toast">正在发送「%1$s」请求…</string>
+    <string name="api_result_copy">复制完整结果</string>
+    <string name="api_help">说明</string>
     <string name="api_test_ok">✓ 测试通过 · HTTP %1$d · %2$d ms</string>
     <string name="api_test_fail">✗ 测试失败 · HTTP %1$d · %2$d ms</string>
     <string name="api_test_error">✗ 请求异常：%1$s</string>
@@ -125,6 +137,10 @@
     <string name="h5_chip_direct">健康长跑（校内直连）</string>
     <string name="h5_chip_webvpn">WebVPN 登录</string>
     <string name="h5_chip_sniff">重新注入嗅探器</string>
+    <string name="h5_chip_help">使用说明</string>
+    <string name="h5_test_title_ok">配置成功</string>
+    <string name="h5_test_title_fail">自动测试未通过</string>
+    <string name="h5_test_copy">复制详情</string>
     <string name="h5_go">前往</string>
     <string name="h5_done">完成，返回</string>
     <string name="h5_no_session">请先在「接口」页登录账号</string>
@@ -206,6 +222,15 @@
     <string name="pref_github_sub">43aquarius/DUT-RunMate · 源码 / Issue 反馈 / 版本发布</string>
     <string name="upd_uptodate">已是最新版本</string>
     <string name="upd_failed">检查更新失败：%1$s</string>
+    <!-- v1.6.1：更新失败改持久对话框 + 浏览器兑底 -->
+    <string name="upd_check_fail_title">检查更新失败</string>
+    <string name="upd_check_fail_body">两个更新通道均未成功：\n\n%1$s\n\n可打开发布中心用浏览器直接下载：\n%2$s</string>
+    <string name="upd_open_site">打开发布中心</string>
+    <string name="upd_browser_dl">浏览器下载</string>
+    <string name="upd_copy_link">复制下载链接</string>
+    <string name="upd_retry">重试</string>
+    <string name="upd_dl_err_title">下载失败</string>
+    <string name="upd_dl_url_label">下载地址：</string>
     <string name="upd_found_title">发现新版本 v%1$s</string>
     <string name="upd_found_msg">来源：%1$s\n\n%2$s</string>
     <string name="upd_src_server">本站服务器</string>
@@ -226,4 +251,8 @@
     <string name="pref_crash_none">暂无崩溃记录</string>
     <string name="pref_crash_copy">复制完整日志</string>
     <string name="pref_crash_copied">已复制到剪贴板</string>
+
+    <!-- v1.6.1：接口页/H5页使用说明（用户问：令牌/自定义接口/三个入口是干什么的） -->
+    <string name="api_help_title">接口页使用说明</string>
+    <string name="api_help_body">【令牌 Token】\nfindExtExercise 接口的鉴权凭据（Authorization 请求头，格式「userId:accessToken」）。用「账号登录·一键配置」或 H5 捕获成功后会自动填好，通常无需手动填写；只有自己抓包时才需要手工粘贴。下方模板里所有 {token} 占位符都会替换成它。\n\n【三个接口模板】\n· 健康长跑距离 findExtExercise —— 核心接口：跑步中轮询它，服务端距离出现 +100m 级增量即判定打卡成功\n· 连通性测试 —— 探测校内服务 service.m.dlut.edu.cn 是否可达（校外不通属正常）\n· 自定义接口 —— 空白模板：任意填 URL/方法/请求头/请求体/距离字段路径，调试任意 HTTP 接口用，只保存在本机\n\n【登录后 H5 捕获页的三个快捷入口】\n· 健康长跑（校内直连）—— 仅校园网内可用，直连打开健康长跑页面，速度最快\n· WebVPN 登录 —— 校外用：经 webvpn.dlut.edu.cn 隧道进入，自动完成统一身份认证登录\n· 重新注入嗅探器 —— 页面跳转后监听脚本可能失效，点它重新挂上；一直捕获不到参数时先点这个试试\n\n【API 判定开关】\n开启后，跑步进入打卡检测圈时自动轮询服务端距离判定打卡；关闭则为纯 GPS 模式（出区即提示，无法判定漏卡）。</string>
 </resources>

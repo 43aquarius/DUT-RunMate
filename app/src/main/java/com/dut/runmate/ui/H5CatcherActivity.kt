@@ -175,6 +175,8 @@ class H5CatcherActivity : AppCompatActivity() {
         b.btnH5Direct.setOnClickListener { load(H5_DIRECT) }
         b.btnWebvpn.setOnClickListener { load(WEBVPN_LOGIN) }
         b.btnSniffAgain.setOnClickListener { injectSniffer(); toast(R.string.h5_sniff_reinjected) }
+        // v1.6.1：入口用途说明（健康长跑直连 / WebVPN / 重新注入嗅探都是干什么的）
+        b.btnHelp.setOnClickListener { HelpDialog.show(this) }
         b.btnGo.setOnClickListener {
             val u = b.etUrl.text.toString().trim()
             if (u.startsWith("http")) load(u)
@@ -460,18 +462,42 @@ class H5CatcherActivity : AppCompatActivity() {
         if (prefs.apiCookie.isNotBlank()) log(getString(R.string.h5_log_cookie_saved))
 
         // 5) 自动发一次测试请求验证整条链路（v1.5.0：页面可能已关闭，回调里判 isFinishing）
+        // v1.6.1：结果改为持久对话框（旧版 Toast 一闪而过、长文本显示不全、无法复制）
         lifecycleScope.launch {
-            val resp = Http.call(p, prefs.apiToken, prefs.apiCookie)
-            val dist = Http.extractDouble(resp.body, p.distPath)
+            val resp = try {
+                Http.call(p, prefs.apiToken, prefs.apiCookie)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                null
+            }
+            val dist = resp?.let { Http.extractDouble(it.body, p.distPath) }
+            val ok = resp != null && resp.error == null && resp.code == 200 && dist != null
+            val detail = buildString {
+                append(getString(if (ok) R.string.h5_test_ok else R.string.h5_test_fail,
+                    if (dist != null) String.format("%.0f", dist) else "")).append("\n\n")
+                if (resp != null) {
+                    append("HTTP ${resp.code} · ${resp.ms} ms\n")
+                    append("URL: ").append(resp.url.take(160)).append("\n\n")
+                    append(Http.pretty(resp.body).take(2000))
+                }
+            }
             runOnUiThread {
                 if (isFinishing) return@runOnUiThread
-                if (resp.error == null && resp.code == 200 && dist != null) {
-                    toast(getString(R.string.h5_test_ok, String.format("%.0f", dist)))
-                    log(getString(R.string.h5_log_test_ok, String.format("%.0f", dist)))
-                } else {
-                    toast(R.string.h5_test_fail)
-                    log(getString(R.string.h5_log_test_fail,
-                        if (resp.error != null) resp.error ?: "" else "HTTP ${resp.code}"))
+                try {
+                    com.google.android.material.dialog.MaterialAlertDialogBuilder(this@H5CatcherActivity)
+                        .setTitle(if (ok) R.string.h5_test_title_ok else R.string.h5_test_title_fail)
+                        .setMessage(detail)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .setNeutralButton(R.string.h5_test_copy) { _, _ ->
+                            runCatching {
+                                val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                cm.setPrimaryClip(android.content.ClipData.newPlainText("runmate", detail))
+                                toast(R.string.pref_crash_copied)
+                            }
+                        }
+                        .show()
+                } catch (_: Throwable) {
                 }
             }
         }

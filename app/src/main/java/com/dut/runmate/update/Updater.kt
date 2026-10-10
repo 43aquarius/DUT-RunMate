@@ -7,6 +7,7 @@ import android.os.Build
 import androidx.core.content.FileProvider
 import com.dut.runmate.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -63,22 +64,40 @@ object Updater {
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
-    /** 检查更新：发布中心服务器优先，GitHub 兜底；任一通道有新版本即返回 */
+    /**
+     * 检查更新：发布中心服务器优先，GitHub 兜底。
+     * v1.6.1：服务器通道共尝试 2 次（间隔 1.5s，抗瞬时网络抖动）；双通道都
+     * 失败时把两个通道的错误合并展示（旧版只显示兜底通道错误，主因被掩盖）。
+     */
     suspend fun check(ctx: Context): CheckResult = withContext(Dispatchers.IO) {
         var serverResult: CheckResult? = null
-        serverResult = try {
-            checkServer(SERVER_BASE)
-        } catch (e: Exception) {
-            CheckResult.Failed("服务器通道: ${e.message}")
+        var serverErr = ""
+        for (attempt in 1..2) {
+            try {
+                serverResult = checkServer(SERVER_BASE)
+                break
+            } catch (e: Exception) {
+                serverErr = e.message ?: e.javaClass.simpleName
+                if (attempt == 1) delay(1500)
+            }
         }
         if (serverResult is CheckResult.HasUpdate) return@withContext serverResult
+        if (serverResult is CheckResult.UpToDate) return@withContext serverResult
 
-        val ghResult = try { checkGithub() } catch (e: Exception) {
-            CheckResult.Failed("GitHub 通道: ${e.message}")
+        var ghErr = ""
+        val ghResult = try {
+            checkGithub()
+        } catch (e: Exception) {
+            ghErr = e.message ?: e.javaClass.simpleName
+            null
         }
         if (ghResult is CheckResult.HasUpdate) return@withContext ghResult
+        if (ghResult is CheckResult.UpToDate) return@withContext ghResult
 
-        serverResult?.takeIf { it is CheckResult.UpToDate } ?: ghResult
+        CheckResult.Failed(
+            "服务器通道（重试2次）: ${serverErr.ifBlank { "未知" }}；" +
+                "GitHub 通道: ${ghErr.ifBlank { "不可用" }}"
+        )
     }
 
     /** 发布中心服务器通道：SERVER_BASE 自动补全 /api/latest */
@@ -97,12 +116,16 @@ object Updater {
             val remoteCode = latest.getInt("versionCode")
             if (remoteCode <= BuildConfig.VERSION_CODE) return CheckResult.UpToDate
 
-            val base = Uri.parse(url).let { "${it.scheme}://${it.host}${if (it.port > 0 && it.port != 80 && it.port != 443) ":${it.port}" else ""}" }
-            var apkUrl = latest.optString("apkUrl", "")
-            if (!apkUrl.startsWith("http")) {
-                val path = latest.optString("apkPath", "")
-                if (path.isBlank()) throw RuntimeException("清单缺少 apkUrl/apkPath")
-                apkUrl = base + (if (path.startsWith("/")) path else "/$path")
+            // v1.6.1 修复「更新连接失败」：线上清单的 apkUrl 曾被平台内部转发域名
+            // （*.fcapp.run，公网不可达）污染。一律改用 apkPath + 内置服务器域名
+            // 重建下载地址，不再信任清单里的绝对 apkUrl。
+            val path = latest.optString("apkPath", "")
+            val apkUrl = if (path.isNotBlank()) {
+                SERVER_BASE.trimEnd('/') + (if (path.startsWith("/")) path else "/$path")
+            } else {
+                val raw = latest.optString("apkUrl", "")
+                if (raw.startsWith("http")) raw
+                else throw RuntimeException("清单缺少 apkUrl/apkPath")
             }
             return CheckResult.HasUpdate(
                 UpdateInfo(

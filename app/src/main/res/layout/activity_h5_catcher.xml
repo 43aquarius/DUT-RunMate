@@ -58,6 +58,11 @@
                 style="@style/Widget.Material3.Chip.Suggestion"
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginStart="8dp" android:text="@string/h5_chip_sniff" />
+            <!-- v1.6.1：三个入口都是干什么的？点这里看说明 -->
+            <com.google.android.material.chip.Chip android:id="@+id/btnHelp"
+                style="@style/Widget.Material3.Chip.Suggestion"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="8dp" android:text="@string/h5_chip_help" />
         </LinearLayout>
     </HorizontalScrollView>
 

@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.3.0-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.6.1-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -27,16 +27,18 @@
 - 🏃 **实测打卡机制**（v1.2.0 抓包确认）：健康长跑为操场 RFID 读卡器计圈，官方距离每次经过读卡器 +100m 阶跃，`findExtExercise` 接口一次返回全部状态（详见 API 文档 §3）；
 - 👁 **随时定位预览**（v1.3.0）：不开跑步也能在首页/地图实时查看位置、定位源与精度（GPS 蓝/网络橙徽章）、最近点位距离与方向；
 - 🔒 **数据全部留在本机**：不联网上传、不读取 i大工 数据、不需要 root。
-- 🔄 **应用内自更新**（v1.1.0 起）：支持自建服务器（发布中心）+ GitHub Release 双通道，每天自动检查，下载带 SHA256 校验；v1.3.0 起设置成为底部导航一级页面，入口更直观；
+- 🔄 **应用内自更新**（v1.1.0 起）：发布中心 + GitHub Release 双通道，每天自动检查，下载带 SHA256 校验；v1.6.1 起下载地址强制由「服务器域名 + 路径」重建，不再受清单外链污染，检查/下载失败均有持久弹窗与浏览器兑底；
+- 🔑 **账号登录·一键配置**（v1.4.0 起）：输入学号密码即可自动登录统一身份认证（CAS）→ 自动打开健康长跑 H5 → 嗅探捕获 findExtExercise 参数 → 自动填好接口页全部配置；登录信息本机保存，v1.6.0 起校外自动走 WebVPN 隧道；
 
 > 判定逻辑说明：官方成绩以服务端记录的距离为准，因此「距离接口的增量」比单纯 GPS 进出圈更可靠 —— 这正是本 App 的核心判定依据。
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.3.0.apk`（约 5.8 MB）；
-2. 安装时允许「未知来源应用」；
-3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
-4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
+1. 国内推荐：到发布中心 https://dut-runmate.space-z.ai 下载 `DUT-RunMate_v1.6.1.apk`（约 5.9 MB），或扫页内二维码重接下载；
+2. 也可到 [Releases](../../releases) 页面下载（GitHub 通道，国内网络可能较慢）；
+3. 安装时允许「未知来源应用」；
+4. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
+5. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
 
 > 老版本（v1.0.x）内没有更新入口，需手动下载本次 APK 覆盖安装一次；v1.1.0+ 可在 App 内更新（设置 → 立即检查）。
 
@@ -97,19 +99,28 @@ cd DUT-RunMate
 ```
 app/src/main/java/com/dut/runmate/
 ├── App.kt / MainActivity.kt                            # 入口（底部导航 5 Tab：跑步/地图/标定/接口/设置）
-├── service/RunTrackerService.kt                        # 前台定位服务（息屏持续运行 + 距离轮询核对）
+├── service/RunTrackerService.kt                        # 前台定位服务（息屏持续运行 + 距离轮询核对，v1.6.1 起单轮隔离 + 协程异常处理器）
 ├── run/DetectEngine.kt · RunBus.kt                     # 检测引擎：进出圈判定 + 距离增量核对
 ├── geo/GeoKit.kt · LocGate.kt                          # WGS-84 ↔ GCJ-02 转换 + 定位源归一
 ├── data/CheckpointStore.kt · Prefs.kt · api/ApiStore.kt   # 点位/设置/接口模板本机存储
+├── auth/CasAuth.kt · WhistleAuth.kt                    # 统一身份认证（CAS，与网页端同协议）+ 微哨通道
 ├── alert/AlertManager.kt                               # TTS 语音（导航通道）+ 提示音 + 震动
-├── update/Updater.kt · UpdateFlow.kt                   # 应用内更新（服务器 + GitHub 双通道）
+├── update/Updater.kt · UpdateFlow.kt                   # 应用内更新（服务器 + GitHub 双通道，v1.6.1 起下载地址强制重建 + 浏览器兑底）
+├── util/SoftLog.kt                                     # 非致命异常落盘（设置页可查看复制）
 └── ui/
-    ├── RunFragment.kt · RadarView.kt                   # 跑步页：定位预览、状态、雷达、小结
+    ├── RunFragment.kt · RadarView.kt                   # 跑步页：定位预览、状态、雷达、小结、服务端距离查询（v1.6.1 持久弹窗）
     ├── MapFragment.kt                                  # 地图选点（osmdroid，缩放至 20 级）
     ├── CalibrateFragment.kt                            # 现场标定（精度加权平均）
-    ├── ApiFragment.kt                                  # 接口调试（预填 findExtExercise 模板）
+    ├── ApiFragment.kt · HelpDialog.kt                  # 接口调试（预填 findExtExercise 模板 + 页面说明）
+    ├── H5CatcherActivity.kt                            # 内嵌 H5 嗅探自动配置（CAS/WebVPN 自动登录）
     ├── SettingsFragment.kt                             # 设置（检测参数/提醒/更新/系统）
     └── CheckpointSheet.kt · PointAdapters.kt           # 点位编辑面板与列表
+
+release-center/                                         # 发布中心（Next.js 16，https://dut-runmate.space-z.ai）
+├── src/app/page.tsx                                   # 版本卡片 / QR 码 / 双通道下载
+├── src/app/api/latest/route.ts                        # 更新清单 API（App 消费；v1.6.1 修复 apkUrl 域名污染）
+├── src/data/releases.json                             # 版本清单（发布新版 = 加 APK 到 public/apk + 更新此文件）
+└── public/apk/                                        # APK 直链目录（.apk 不入库，走 Release 资产）
 ```
 
 **技术栈**：Kotlin · AndroidX · Material Components · osmdroid 6.1.18（开源地图框架 + 高德瓦片，含超源缩放） · OkHttp 4.12 · 前台服务 + WakeLock · TTS
@@ -122,6 +133,22 @@ app/src/main/java/com/dut/runmate/
 - 网络定位（基站/Wi-Fi，国产 ROM 返回 GCJ-02）会被自动归一后再参与显示与检测（v1.2.0），地图上灰点即网络定位，蓝点为 GPS。
 
 ## 更新日志
+
+- **v1.6.1（2026-10-10）**
+  - 🐛 **修复应用内更新「连接失败」**：更新清单里的下载地址曾被平台内部转发域名污染（公网不可达），现一律以「服务器域名 + apkPath」重建下载地址；检查/下载失败改为持久弹窗（完整展示双通道错误），提供重试 / 浏览器下载 / 复制链接 / 打开发布中心兑底，服务器通道自动重试 2 次；
+  - 🐛 **修复跑步页「查询服务端距离」闪退**：点击链路全程隔离加固，任何异常只记入崩溃日志；查询结果改为持久弹窗，支持一键复制；
+  - ✨ **测试结果可查看可复制**：接口页「发送测试」与 H5 自动测试不再用一闪而过的底部 Toast，改为持久卡片/弹窗，文本可长按选中，新增「复制完整结果」；
+  - 🔧 跑步服务轮询循环整段隔离 + 协程异常处理器，轮询中任何异常不再可能杀死进程；
+  - ✨ 接口页新增「说明」按钮、H5 捕获页新增「使用说明」入口（令牌/自定义接口/三个快捷入口用途）；仓库同步收录发布中心源码（release-center/）。
+- **v1.6.0（2026-10-10）**
+  - 🐛 修复校外 WebVPN 无法登录（学校 WebVPN 已改「仅统一身份认证登录」，自动点击认证入口 → CAS 自动填表 → 重进健康长跑 H5）；
+  - 🐛 加固「开始跑步」后 1~2 秒闪退（定位/轮询/通知/语音回调逐段隔离）；
+  - ✨ 测试即时反馈（结果卡片前置 + 按钮测试中状态）；更新页只留「检查更新」；设置页 GitHub 入口。
+- **v1.5.0 / v1.5.1（2026-10-09）**
+  - 🐛 修复登录「a is empty / 显示密码错误」（登录改用学校统一身份认证 CAS 协议，双通道）；
+  - ✨ 登录信息本机保存与回填；锁屏完整显示官方打卡距离；崩溃日志落盘可查看复制；更新服务器地址内置固定。
+- **v1.4.0（2026-10-09）**
+  - ✨ 账号登录·一键配置：学号密码 → CAS/微哨登录 → 内嵌 H5 嗅探 findExtExercise → 自动填好全部接口配置（WebVPN 隐道场景自动携带 Cookie）。
 
 - **v1.3.0（2026-10-09）**
   - ✨ **设置成为底部导航一级页面**（第 5 个 Tab），「检查更新」入口不再难找；关于区块动态显示当前版本；

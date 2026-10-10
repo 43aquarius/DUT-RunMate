@@ -28,8 +28,6 @@ import com.dut.runmate.run.DetectEngine
 import com.dut.runmate.run.RunBus
 import kotlinx.coroutines.*
 import java.io.File
-import java.io.PrintWriter
-import java.io.StringWriter
 import kotlin.math.roundToInt
 
 /**
@@ -67,6 +65,11 @@ class RunTrackerService : Service() {
     // 定位源缓存（坐标已归一 WGS-84）：GPS 优先，网络仅兑底
     private var lastGpsFix: Location? = null
 
+    // v1.6.1：轮询计时状态（从协程局部变量提为字段，供抽出的 pollOnce 使用）
+    private var lastZonePoll = 0L
+    private var lastAnchor = 0L
+    private var pollReqSeen = 0L
+
     private val locListener = LocationListener { loc ->
         // v1.6.0：定位回调全隔离——部分 ROM 的网络定位带异常元数据时仅跳过该次，不闪退
         try {
@@ -78,16 +81,7 @@ class RunTrackerService : Service() {
 
     /** v1.6.0：非致命异常落盘（与 App 崩溃日志同文件），便于远程定位闪退根因 */
     private fun logSoft(where: String, e: Throwable) {
-        try {
-            val sw = StringWriter()
-            e.printStackTrace(PrintWriter(sw))
-            val f = File(filesDir, "crash_log.txt")
-            val head = "\n[SOFT] time=${System.currentTimeMillis()} svc=$where\n"
-            val old = if (f.exists()) f.readText() else ""
-            val keep = (old + head + sw.toString()).takeLast(64 * 1024)
-            f.writeText(keep)
-        } catch (_: Throwable) {
-        }
+        com.dut.runmate.util.SoftLog.write(filesDir, "svc=$where", e)
     }
 
     override fun onBind(intent: Intent?) = null
@@ -133,7 +127,11 @@ class RunTrackerService : Service() {
         }
 
         alert = AlertManager(this, prefs).also { it.initTts() }
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        // v1.6.1：挂全局协程异常处理器——服务协程内任何未捕获异常只落盘，
+        // 不再经由默认处理器杀死进程（旧版轮询循环外层无保护，任何一段抛
+        // 异常都会闪退，与「开始跑步/查询距离后 1~2 秒闪退」现象一致）
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate +
+            CoroutineExceptionHandler { _, e -> logSoft("coroutine", e) })
 
         engine = DetectEngine(prefs, ::onEvent).also {
             it.apiMode = prefs.apiEnabled
@@ -142,6 +140,7 @@ class RunTrackerService : Service() {
 
         startAt = SystemClock.elapsedRealtime()
         sessionMeters = 0.0; fixCount = 0; lastFix = null; lastGpsFix = null
+        lastZonePoll = 0L; lastAnchor = 0L; pollReqSeen = RunBus.state.value.pollReq
 
         // 前台服务 + 常驻通知
         // v1.6.0：部分 ROM 对 startForeground(带类型) 有私有限制，失败时逐级降级
@@ -196,54 +195,68 @@ class RunTrackerService : Service() {
      */
     private fun startPoller() {
         scope?.launch(Dispatchers.Main) {
-            var lastZonePoll = 0L
-            var lastAnchor = 0L
-            var lastReqSeen = RunBus.state.value.pollReq
             while (isActive) {
                 delay(500)
-                if (!prefs.apiEnabled) continue
-                val eng = engine ?: break
-                val prof = apiStore.distanceProfile() ?: continue
-                if (prof.url.isBlank()) continue
-                val now = SystemClock.elapsedRealtime()
-                val manual = RunBus.state.value.pollReq != lastReqSeen
-                if (manual) lastReqSeen = RunBus.state.value.pollReq
-                val need = eng.needsPoll()
-                val zoneDue = need && now - lastZonePoll >= prefs.pollInterval * 1000L
-                val anchorDue = now - lastAnchor > 15_000L
-                if (!zoneDue && !anchorDue && !manual) continue
-
-                // v1.6.0：单次轮询失败只记日志，不中断循环
-                val resp = try {
-                    Http.call(prof, prefs.apiToken, prefs.apiCookie)
+                // v1.6.1：单轮全部隔离——任何一段异常只跳过本轮，循环继续
+                try {
+                    pollOnce()
+                } catch (ce: CancellationException) {
+                    throw ce
                 } catch (e: Throwable) {
-                    logSoft("poll", e)
-                    continue
-                }
-                val doneAt = SystemClock.elapsedRealtime()
-                if (resp.error != null) {
-                    RunBus.update { it.copy(apiErr = "网络错误: ${resp.error}") }
-                    continue
-                }
-                if (resp.code !in 200..299) {
-                    RunBus.update { it.copy(apiErr = "HTTP ${resp.code}") }
-                    continue
-                }
-                if (need) lastZonePoll = doneAt
-                lastAnchor = doneAt
-                val v = Http.extractDouble(resp.body, prof.distPath)
-                if (v != null) {
-                    RunBus.update { it.copy(apiDistance = v, apiErr = null) }
-                    try {
-                        eng.onApiDistance(v, doneAt)
-                    } catch (e: Throwable) {
-                        logSoft("onApiDistance", e)
-                    }
-                    refreshNotification()      // v1.5.0：打卡距离阶跃立即上锁屏通知
-                } else {
-                    RunBus.update { it.copy(apiErr = "未能提取: ${prof.distPath}") }
+                    logSoft("pollLoop", e)
                 }
             }
+        }
+    }
+
+    /** v1.6.1：单次轮询（从循环体抽出便于整段隔离） */
+    private suspend fun pollOnce() {
+        if (!prefs.apiEnabled) return
+        val eng = engine ?: return
+        val prof = apiStore.distanceProfile() ?: return
+        if (prof.url.isBlank()) return
+        val now = SystemClock.elapsedRealtime()
+        val manual = RunBus.state.value.pollReq != pollReqSeen
+        if (manual) pollReqSeen = RunBus.state.value.pollReq
+        val need = eng.needsPoll()
+        val zoneDue = need && now - lastZonePoll >= prefs.pollInterval * 1000L
+        val anchorDue = now - lastAnchor > 15_000L
+        if (!zoneDue && !anchorDue && !manual) return
+
+        val resp = try {
+            Http.call(prof, prefs.apiToken, prefs.apiCookie)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            logSoft("poll", e)
+            return
+        }
+        val doneAt = SystemClock.elapsedRealtime()
+        if (resp.error != null) {
+            RunBus.update { it.copy(apiErr = "网络错误: ${resp.error}") }
+            return
+        }
+        if (resp.code !in 200..299) {
+            RunBus.update { it.copy(apiErr = "HTTP ${resp.code}") }
+            return
+        }
+        if (need) lastZonePoll = doneAt
+        lastAnchor = doneAt
+        val v = Http.extractDouble(resp.body, prof.distPath)
+        if (v != null) {
+            RunBus.update { it.copy(apiDistance = v, apiErr = null) }
+            try {
+                eng.onApiDistance(v, doneAt)
+            } catch (e: Throwable) {
+                logSoft("onApiDistance", e)
+            }
+            try {
+                refreshNotification()      // v1.5.0：打卡距离阶跃立即上锁屏通知
+            } catch (e: Throwable) {
+                logSoft("refreshNotification", e)
+            }
+        } else {
+            RunBus.update { it.copy(apiErr = "未能提取: ${prof.distPath}") }
         }
     }
 
