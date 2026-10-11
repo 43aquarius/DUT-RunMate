@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.3-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.4-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.3.apk`（约 6.0 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.4.apk`（约 6.0 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,10 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.4（2026-10-11）**
+  - 🐛 **修复标定页「添加打卡点」只能看到一个点位**：旧版列表控件（RecyclerView wrap_content）嵌在整页 ScrollView 里，部分 ROM 只测出第一个条目的高度——无论存多少点都只显示一个；改为 LinearLayout 逐条渲染，全部点位必然展开；
+  - 📱 **锁屏显示应用（补全 v1.8.3）**：跑步进行中锁屏后，亮屏直接显示跑步界面无需解锁（Activity SHOW_WHEN_LOCKED + TURN_SCREEN_ON，停止即恢复正常锁屏）；v1.8.3 只做到了锁屏通知公开，应用本体仍被锁屏挡住；
+  - 🧹 移除无引用的 CalibPointAdapter。
 - **v1.8.3（2026-10-11）**
   - 🔐 **原生一键配置（重大）**：登录成功后不再依赖 H5 捕获页嗅探——App 内原生复刻健康长跑 H5 完整认证链（CAS → WebVPN → 隧道前缀本地计算 → mobileCheckJump 免密跳转 → noPassCheck 令牌交换 → findExeRule/findExtExercise 验证），一步配好令牌/模板/Cookie，**校外流量同样可用**（根治「已登录却拿不到 token / 账号未捕获 / webvpn 会话未建立或已过期」——H5 捕获在校外必然失败的根因是 H5 内部请求写死内网地址，官方 App WebView 自带改写而第三方没有）；
   - 🔄 **会话自动重连**：跑步中 WebVPN 会话过期，已保存学号密码时后台自动重跑原生链路（限频 5 分钟），锁屏通知显示「自动重连中」；
