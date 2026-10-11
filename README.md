@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.6-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.7-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.6.apk`（约 6.1 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.7.apk`（约 6.1 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,10 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.7（2026-10-11）**
+  - 🔊 **TTS 引擎多链兜底（用户实报「TTS 引擎不可用」）**：旧版只试系统默认引擎一次，国产 ROM 默认引擎缺失/损坏/无中文语音数据时语音直接判死。现按「引擎链」逐个尝试：系统默认 → Google → 小爱 → 讯飞 → 百度 → 三星 → PackageManager 扫描出的其余引擎（TTS_SERVICE 系统服务发现，不写死名单），初始化失败或缺中文语音数据自动换下一个；自检展示当前引擎名，TTS 不可用时弹窗提供「去系统语音设置」直达入口；
+  - 📳 **震动补「通知震动」属性（用户实报「显示触发但手机没震」）**：旧调用不带属性（系统归为 UNKNOWN 用法），部分 ROM 在静音/勿扰/触感策略下静默吞掉；现按 API 30+/26+/24+ 三级挂 USAGE_NOTIFICATION 属性归入系统通知震动通道；「测试提醒」自检由写死的静态文案改为真实调用结果（vibState 诊断：无震动模块/调用异常/开关未开），失败附排查指引；三档波形再加长；
+  - 🎨 **锁屏卡片实底色（用户实报「背景透明」）**：通知 setColor(品牌蓝 #1151FF)+setColorized；MediaSession 补 512 渐变实底专辑图——Android 11+ 锁屏系统媒体卡背景取自专辑图，无图时部分 ROM 直接透出壁纸；卡片附缩略图，观感对齐音乐软件。
 - **v1.8.6（2026-10-11）**
   - 🔊 **语音/提示音/震动三通道彻底重修（用户实报全部无效）**：TTS 音频通道由「导航」改为「媒体」（导航通道多数设备默认极小=无声）；中文语音包缺失时如实降级不再谎报就绪；提示音在媒体音量为 0 时自动切「通知」通道兜底；震动波形加长（口袋/臂包可感知）并修复 Android 7.x 上 VibrationEffect 重载触发 NoSuchMethodError（Error 捕不住）导致整次震动丢失的缺陷；设置页新增「测试提醒」当场验证三通道并给出诊断；
   - 📱 **锁屏显示改为音乐软件样式（按用户澄清重做）**：MediaSession + MediaStyle 媒体卡片——标题=官方打卡距离、副标题=漏卡/待确认/已确认状态 + GPS 里程、附「立即核对/结束」按钮；Android 11+ 锁屏与快捷设置顶部媒体区渲染；v1.8.4 的 setShowWhenLocked 整页显示方案随之移除；
