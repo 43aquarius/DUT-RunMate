@@ -1,17 +1,28 @@
 {
   "repo": "43aquarius/DUT-RunMate",
   "latest": {
-    "versionName": "1.8.4",
-    "versionCode": 17,
+    "versionName": "1.8.5",
+    "versionCode": 18,
     "date": "2026-10-11",
-    "apkFile": "DUT-RunMate_v1.8.4.apk",
-    "sha256": "150bd63740c3fb74a4e68fcf6976ba1d33b309e02f6b440a84a697fa56f7ab2f",
-    "sizeBytes": 6008633,
+    "apkFile": "DUT-RunMate_v1.8.5.apk",
+    "sha256": "918a8c216c9472ef2aef01291ece7846d1d35abb7ead9ae56c6405f6d4a09864",
+    "sizeBytes": 6009025,
     "minSdk": 24,
     "targetSdk": 34,
-    "notes": "【修复】标定页「添加打卡点」只能看到一个点位 · 锁屏后看不到应用\n\n- 标定页底部点位列表修复：旧版列表控件（RecyclerView）嵌在整页滚动容器里，在部分机型上只测出第一个条目的高度——无论保存了多少个点都只显示一个。本版改为逐条渲染，所有已保存点位必然完整展示（点击可编辑、× 可删除）\n- 锁屏显示（补全 v1.8.3）：上一版已让跑步通知在锁屏可见，但应用本身仍被锁屏挡住。本版新增：跑步进行中锁屏后，按电源键/亮屏直接显示跑步界面，无需解锁；停止跑步立即恢复正常锁屏。注意需保持跑伴在跑步前处于前台（不要先按 Home 再锁屏）\n- 地图页「操场环线」说明：它是大工操场跑道的参考轨迹线（蓝色），仅用于对照选点与跑位参考，不参与打卡检测计算，可随时开关"
+    "notes": "【更新】更新检测提速：GitHub 优先 + 每次启动必查\n\n- 检查顺序反转：先查 GitHub Release（发布源头），再查本站服务器。此前网站为独立部署、可能滞后数小时才同步，旧顺序会在窗口期误判「已是最新」；现在 GitHub 上刚发的版本第一时间就能收到升级提醒\n- 每次进入 App 都自动检查：移除旧版「每天最多一次」的限制——冷启动、后台切回前台都会检查，同次使用内 5 分钟去重防打扰\n- 双通道结果合并：任一通道发现新版即提醒；两通道都有更新时取版本更高者，同版本优先从本站服务器下载（国内更稳、带 SHA-256 完整性校验）\n- 修复隐患：App 内所有 GitHub 链接与下载地址统一改用小写仓库名，规避 GitHub 侧仓库名称路由偶发 404 导致检查/下载失败"
   },
   "history": [
+    {
+      "versionName": "1.8.4",
+      "versionCode": 17,
+      "date": "2026-10-11",
+      "apkFile": "DUT-RunMate_v1.8.4.apk",
+      "sha256": "150bd63740c3fb74a4e68fcf6976ba1d33b309e02f6b440a84a697fa56f7ab2f",
+      "sizeBytes": 6008633,
+      "minSdk": 24,
+      "targetSdk": 34,
+      "notes": "【修复】标定页「添加打卡点」只能看到一个点位 · 锁屏后看不到应用\n\n- 标定页底部点位列表修复：旧版列表控件（RecyclerView）嵌在整页滚动容器里，在部分机型上只测出第一个条目的高度——无论保存了多少个点都只显示一个。本版改为逐条渲染，所有已保存点位必然完整展示（点击可编辑、× 可删除）\n- 锁屏显示（补全 v1.8.3）：上一版已让跑步通知在锁屏可见，但应用本身仍被锁屏挡住。本版新增：跑步进行中锁屏后，按电源键/亮屏直接显示跑步界面，无需解锁；停止跑步立即恢复正常锁屏。注意需保持跑伴在跑步前处于前台（不要先按 Home 再锁屏）\n- 地图页「操场环线」说明：它是大工操场跑道的参考轨迹线（蓝色），仅用于对照选点与跑位参考，不参与打卡检测计算，可随时开关"
+    },
     {
       "versionName": "1.8.3",
       "versionCode": 16,
@@ -139,20 +150,6 @@
       "githubTag": "v1.4.0",
       "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases",
       "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.4.0.apk"
-    },
-    {
-      "versionName": "1.3.0",
-      "versionCode": 5,
-      "date": "2026-10-09",
-      "apkFile": "DUT-RunMate_v1.3.0.apk",
-      "sha256": "c4e762c2fa2a698a10db4d3364485ac5c7d3ea44cf2c53078879f730ae0b39c7",
-      "sizeBytes": 5881225,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "【增强】打卡核对与设置页\n\n- 「健康长跑距离 findExtExercise」接口模板预填实测地址与参数\n- 「服务端距离」点按立即核对（跑步中）/ 直接查询（未跑步）\n- 设置改为底部导航一级页面，修复进入设置页闪退（Slider 网格吸附自愈）",
-      "githubTag": "v1.3.0",
-      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases",
-      "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.3.0.apk"
     }
   ]
 }

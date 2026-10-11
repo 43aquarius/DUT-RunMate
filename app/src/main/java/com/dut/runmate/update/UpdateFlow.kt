@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * 更新流程编排：自动检查（每天一次）/ 手动检查 → 弹窗 → 进度下载 → 安装。
+ * 更新流程编排：自动检查（v1.8.5 起每次启动）/ 手动检查 → 弹窗 → 进度下载 → 安装。
  *
  * v1.6.1 反馈改造：检查失败 / 下载失败不再用一闪而过的 Toast，改用持久对话框，
  * 完整展示错误详情，并提供「重试 / 浏览器下载 / 复制链接」兜底——应用内下载
@@ -29,15 +29,28 @@ import java.io.File
  */
 object UpdateFlow {
 
-    private const val CHECK_INTERVAL_MS = 24 * 3600_000L
+    /** v1.8.5：自动检查去重窗——同一次使用内（旋转/亮灭屏/快速切换）不重复检查 */
+    private const val RECHECK_DEDUP_MS = 5 * 60_000L
+
     private var pendingApk: File? = null     // 授权「安装未知应用」回来后继续安装
 
-    /** 启动时自动检查（静默失败） */
+    /**
+     * 进入 App 时自动检查（静默失败）。
+     * v1.8.5：每次进入 App 都检查，移除旧版「每天最多一次」的 24h 节流——
+     * 检查顺序 GitHub 优先（发布源头），网站未同步也能第一时间发现新版。
+     * 调用点在 MainActivity.onResume：冷启动、后台回到前台（进程未被杀的
+     * 常驻场景）都会覆盖。两个防打扰保护：
+     * - 5 分钟去重窗：同次使用内的旋转/息屏亮屏/快速切走切回不重复检查
+     * - 下载待安装（pendingApk）期间跳过：不打断正在进行的更新流程
+     * 仍是最新则完全静默不打扰，失败也不弹窗。updLastCheckMs 记录最后
+     * 一次检查时间（诊断用）。
+     */
     fun maybeAutoCheck(activity: AppCompatActivity) {
         val prefs = Prefs.get(activity)
         if (!prefs.updAutoCheck) return
+        if (pendingApk != null) return
         val now = System.currentTimeMillis()
-        if (now - prefs.updLastCheckMs < CHECK_INTERVAL_MS) return
+        if (now - prefs.updLastCheckMs < RECHECK_DEDUP_MS) return
         prefs.updLastCheckMs = now
         runCheck(activity, silent = true)
     }

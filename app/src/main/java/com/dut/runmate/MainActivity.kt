@@ -55,7 +55,6 @@ class MainActivity : AppCompatActivity() {
         if (savedInstanceState == null) {
             b.bottomNav.selectedItemId = R.id.nav_run
             askPermissions()
-            UpdateFlow.maybeAutoCheck(this)
         }
 
         b.toolbar.setOnMenuItemClickListener {
@@ -103,6 +102,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // v1.8.5：每次进入 App（冷启动/后台回前台）都静默检查更新，
+        // GitHub Release 优先——发布源头第一时间可见；详见 UpdateFlow.maybeAutoCheck。
+        // 放在 resumePendingInstall 之前：下载待安装期间跳过检查，不重复弹窗。
+        UpdateFlow.maybeAutoCheck(this)
         UpdateFlow.resumePendingInstall(this)
     }
 

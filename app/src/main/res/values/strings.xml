@@ -266,9 +266,9 @@
     <!-- 更新 -->
     <string name="pref_update">更新</string>
     <string name="pref_upd_auto">自动检查更新</string>
-    <string name="pref_upd_auto_sub">每天启动时静默检查一次</string>
+    <string name="pref_upd_auto_sub">每次启动时静默检查（GitHub 优先，仍是最新则不打扰）</string>
     <string name="pref_upd_server">更新服务器</string>
-    <string name="pref_upd_server_fixed">https://dut-runmate.space-z.ai（内置固定）\n检查失败时自动改用 GitHub Release</string>
+    <string name="pref_upd_server_fixed">GitHub Release 优先 + 本站服务器兜底（内置固定）\nhttps://dut-runmate.space-z.ai</string>
     <string name="pref_upd_check_now">检查更新</string>
     <!-- v1.6.0 GitHub 开源仓库入口 -->
     <string name="pref_github">GitHub 开源仓库</string>

@@ -19,10 +19,19 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /**
- * 应用内更新：双通道检查（发布中心服务器 → GitHub Release 兜底）+ 下载 + 安装。
+ * 应用内更新：双通道检查（GitHub Release 优先 → 发布中心服务器兜底）+ 下载 + 安装。
  *
- * v1.5.0：服务器地址为内置常量（用户指定的发布中心），不再支持自定义；
- * 服务器不可达时自动改走 GitHub Release。
+ * v1.8.5：检查顺序反转。发布流程先出 GitHub Release，网站（独立部署快照）
+ * 可能滞后数小时才同步；旧顺序（服务器优先）在网站未同步时会误判「已是最新」，
+ * 漏掉 GitHub 上的新版。现改为 GitHub 先查，再查服务器，双通道结果合并：
+ * 任一发现更新取版本更高者（同版本优先服务器——国内下载更稳且带 sha256）。
+ *
+ * v1.8.5 附带修复：GitHub 对仓库名大小写不敏感，但实测该仓库精确大小写形式
+ * （DUT-RunMate）的名称路由（API/网页/资产下载）一度整体 404，小写形式始终
+ * 正常——所有出站 GitHub URL 一律使用小写仓库名，并对资产下载 URL 里的
+ * 仓库段做小写归一，规避同类风险。
+ *
+ * v1.5.0：服务器地址为内置常量（用户指定的发布中心），不再支持自定义。
  *
  * 服务器清单格式（配套发布中心 /api/latest）：
  * { ok, latest: { versionName, versionCode, apkUrl|apkPath, sha256, sizeBytes, notes, ... } }
@@ -32,7 +41,11 @@ import java.util.concurrent.TimeUnit
  */
 object Updater {
 
-    const val GITHUB_REPO = "43aquarius/DUT-RunMate"
+    /** v1.8.5：仓库标识（出站 URL 用，一律小写，见对象头注释） */
+    const val GITHUB_REPO = "43aquarius/dut-runmate"
+
+    /** 仓库名（仅界面显示用，如设置页副标题、复制链接提示） */
+    const val GITHUB_REPO_DISPLAY = "43aquarius/DUT-RunMate"
 
     /** v1.5.0：发布中心固定地址（用户指定），不再从设置读取 */
     const val SERVER_BASE = "https://dut-runmate.space-z.ai"
@@ -65,39 +78,61 @@ object Updater {
         .build()
 
     /**
-     * 检查更新：发布中心服务器优先，GitHub 兜底。
-     * v1.6.1：服务器通道共尝试 2 次（间隔 1.5s，抗瞬时网络抖动）；双通道都
-     * 失败时把两个通道的错误合并展示（旧版只显示兜底通道错误，主因被掩盖）。
+     * 检查更新（v1.8.5 顺序反转）：GitHub Release 优先 → 发布中心服务器其次。
+     *
+     * 为什么 GitHub 优先：发布源头在 GitHub，网站是后续同步的独立部署，
+     * 存在「GitHub 已发新版、网站还没同步」的窗口期；旧顺序此时会误报最新。
+     *
+     * 合并规则：
+     * - 任一通道发现更新 → 取 versionName 更高者；同版本优先服务器
+     *   （国内下载更稳、清单带 sha256 校验）
+     * - 双通道均无更新（任一返回 UpToDate 即可信）→ UpToDate
+     * - 双通道均失败 → Failed（两通道错误合并展示，v1.6.1 起不掩盖主因）
+     *
+     * 两通道各重试 2 次（间隔 1.5s，抗瞬时网络抖动）；检查在后台协程进行，
+     * 全部失败的最坏耗时也不影响启动体验。
      */
     suspend fun check(ctx: Context): CheckResult = withContext(Dispatchers.IO) {
-        var serverResult: CheckResult? = null
-        var serverErr = ""
+        // 通道 1：GitHub Release（发布源头，版本最新）
+        var ghResult: CheckResult? = null
+        var ghErr = ""
         for (attempt in 1..2) {
             try {
-                serverResult = checkServer(SERVER_BASE)
+                ghResult = checkGithub()
                 break
             } catch (e: Exception) {
-                serverErr = e.message ?: e.javaClass.simpleName
+                ghErr = e.message ?: e.javaClass.simpleName
                 if (attempt == 1) delay(1500)
             }
         }
-        if (serverResult is CheckResult.HasUpdate) return@withContext serverResult
-        if (serverResult is CheckResult.UpToDate) return@withContext serverResult
 
-        var ghErr = ""
-        val ghResult = try {
-            checkGithub()
-        } catch (e: Exception) {
-            ghErr = e.message ?: e.javaClass.simpleName
-            null
+        // 通道 2：发布中心服务器（下载更稳，带 sha256；GitHub 不可达时的兜底）
+        var svResult: CheckResult? = null
+        var svErr = ""
+        for (attempt in 1..2) {
+            try {
+                svResult = checkServer(SERVER_BASE)
+                break
+            } catch (e: Exception) {
+                svErr = e.message ?: e.javaClass.simpleName
+                if (attempt == 1) delay(1500)
+            }
         }
-        if (ghResult is CheckResult.HasUpdate) return@withContext ghResult
-        if (ghResult is CheckResult.UpToDate) return@withContext ghResult
 
-        CheckResult.Failed(
-            "服务器通道（重试2次）: ${serverErr.ifBlank { "未知" }}；" +
-                "GitHub 通道: ${ghErr.ifBlank { "不可用" }}"
-        )
+        val ghUpd = ghResult as? CheckResult.HasUpdate
+        val svUpd = svResult as? CheckResult.HasUpdate
+        when {
+            ghUpd != null && svUpd != null ->
+                // 双通道都有更新：版本不同取更高者；同版本优先服务器（下载更稳+带校验）
+                if (semverCompare(svUpd.info.versionName, ghUpd.info.versionName) >= 0) svUpd else ghUpd
+            ghUpd != null -> ghUpd
+            svUpd != null -> svUpd
+            ghResult is CheckResult.UpToDate || svResult is CheckResult.UpToDate -> CheckResult.UpToDate
+            else -> CheckResult.Failed(
+                "GitHub 通道（重试2次）: ${ghErr.ifBlank { "未知" }}；" +
+                    "服务器通道（重试2次）: ${svErr.ifBlank { "未知" }}"
+            )
+        }
     }
 
     /** 发布中心服务器通道：SERVER_BASE 自动补全 /api/latest */
@@ -140,7 +175,7 @@ object Updater {
         }
     }
 
-    /** GitHub Release 通道（国内网络可能不可达，作为兜底） */
+    /** GitHub Release 通道（发布源头，v1.8.5 起优先；国内可能不可达，失败自动落服务器通道） */
     private fun checkGithub(): CheckResult {
         val req = Request.Builder().url(GITHUB_API)
             .header("User-Agent", "DUT-RunMate-Updater")
@@ -162,7 +197,11 @@ object Updater {
             return CheckResult.HasUpdate(
                 UpdateInfo(
                     versionName = tag,
-                    apkUrl = asset.getString("browser_download_url"),
+                    // v1.8.5：下载 URL 里的仓库段小写归一——GitHub 返回的
+                    // browser_download_url 携带精确大小写仓库名，该形式的资产
+                    // 路由曾整体 404；小写形式始终可用（GitHub 大小写不敏感）。
+                    apkUrl = asset.getString("browser_download_url")
+                        .replace("/$GITHUB_REPO_DISPLAY/", "/$GITHUB_REPO/", ignoreCase = true),
                     sha256 = null,           // GitHub 资产 API 不直接给 sha256
                     sizeBytes = asset.optLong("size", 0L),
                     notes = root.optString("body", ""),
