@@ -176,7 +176,7 @@ object Http {
             if (path.startsWith("/login") || path.startsWith("/cas")) return true
             return false
         }
-        // 兑底：无终态 URL 时看登录页特征
+        // 兜底：无终态 URL 时看登录页特征
         val b = body.lowercase()
         return b.contains("<html") && (b.contains("webvpn") || b.contains("统一身份认证"))
     }

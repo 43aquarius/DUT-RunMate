@@ -52,6 +52,9 @@ class ApiFragment : Fragment() {
 
     override fun onViewCreated(v: View, savedInstanceState: Bundle?) {
         super.onViewCreated(v, savedInstanceState)
+        // v1.8.2：复位批量查询在逓标记（旧版取消路径不复位——切页中断后 queryingAll
+        // 永久卡 true，「查询全部账号距离」从此点击无反应，只能杀进程恢复）
+        queryingAll = false
         adapter = ProfileAdapter(store.profiles, { p -> test(p) }, { p -> edit(p) })
         b.rvProfiles.adapter = adapter
         b.rvProfiles.layoutManager = LinearLayoutManager(requireContext())
@@ -397,7 +400,7 @@ class ApiFragment : Fragment() {
             try {
                 accounts.forEachIndexed { i, acc ->
                     if (_b == null) {                       // 页面已销毁：放弃 UI 更新
-                        dialog.dismiss(); return@launch
+                        dialog.dismiss(); queryingAll = false; return@launch
                     }
                     dialog.setMessage(getString(R.string.acct_query_progress,
                         i + 1, accounts.size, acctLabel(acc)))
@@ -407,6 +410,7 @@ class ApiFragment : Fragment() {
                 }
             } catch (e: CancellationException) {
                 dialog.dismiss()
+                queryingAll = false        // v1.8.2：页面销毁取消时同样复位（见 onViewCreated 注释）
                 throw e
             } catch (_: Exception) {
             }

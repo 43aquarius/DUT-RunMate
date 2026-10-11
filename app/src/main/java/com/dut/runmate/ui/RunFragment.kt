@@ -210,11 +210,19 @@ class RunFragment : Fragment() {
                     val resp = Http.call(prof, prefs.apiToken, prefs.apiCookie)
                     if (_b == null) return@launch      // 页面已销毁：放弃 UI 更新
                     val ok = resp.error == null && resp.code in 200..299
+                    // v1.8.2：会话失效识别（旧版会报「未能提取」，用户无从排查）
+                    val webvpnExpired = resp.error == null &&
+                        Http.isWebvpnLoginRedirect(resp.finalUrl, resp.body, resp.url)
                     val dv = if (ok) Http.extractDouble(resp.body, prof.distPath) else null
                     if (ok) {
                         RunBus.update {
                             it.copy(apiDistance = dv,
                                 apiErr = if (dv == null) "未能提取: ${prof.distPath}" else null)
+                        }
+                    } else if (webvpnExpired) {
+                        RunBus.update {
+                            it.copy(apiDistance = null,
+                                apiErr = "WebVPN 会话已过期，请重新登录捕获")
                         }
                     } else {
                         RunBus.update {
@@ -223,11 +231,12 @@ class RunFragment : Fragment() {
                         }
                     }
                     val headline = when {
+                        webvpnExpired -> getString(R.string.api_hint_webvpn_expired)
                         ok && dv != null -> getString(R.string.run_query_ok, String.format("%.1f", dv))
                         ok -> getString(R.string.run_query_no_extract, prof.distPath)
                         else -> getString(R.string.run_query_http, resp.code, resp.ms)
                     }
-                    showQueryResult(headline, ok, resp, prof)
+                    showQueryResult(headline, ok && !webvpnExpired, resp, prof)
                 }.onFailure { e ->
                     // v1.6.1：页面仍在才展示/记录；已分离则静默丢弃（requireContext 会抛异常）
                     if (_b == null) return@onFailure

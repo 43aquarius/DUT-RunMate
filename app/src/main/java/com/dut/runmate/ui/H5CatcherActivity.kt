@@ -241,7 +241,7 @@ class H5CatcherActivity : AppCompatActivity() {
 
             override fun onPageCommitVisible(v: WebView, url: String) {
                 super.onPageCommitVisible(v, url)
-                injectSniffer()   // v1.6.2：比 onPageFinished 更早的兑底注入时机
+                injectSniffer()   // v1.6.2：比 onPageFinished 更早的兜底注入时机
             }
 
             override fun onPageFinished(v: WebView, url: String) {
@@ -271,6 +271,11 @@ class H5CatcherActivity : AppCompatActivity() {
                     log(getString(R.string.h5_log_prefix_rejected))
                     webvpnStage = 1
                     portalScanned = false
+                    // v1.8.2：同时复位两个一次性标记（旧版只重置 stage/portalScanned——
+                    // 转回 /login 后若会话未建立，maybeAutoFillWebvpn 因 triedFill=true
+                    // 且 stage<3 直接 return，不会自动点「统一身份认证登录」，用户卡在登录页）
+                    webvpnTriedFill = false
+                    casTriedFill = false
                     load(WEBVPN_LOGIN)
                 }
             }
@@ -380,7 +385,7 @@ class H5CatcherActivity : AppCompatActivity() {
      * - Cookie（whistlekey / wengine_vpn_ticket 等）从 CookieManager 原样转发
      * - 3xx/非 200：状态码+响应头+字节流原样交回 WebView 自行处理
      * - 200 HTML：嗅探器 <script> 插入 <head> 顶部后返回
-     * - 任何异常由调用方兑底返回 null → WebView 默认加载
+     * - 任何异常由调用方兜底返回 null → WebView 默认加载
      */
     private fun interceptH5Document(
         v: WebView, url: String, reqHeaders: Map<String, String>
@@ -691,7 +696,7 @@ class H5CatcherActivity : AppCompatActivity() {
         }
         if (tunnelPrefix.isNotBlank() && absUrl.contains("/http-8081/0/"))
             absUrl = absUrl.replace("/http-8081/0/", "/http-8081/$tunnelPrefix/")
-        // v1.8.1：从捕获 URL 反向提取真实前缀并持久化（门户链接没扫到时的兑底来源），
+        // v1.8.1：从捕获 URL 反向提取真实前缀并持久化（门户链接没扫到时的兜底来源），
         // 后续 H5 捕获直达与全部距离查询请求都使用真实前缀
         Regex("/http-8081/([^/]+?)/").find(absUrl)?.let { m ->
             val pref = m.groupValues[1]

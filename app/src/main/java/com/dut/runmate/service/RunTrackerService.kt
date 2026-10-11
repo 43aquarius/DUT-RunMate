@@ -62,7 +62,7 @@ class RunTrackerService : Service() {
     private var fixCount = 0
     private var lastFix: Location? = null
     private var lastNotif = 0L
-    // 定位源缓存（坐标已归一 WGS-84）：GPS 优先，网络仅兑底
+    // 定位源缓存（坐标已归一 WGS-84）：GPS 优先，网络仅兜底
     private var lastGpsFix: Location? = null
 
     // v1.6.1：轮询计时状态（从协程局部变量提为字段，供抽出的 pollOnce 使用）
@@ -240,6 +240,13 @@ class RunTrackerService : Service() {
             RunBus.update { it.copy(apiErr = "HTTP ${resp.code}") }
             return
         }
+        // v1.8.2：隧道会话失效识别（对齐接口页/批量查询 v1.8.0 行为）。
+        // 旧版此处只会在下面报「未能提取: pmDel.distance」——实际拿到的是登录页 HTML，
+        // 跑步中看到该提取错误完全无从排查；轮询器是最后一个未接 webvpn 判断的调用点。
+        if (Http.isWebvpnLoginRedirect(resp.finalUrl, resp.body, resp.url)) {
+            RunBus.update { it.copy(apiErr = "WebVPN 会话已过期，请重新登录捕获") }
+            return
+        }
         if (need) lastZonePoll = doneAt
         lastAnchor = doneAt
         val v = Http.extractDouble(resp.body, prof.distPath)
@@ -360,7 +367,9 @@ class RunTrackerService : Service() {
         val st = RunBus.state.value
         val apiTxt = st.apiDistance
             ?.let { "官方打卡 %d m".format(it.roundToInt()) }
-            ?: "官方打卡：待接口"
+            ?: (if (st.apiErr?.contains("WebVPN") == true)
+                "官方打卡：会话过期，需重登录"   // v1.8.2：锁屏上直接可见会话状态，不用解锁查
+                else "官方打卡：待接口")
         val gpsTxt = if (st.stats.meters >= 10)
             "GPS %.2f km".format(st.stats.meters / 1000.0)
         else "GPS 累积中"
