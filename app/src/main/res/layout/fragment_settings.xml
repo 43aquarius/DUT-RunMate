@@ -33,10 +33,11 @@
                 <TextView android:id="@+id/tvRadius" android:layout_width="match_parent"
                     android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant" android:text="25 m" />
+                <!-- v1.8.6：最小可调精度 1m（原步长 5m） -->
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderRadius" android:layout_width="match_parent"
                     android:layout_height="wrap_content" android:valueFrom="15" android:valueTo="80"
-                    android:stepSize="5" />
+                    android:stepSize="1" />
             </LinearLayout>
 
             <!-- 预告距离 -->
@@ -50,10 +51,11 @@
                 <TextView android:id="@+id/tvApproach" android:layout_width="match_parent"
                     android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant" android:text="60 m" />
+                <!-- v1.8.6：最小可调精度 1m（原步长 10m） -->
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderApproach" android:layout_width="match_parent"
                     android:layout_height="wrap_content" android:valueFrom="30" android:valueTo="150"
-                    android:stepSize="10" />
+                    android:stepSize="1" />
             </LinearLayout>
 
             <!-- 确认阈值 -->
@@ -158,6 +160,13 @@
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/swVibrate" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             </LinearLayout>
+
+            <!-- v1.8.6：测试提醒——当场验证语音/提示音/震动三通道（用户实报三通道全无效后的自查入口） -->
+            <com.google.android.material.button.MaterialButton
+                style="?attr/materialButtonOutlinedStyle"
+                android:id="@+id/btnTestAlert"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:text="@string/pref_test_alert" />
 
             <TextView style="@style/TextAppearance.RunMate.Label"
                 android:layout_width="match_parent" android:layout_height="wrap_content"

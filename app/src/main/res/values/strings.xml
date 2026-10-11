@@ -50,6 +50,25 @@
     <string name="api_not_configured">距离接口未配置，请到「接口」页填写抓包参数</string>
     <string name="api_need_enable">请先在「设置」页开启 API 判定</string>
 
+    <!-- v1.8.6：跑步页下拉刷新 -->
+    <string name="pull_refresh_done">已刷新：服务端距离 %1$s m</string>
+    <string name="pull_refresh_too_frequent">正在查询中，请稍候</string>
+
+    <!-- v1.8.6：锁屏媒体卡片 / 通知动作 -->
+    <string name="notif_verify">立即核对</string>
+    <string name="media_card_waiting">官方打卡：待接口</string>
+
+    <!-- v1.8.6：测试提醒 -->
+    <string name="pref_test_alert">测试提醒（语音+提示音+震动）</string>
+    <string name="alert_test_playing">正在播报测试，请留意听感与震感…</string>
+    <string name="alert_test_tts_text">语音播报测试。如果你能听到这句话，说明语音通道正常。</string>
+    <string name="alert_test_title">提醒通道自检结果</string>
+    <string name="alert_test_tts_ok">✓ 语音引擎就绪（跟随媒体音量，请确认媒体音量已开启）</string>
+    <string name="alert_test_tts_bad">✗ 语音引擎异常：%1$s</string>
+    <string name="alert_test_chime_ok">✓ 提示音已播报（走媒体/通知通道，听不到请调高音量）</string>
+    <string name="alert_test_vib_ok">✓ 震动已触发（无震感请检查系统「触感反馈」是否开启）</string>
+    <string name="alert_test_switch_off">注：部分提醒开关处于关闭状态，跑步时对应通道不会触发</string>
+
     <!-- 标定页 -->
     <string name="calib_title">现场标定</string>
     <string name="calib_hint">站在打卡点中央，等精度收敛（≤10m 更佳），点击「开始平均标定」。</string>

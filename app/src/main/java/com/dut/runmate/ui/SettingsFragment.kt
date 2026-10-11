@@ -85,6 +85,43 @@ class SettingsFragment : Fragment() {
         b.swVibrate.isChecked = prefs.vibrateEnabled
         b.swVibrate.setOnCheckedChangeListener { _, c -> prefs.vibrateEnabled = c }
 
+        // v1.8.6：测试提醒——当场播报语音+提示音+震动，4.5s 后弹出三通道自检结果。
+        // 用户实报三通道全部无效后的自查入口：TTS 引擎状态、音量通道、开关状态一目了然。
+        b.btnTestAlert.setOnClickListener {
+            val am = com.dut.runmate.alert.AlertManager(requireContext(), prefs)
+            am.initTts()
+            try {
+                Toast.makeText(requireContext(), R.string.alert_test_playing, Toast.LENGTH_SHORT).show()
+            } catch (_: Throwable) { }
+            // TTS 引擎初始化需 1~3 秒：先等 1.5s 再统一触发三通道
+            view?.postDelayed({
+                try { am.testAlert(getString(R.string.alert_test_tts_text)) } catch (_: Throwable) { }
+            }, 1500L)
+            // 播报完成后展示诊断 + 释放引擎
+            view?.postDelayed({
+                val ttsLine = if (am.ttsState.isBlank())
+                    getString(R.string.alert_test_tts_ok)
+                else getString(R.string.alert_test_tts_bad, am.ttsState)
+                val sb = buildString {
+                    append(ttsLine).append('\n')
+                    append(getString(R.string.alert_test_chime_ok)).append('\n')
+                    append(getString(R.string.alert_test_vib_ok))
+                    if (!prefs.ttsEnabled || !prefs.chimeEnabled || !prefs.vibrateEnabled)
+                        append("\n\n").append(getString(R.string.alert_test_switch_off))
+                }
+                try {
+                    am.shutdown()
+                } catch (_: Throwable) { }
+                try {
+                    android.app.AlertDialog.Builder(requireContext())
+                        .setTitle(R.string.alert_test_title)
+                        .setMessage(sb)
+                        .setPositiveButton(android.R.string.ok, null)
+                        .show()
+                } catch (_: Throwable) { }
+            }, 4500L)
+        }
+
         // API
         b.swApi.isChecked = prefs.apiEnabled
         b.swApi.setOnCheckedChangeListener { _, c -> prefs.apiEnabled = c }

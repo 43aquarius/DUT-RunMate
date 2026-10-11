@@ -1,17 +1,28 @@
 {
   "repo": "43aquarius/DUT-RunMate",
   "latest": {
-    "versionName": "1.8.5",
-    "versionCode": 18,
+    "versionName": "1.8.6",
+    "versionCode": 19,
     "date": "2026-10-11",
-    "apkFile": "DUT-RunMate_v1.8.5.apk",
-    "sha256": "918a8c216c9472ef2aef01291ece7846d1d35abb7ead9ae56c6405f6d4a09864",
-    "sizeBytes": 6009025,
+    "apkFile": "DUT-RunMate_v1.8.6.apk",
+    "sha256": "0d4e3476ba4ec8be1c83bcef963a0910f2b40dc0be6e35c24f9dd69d448020c7",
+    "sizeBytes": 6131321,
     "minSdk": 24,
     "targetSdk": 34,
-    "notes": "【更新】更新检测提速：GitHub 优先 + 每次启动必查\n\n- 检查顺序反转：先查 GitHub Release（发布源头），再查本站服务器。此前网站为独立部署、可能滞后数小时才同步，旧顺序会在窗口期误判「已是最新」；现在 GitHub 上刚发的版本第一时间就能收到升级提醒\n- 每次进入 App 都自动检查：移除旧版「每天最多一次」的限制——冷启动、后台切回前台都会检查，同次使用内 5 分钟去重防打扰\n- 双通道结果合并：任一通道发现新版即提醒；两通道都有更新时取版本更高者，同版本优先从本站服务器下载（国内更稳、带 SHA-256 完整性校验）\n- 修复隐患：App 内所有 GitHub 链接与下载地址统一改用小写仓库名，规避 GitHub 侧仓库名称路由偶发 404 导致检查/下载失败"
+    "notes": "【修复】提醒三通道 + 锁屏卡片 + 下拉刷新 + 1m 精度\n\n- 语音/提示音/震动彻底重修：语音改走媒体音量通道（旧版走「导航」通道，多数设备默认极小=无声）；中文语音包缺失时如实降级，不再谎报就绪；提示音在媒体音量为 0 时自动切通知通道；震动波形加长（口袋/臂包可感知），并修复 Android 7.x 上震动整段丢失的兼容缺陷。设置页新增「测试提醒」，当场验证三通道并给出诊断\n- 锁屏显示改为音乐软件样式：媒体卡片只显示关键信息——标题=官方打卡距离，副标题=漏卡/待确认/已确认状态，附「立即核对/结束」按钮；v1.8.4 的「整页显示在锁屏上」按用户澄清移除\n- 跑步页支持下拉刷新：向下划屏幕即触发服务端距离查询/核对，成功静默更新数字、失败给出原因（详情弹窗仍走点按入口）\n- 检测参数最小可调精度 1m：默认半径（原 5m 步长）、预告距离（原 10m 步长）、单点半径（原 5m 步长）全部改为 1m 步进；确认阈值原本即 1m"
   },
   "history": [
+    {
+      "versionName": "1.8.5",
+      "versionCode": 18,
+      "date": "2026-10-11",
+      "apkFile": "DUT-RunMate_v1.8.5.apk",
+      "sha256": "918a8c216c9472ef2aef01291ece7846d1d35abb7ead9ae56c6405f6d4a09864",
+      "sizeBytes": 6009025,
+      "minSdk": 24,
+      "targetSdk": 34,
+      "notes": "【更新】更新检测提速：GitHub 优先 + 每次启动必查\n\n- 检查顺序反转：先查 GitHub Release（发布源头），再查本站服务器。此前网站为独立部署、可能滞后数小时才同步，旧顺序会在窗口期误判「已是最新」；现在 GitHub 上刚发的版本第一时间就能收到升级提醒\n- 每次进入 App 都自动检查：移除旧版「每天最多一次」的限制——冷启动、后台切回前台都会检查，同次使用内 5 分钟去重防打扰\n- 双通道结果合并：任一通道发现新版即提醒；两通道都有更新时取版本更高者，同版本优先从本站服务器下载（国内更稳、带 SHA-256 完整性校验）\n- 修复隐患：App 内所有 GitHub 链接与下载地址统一改用小写仓库名，规避 GitHub 侧仓库名称路由偶发 404 导致检查/下载失败"
+    },
     {
       "versionName": "1.8.4",
       "versionCode": 17,
@@ -136,20 +147,6 @@
       "githubTag": "v1.5.0",
       "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases",
       "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.5.0.apk"
-    },
-    {
-      "versionName": "1.4.0",
-      "versionCode": 6,
-      "date": "2026-10-09",
-      "apkFile": "DUT-RunMate_v1.4.0.apk",
-      "sha256": "776265543364039c6ca58c6245ea2a1db29a15ac12cc788a3b002f8efaae4fbd",
-      "sizeBytes": 5916481,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "【新功能】账号登录 · 一键配置\n\n- 「接口」页输入学号密码登录微哨（i大工）服务，自动打开健康长跑 H5 捕获 userId/amId/pmId/sign 与令牌，告别手动抓包誊抄\n- 新增 H5 捕获页：校内直连 / 校外 WebVPN 自动填表，JS 嗅探器全自动写入接口配置\n- 接口模板支持 {cookie} 占位符（WebVPN 隧道场景）",
-      "githubTag": "v1.4.0",
-      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases",
-      "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.4.0.apk"
     }
   ]
 }

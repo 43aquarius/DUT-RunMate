@@ -104,8 +104,19 @@ class RunFragment : Fragment() {
             }
         }
 
-        // 服务端距离：点按核对/查询
-        b.layoutApi.setOnClickListener { onApiTap() }
+        // 服务端距离：点按 = 核对/查询并弹详情（v1.8.6 起与下拉刷新共用同一链路）
+        b.layoutApi.setOnClickListener { requestDistanceRefresh(showDialog = true) }
+
+        // v1.8.6：下拉刷新距离查询（用户需求：主页面「跑步」向下划屏幕即刷新；
+        // 查询成功静默更新数字，失败 Toast 提示原因——详情弹窗留给点按入口）
+        b.swipeRefresh.setOnRefreshListener {
+            requestDistanceRefresh(showDialog = false) {
+                if (_b != null) b.swipeRefresh.isRefreshing = false
+            }
+        }
+        try {
+            b.swipeRefresh.setColorSchemeResources(R.color.md_primary)
+        } catch (_: Throwable) { }
 
         viewLifecycleOwner.lifecycleScope.launch {
             RunBus.state.collect { render(it) }
@@ -173,39 +184,52 @@ class RunFragment : Fragment() {
         super.onPause()
     }
 
-    // ---------- 服务端距离：点按核对 ----------
+    /** v1.8.6：安全显示文本 Toast（中文消息用），与 safeToast 同样隔离 ROM 异常 */
+    private fun safeToastText(msg: String) {
+        try {
+            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
+        } catch (_: Throwable) {
+        }
+    }
+
+    // ---------- 服务端距离：点按核对 / 下拉刷新 ----------
 
     /**
-     * v1.6.1 重写（闪退修复 + 反馈改造）：
-     *  - 点击链路与协程全程 runCatching 隔离（与接口页 v1.5.1 同款加固，
-     *    任何异常只落盘崩溃日志，绝不上抛闪退）；
-     *  - 查询状态就地显示在右上角（旧版 Toast 一闪而过看不清）；
-     *  - 结果弹窗持久展示：距离 / 错误详情 + 响应体 + 复制按钮。
+     * v1.6.1 原逻辑，v1.8.6 重构为统一入口：
+     *  - showDialog=true（点按）：结果弹持久详情弹窗（含响应体/复制），行为与旧版一致；
+     *  - showDialog=false（下拉刷新）：成功静默更新 RunBus（右上角数字自动刷新）+
+     *    Toast 简报；失败/异常 Toast 给出原因，不弹长弹窗。
+     *  跑步中两者等价：触发服务即时轮询一次（pollReq+1）。
+     *  全链路 runCatching 隔离（v1.6.1 防闪退加固保留）。
      */
-    private fun onApiTap() {
+    private fun requestDistanceRefresh(showDialog: Boolean, onDone: (() -> Unit)? = null) {
         runCatching {
             if (!prefs.apiEnabled) {
                 safeToast(R.string.api_need_enable)
-                return
+                onDone?.invoke(); return
             }
             if (RunBus.state.value.running) {
                 RunBus.update { it.copy(pollReq = it.pollReq + 1) }
                 safeToast(R.string.verify_requested)
-                return
+                onDone?.invoke(); return
             }
-            if (querying) return                       // 防重复点击
+            if (querying) {
+                if (!showDialog) safeToast(R.string.pull_refresh_too_frequent)
+                onDone?.invoke(); return                       // 防重复点击
+            }
             val prof = apiStore.distanceProfile()
             if (prof == null || prof.url.isBlank()) {
                 safeToast(R.string.api_not_configured)
-                return
+                onDone?.invoke(); return
             }
             querying = true
-            // 就地显示查询状态（不再用底部 Toast）
+            // 就地显示查询状态（点按与下拉共用）
             if (_b != null) {
                 b.tvApiDist.text = getString(R.string.verify_querying_short)
                 b.tvApiDistVal.text = "…"
             }
             viewLifecycleOwner.lifecycleScope.launch {
+                var resultToast: String? = null
                 runCatching {
                     val resp = Http.call(prof, prefs.apiToken, prefs.apiCookie)
                     if (_b == null) return@launch      // 页面已销毁：放弃 UI 更新
@@ -239,30 +263,38 @@ class RunFragment : Fragment() {
                         ok -> getString(R.string.run_query_no_extract, prof.distPath)
                         else -> getString(R.string.run_query_http, resp.code, resp.ms)
                     }
-                    showQueryResult(headline, ok && !webvpnExpired, resp, prof)
+                    resultToast = when {
+                        webvpnExpired -> headline
+                        ok && dv != null -> getString(R.string.pull_refresh_done, String.format("%.1f", dv))
+                        else -> headline
+                    }
+                    if (showDialog) showQueryResult(headline, ok && !webvpnExpired, resp, prof)
                 }.onFailure { e ->
                     // v1.6.1：页面仍在才展示/记录；已分离则静默丢弃（requireContext 会抛异常）
                     if (_b == null) return@onFailure
-                    SoftLog.write(requireContext().filesDir, "run=onApiTap", e)
-                    showQueryResult(
-                        getString(R.string.api_test_error, "${e.javaClass.simpleName}: ${e.message ?: ""}"),
-                        false, null, prof)
+                    SoftLog.write(requireContext().filesDir, "run=refresh", e)
+                    val err = getString(R.string.api_test_error, "${e.javaClass.simpleName}: ${e.message ?: ""}")
+                    resultToast = err
+                    if (showDialog) showQueryResult(err, false, null, prof)
                 }
                 querying = false
+                // 下拉刷新：结果 Toast 简报（成功=已刷新+距离；失败=原因）
+                if (!showDialog && _b != null) resultToast?.let { safeToastText(it) }
                 // 恢复右上角标签（render 也会在下次状态变化时重设）
                 if (_b != null && !RunBus.state.value.running) {
                     b.tvApiDist.text = getString(R.string.api_dist_query)
                 }
+                onDone?.invoke()
             }
         }.onFailure { e ->
-            // 双保险：点击瞬间同步路径上的任何异常同样只落盘不闪退
+            // 双保险：同步路径任何异常同样只落盘不闪退；回调兜底防转圈不停
             try {
-                SoftLog.write(requireContext().filesDir, "run=onApiTapOuter", e)
+                if (_b != null) SoftLog.write(requireContext().filesDir, "run=refreshOuter", e)
             } catch (_: Throwable) {
             }
+            onDone?.invoke()
         }
     }
-
     /** v1.6.1：查询结果持久弹窗（含完整响应 + 复制），替代一闪而过的 Toast */
     private fun showQueryResult(headline: String, ok: Boolean, resp: Http.Resp?, prof: com.dut.runmate.data.api.ApiProfile) {
         if (_b == null) return

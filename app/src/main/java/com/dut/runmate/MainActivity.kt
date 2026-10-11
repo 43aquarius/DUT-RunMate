@@ -5,21 +5,17 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import com.dut.runmate.databinding.ActivityMainBinding
-import com.dut.runmate.run.RunBus
 import com.dut.runmate.ui.ApiFragment
 import com.dut.runmate.ui.CalibrateFragment
 import com.dut.runmate.ui.MapFragment
 import com.dut.runmate.ui.RunFragment
 import com.dut.runmate.ui.SettingsFragment
 import com.dut.runmate.update.UpdateFlow
-import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
@@ -68,36 +64,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // v1.8.4 锁屏显示：跑步进行中允许窗口显示在锁屏之上并随亮屏点亮。
-        // v1.8.3 已把跑步通知设为锁屏公开（渠道级），但用户实测锁屏上仍只能
-        // 看到通知入口、无法直接看到应用——真正的「应用显示在锁屏界面」需要
-        // Activity 声明 SHOW_WHEN_LOCKED：跑步中锁屏后再亮屏，直接显示跑步
-        // 界面，无需解锁。停止跑步立即恢复，避免非跑步场景绕过锁屏。
-        lifecycleScope.launch {
-            RunBus.state.collect { st ->
-                val on = st.running
-                try {
-                    if (Build.VERSION.SDK_INT >= 27) {
-                        setShowWhenLocked(on)
-                        setTurnScreenOn(on)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        if (on) {
-                            window.addFlags(
-                                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                            )
-                        } else {
-                            window.clearFlags(
-                                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                            )
-                        }
-                    }
-                } catch (_: Throwable) {
-                }
-            }
-        }
+        // v1.8.6：锁屏显示改造说明——
+        // v1.8.4 曾在此处随跑步状态 setShowWhenLocked/setTurnScreenOn（把整个主页面
+        // 显示在锁屏上）。用户澄清：想要的是「音乐软件式的锁屏卡片，只显示关键信息
+        // （当前打卡距离、有没有漏卡）」，不是整页显示。故移除本段，锁屏显示改由
+        // RunTrackerService 的 MediaSession + MediaStyle 前台通知（媒体卡片）承担，
+        // 见 RunTrackerService.setupMediaSession/pushMediaMeta。
     }
 
     override fun onResume() {

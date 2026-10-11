@@ -85,11 +85,12 @@
         android:textColor="?attr/colorOnSurfaceVariant"
         android:text="25 m" />
 
+    <!-- v1.8.6：最小可调精度 1m（原步长 5m） -->
     <com.google.android.material.slider.Slider
         android:id="@+id/sliderSheetRadius"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:valueFrom="10" android:valueTo="100" android:stepSize="5" />
+        android:valueFrom="10" android:valueTo="100" android:stepSize="1" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/tilCpNote" android:layout_width="match_parent"

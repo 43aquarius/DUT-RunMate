@@ -15,6 +15,10 @@ import android.location.LocationManager
 import android.os.*
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
+import androidx.media.app.NotificationCompat as MediaNotif
 import com.dut.runmate.MainActivity
 import com.dut.runmate.R
 import com.dut.runmate.alert.AlertManager
@@ -43,6 +47,11 @@ class RunTrackerService : Service() {
     companion object {
         const val ACT_START = "com.dut.runmate.START"
         const val ACT_STOP = "com.dut.runmate.STOP"
+        /** v1.8.6：通知/媒体卡「立即核对」动作（服务 intent 形式，≤Android12 的通知按钮走它） */
+        const val ACT_VERIFY = "com.dut.runmate.VERIFY"
+        /** v1.8.6：媒体会话自定义动作命名空间（Android 13+ 媒体卡片按钮走 MediaSession 回调） */
+        const val MEDIA_ACT_VERIFY = "com.dut.runmate.media.VERIFY"
+        const val MEDIA_ACT_STOP = "com.dut.runmate.media.STOP"
         const val CH_ID = "runmate_run"
         const val NID = 1001
     }
@@ -56,6 +65,8 @@ class RunTrackerService : Service() {
     private var scope: CoroutineScope? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var notifMgr: NotificationManager? = null
+    /** v1.8.6：锁屏媒体卡片会话（音乐软件样式；标题=打卡距离、副标题=漏卡状态） */
+    private var mediaSession: MediaSessionCompat? = null
 
     private var startAt = 0L
     private var sessionMeters = 0.0
@@ -95,6 +106,11 @@ class RunTrackerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACT_STOP -> { stopRun(); return START_NOT_STICKY }
+            // v1.8.6：通知/媒体卡「立即核对」按钮（≤12 通知按钮；13+ 走会话回调）
+            ACT_VERIFY -> {
+                try { RunBus.update { it.copy(pollReq = it.pollReq + 1) } } catch (_: Throwable) { }
+                return START_NOT_STICKY
+            }
             else -> if (!RunBus.state.value.running) {
                 // v1.6.0：启动全隔离——任何异常（含部分 ROM 的 startForeground 限制）
                 // 都降级为「停止服务 + Toast 提示」，绝不让进程闪退
@@ -154,6 +170,8 @@ class RunTrackerService : Service() {
         lastZonePoll = 0L; lastAnchor = 0L; pollReqSeen = RunBus.state.value.pollReq
 
         // 前台服务 + 常驻通知
+        // v1.8.6：锁屏媒体卡片会话先建（buildNotification 的 MediaStyle 需要其 token）
+        setupMediaSession()
         // v1.6.0：部分 ROM 对 startForeground(带类型) 有私有限制，失败时逐级降级
         val n = buildNotification("定位中…")
         try {
@@ -480,24 +498,97 @@ class RunTrackerService : Service() {
         val stopPi = PendingIntent.getService(this, 1,
             Intent(this, RunTrackerService::class.java).setAction(ACT_STOP),
             PendingIntent.FLAG_IMMUTABLE)
+        // v1.8.6：「立即核对」动作（≤12 的通知按钮；13+ 媒体卡片按钮走会话回调）
+        val verifyPi = PendingIntent.getService(this, 2,
+            Intent(this, RunTrackerService::class.java).setAction(ACT_VERIFY),
+            PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CH_ID)
             .setSmallIcon(R.drawable.ic_run)
             .setContentTitle(getString(R.string.notif_title))
             .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            // v1.8.6：锁屏改为音乐软件样式的媒体卡片（用户澄清：不是显示整个主页面，
+            // 而是一个框框里只显示关键信息）。Android 11+ 锁屏/QS 媒体区、5~10 锁屏
+            // 白底媒体卡；卡片标题/副标题来自 MediaSession 元数据（pushMediaMeta）
+            .setStyle(MediaNotif.MediaStyle()
+                .setMediaSession(mediaSession?.sessionToken)
+                .setShowActionsInCompactView(0, 1))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setSilent(true)
-            // v1.8.3：FGS 通知立即上屏（部分 ROM 默认延迟 10 秒+，跑步开始后
-            // 状态栏/锁屏长时间看不到入口）
+            // v1.8.3 保留：FGS 通知立即上屏
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            // v1.5.0 锁屏显示：VISIBILITY_PUBLIC 在锁屏完整展示；
-            // CATEGORY_WORKOUT 在 Android 12+ 归入「锻炼」分组（锁屏顶部胶囊入口）。
+            // v1.5.0 锁屏公开（渠道级 lockscreenVisibility=PUBLIC 见 startRun）
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_WORKOUT)
             .setContentIntent(pi)
+            .addAction(R.drawable.ic_check, getString(R.string.notif_verify), verifyPi)
             .addAction(R.drawable.ic_stop, getString(R.string.notif_stop), stopPi)
             .build()
+    }
+
+    // ---------- v1.8.6：锁屏媒体卡片（音乐软件样式） ----------
+
+    /**
+     * v1.8.6：锁屏显示改造——用户澄清「不是显示整个主页面，而是像音乐软件的锁屏
+     * 显示一样，一个框里只显示关键信息（当前打卡距离、有没有漏卡）」。
+     * 实现 = MediaSession + MediaStyle 前台通知：Android 11+ 锁屏/快捷设置顶部
+     * 媒体区、Android 5~10 锁屏白底媒体卡，标题/副标题/按钮由系统渲染。
+     * v1.8.4 的 setShowWhenLocked（整页显示在锁屏上）随之移除（MainActivity）。
+     */
+    private fun setupMediaSession() {
+        if (mediaSession != null) return
+        try {
+            mediaSession = MediaSessionCompat(this, "runmate_run").apply {
+                setCallback(object : MediaSessionCompat.Callback() {
+                    override fun onCustomAction(action: String?, extras: Bundle?) {
+                        when (action) {
+                            // Android 13+：媒体卡片上的按钮来自会话自定义动作
+                            MEDIA_ACT_VERIFY -> {
+                                try { RunBus.update { it.copy(pollReq = it.pollReq + 1) } } catch (_: Throwable) { }
+                            }
+                            MEDIA_ACT_STOP -> stopRun()
+                        }
+                    }
+                    override fun onStop() { stopRun() }
+                })
+                setSessionActivity(PendingIntent.getActivity(this@RunTrackerService, 0,
+                    Intent(this@RunTrackerService, MainActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE))
+                isActive = true
+            }
+        } catch (e: Throwable) {
+            logSoft("setupMediaSession", e)
+        }
+    }
+
+    /** 媒体卡片按钮状态（Android 13+ 的操作芯片来自这里而不是通知 addAction） */
+    private fun pushMediaState() {
+        val s = mediaSession ?: return
+        try {
+            s.setPlaybackState(PlaybackStateCompat.Builder()
+                .setActions(PlaybackStateCompat.ACTION_STOP)
+                .addCustomAction(PlaybackStateCompat.CustomAction
+                    .Builder(MEDIA_ACT_VERIFY, getString(R.string.notif_verify), R.drawable.ic_check)
+                    .build())
+                .addCustomAction(PlaybackStateCompat.CustomAction
+                    .Builder(MEDIA_ACT_STOP, getString(R.string.notif_stop), R.drawable.ic_stop)
+                    .build())
+                // STATE_PLAYING：无 duration 元数据时不渲染进度条，仅呈现「活动中」卡片
+                .setState(PlaybackStateCompat.STATE_PLAYING, 0L, 0f)
+                .build())
+        } catch (e: Throwable) { logSoft("pushMediaState", e) }
+    }
+
+    /** 媒体卡片关键信息：标题=官方打卡距离，副标题=漏卡/确认/GPS 状态 */
+    private fun pushMediaMeta(title: String, subtitle: String) {
+        val s = mediaSession ?: return
+        try {
+            s.setMetadata(MediaMetadataCompat.Builder()
+                .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, subtitle)
+                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, subtitle)
+                .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)  // 不渲染进度条
+                .build())
+        } catch (e: Throwable) { logSoft("pushMediaMeta", e) }
     }
 
     /** v1.5.0：通知文本 = 官方打卡距离 + 自测 GPS 里程 + 点位状态（锁屏可见） */
@@ -529,6 +620,29 @@ class RunTrackerService : Service() {
             } catch (e: Throwable) {
                 logSoft("notify", e)
             }
+        }
+        // v1.8.6：锁屏媒体卡片同步刷新——标题=官方打卡距离（当前关键信息），
+        // 副标题=漏卡/待确认/已确认状态；打卡距离阶跃时锁屏卡片即时更新
+        try {
+            val missed = snaps.filter { it.state == RunBus.CpState.MISSED }
+            val inZone = snaps.firstOrNull { it.state == RunBus.CpState.IN_ZONE }
+            val grace = snaps.firstOrNull { it.state == RunBus.CpState.GRACE }
+            val cardTitle = st.apiDistance
+                ?.let { "官方打卡 ${it.roundToInt()} m" }
+                ?: apiTxt      // 复用同源状态文案（续期中/会话过期/接口异常/待接口）
+            val cardSub = when {
+                missed.isNotEmpty() ->
+                    "⚠ 漏卡：${missed.joinToString("、") { it.cp.name }} · $gpsTxt"
+                inZone != null ->
+                    "检测区内等待确认 · ${inZone.cp.name} · $gpsTxt"
+                grace != null ->
+                    "已出区·宽限核查中 · $gpsTxt"
+                else -> "无漏卡 · 已确认 $ok/${snaps.size} · $gpsTxt"
+            }
+            pushMediaState()
+            pushMediaMeta(cardTitle, cardSub)
+        } catch (e: Throwable) {
+            logSoft("mediaCard", e)
         }
     }
 
@@ -567,6 +681,11 @@ class RunTrackerService : Service() {
         try {
             (getSystemService(Context.LOCATION_SERVICE) as LocationManager).removeUpdates(locListener)
         } catch (_: Exception) { }
+        // v1.8.6：释放锁屏媒体会话（先置非活跃，锁屏卡片随之移除）
+        try {
+            mediaSession?.apply { isActive = false; release() }
+        } catch (_: Exception) { }
+        mediaSession = null
         scope?.cancel(); scope = null
         engine = null
         alert?.shutdown(); alert = null

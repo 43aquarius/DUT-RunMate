@@ -11,8 +11,8 @@ android {
         applicationId = "com.dut.runmate"
         minSdk = 24
         targetSdk = 34
-        versionCode = 18
-        versionName = "1.8.5"
+        versionCode = 19
+        versionName = "1.8.6"
     }
 
     signingConfigs {
@@ -49,4 +49,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("org.osmdroid:osmdroid-android:6.1.18")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // v1.8.6：跑步页下拉刷新
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+    // v1.8.6：锁屏媒体卡片（音乐软件样式：MediaSessionCompat + MediaStyle）
+    implementation("androidx.media:media:1.7.0")
 }
