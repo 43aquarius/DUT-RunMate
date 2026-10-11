@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.5-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.6-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.5.apk`（约 6.0 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.6.apk`（约 6.1 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,11 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.6（2026-10-11）**
+  - 🔊 **语音/提示音/震动三通道彻底重修（用户实报全部无效）**：TTS 音频通道由「导航」改为「媒体」（导航通道多数设备默认极小=无声）；中文语音包缺失时如实降级不再谎报就绪；提示音在媒体音量为 0 时自动切「通知」通道兜底；震动波形加长（口袋/臂包可感知）并修复 Android 7.x 上 VibrationEffect 重载触发 NoSuchMethodError（Error 捕不住）导致整次震动丢失的缺陷；设置页新增「测试提醒」当场验证三通道并给出诊断；
+  - 📱 **锁屏显示改为音乐软件样式（按用户澄清重做）**：MediaSession + MediaStyle 媒体卡片——标题=官方打卡距离、副标题=漏卡/待确认/已确认状态 + GPS 里程、附「立即核对/结束」按钮；Android 11+ 锁屏与快捷设置顶部媒体区渲染；v1.8.4 的 setShowWhenLocked 整页显示方案随之移除；
+  - ⬇️ **跑步页下拉刷新**：SwipeRefreshLayout 向下划屏即触发服务端距离查询/核对（onApiTap 重构为 requestDistanceRefresh 统一入口：点按弹详情、下拉 Toast 简报）；查询中防重入、回调兜底防转圈不停；
+  - 🎚️ **检测参数最小可调精度 1m**：默认检测半径（原 5m 步长）、预告距离（原 10m 步长）、单点编辑半径（原 5m 步长）全部改为 1m 步进。
 - **v1.8.5（2026-10-11）**
   - 🔄 **更新检测顺序反转：GitHub Release 优先 → 发布中心服务器兜底**：发布流程先出 GitHub Release，网站（独立部署快照）可能滞后数小时才同步；旧顺序（服务器优先）在窗口期会误判「已是最新」，漏掉 GitHub 上的新版。现双通道都检查、结果合并：任一发现更新取版本更高者，同版本优先服务器下载（国内更稳、带 SHA-256 校验）；
   - ⏱️ **每次进入 App 都自动检查**：移除旧版 24h 节流——冷启动、后台切回前台（onResume）都静默检查；同次使用内 5 分钟去重防打扰，下载待安装期间跳过避免重复弹窗；
