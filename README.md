@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.4-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.5-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.4.apk`（约 6.0 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.5.apk`（约 6.0 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,10 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.5（2026-10-11）**
+  - 🔄 **更新检测顺序反转：GitHub Release 优先 → 发布中心服务器兜底**：发布流程先出 GitHub Release，网站（独立部署快照）可能滞后数小时才同步；旧顺序（服务器优先）在窗口期会误判「已是最新」，漏掉 GitHub 上的新版。现双通道都检查、结果合并：任一发现更新取版本更高者，同版本优先服务器下载（国内更稳、带 SHA-256 校验）；
+  - ⏱️ **每次进入 App 都自动检查**：移除旧版 24h 节流——冷启动、后台切回前台（onResume）都静默检查；同次使用内 5 分钟去重防打扰，下载待安装期间跳过避免重复弹窗；
+  - 🔧 **GitHub 链接小写化（隐患修复）**：发布当日实测 GitHub 侧该仓库精确大小写名称的路由（API/网页/资产下载）一度整体 404，小写形式始终正常——App 内所有 GitHub URL 统一改用小写仓库名，并对资产下载 URL 的仓库段做小写归一。
 - **v1.8.4（2026-10-11）**
   - 🐛 **修复标定页「添加打卡点」只能看到一个点位**：旧版列表控件（RecyclerView wrap_content）嵌在整页 ScrollView 里，部分 ROM 只测出第一个条目的高度——无论存多少点都只显示一个；改为 LinearLayout 逐条渲染，全部点位必然展开；
   - 📱 **锁屏显示应用（补全 v1.8.3）**：跑步进行中锁屏后，亮屏直接显示跑步界面无需解锁（Activity SHOW_WHEN_LOCKED + TURN_SCREEN_ON，停止即恢复正常锁屏）；v1.8.3 只做到了锁屏通知公开，应用本体仍被锁屏挡住；
