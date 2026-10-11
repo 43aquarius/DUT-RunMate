@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.2-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.3-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.2.apk`（约 5.9 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.3.apk`（约 6.0 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,14 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.3（2026-10-11）**
+  - 🔐 **原生一键配置（重大）**：登录成功后不再依赖 H5 捕获页嗅探——App 内原生复刻健康长跑 H5 完整认证链（CAS → WebVPN → 隧道前缀本地计算 → mobileCheckJump 免密跳转 → noPassCheck 令牌交换 → findExeRule/findExtExercise 验证），一步配好令牌/模板/Cookie，**校外流量同样可用**（根治「已登录却拿不到 token / 账号未捕获 / webvpn 会话未建立或已过期」——H5 捕获在校外必然失败的根因是 H5 内部请求写死内网地址，官方 App WebView 自带改写而第三方没有）；
+  - 🔄 **会话自动重连**：跑步中 WebVPN 会话过期，已保存学号密码时后台自动重跑原生链路（限频 5 分钟），锁屏通知显示「自动重连中」；
+  - 🔔 **打卡提醒补全**：进区 ≥20s 未确认每 20s「语音+提示音+震动」强提醒；进区/接近/确认全部补震动；核对链路异常（区内）跟 60s 限频强提醒；开跑时接口未配置立即提醒——均不依赖 TTS 就绪；
+  - 📱 **锁屏显示修复**：通知渠道显式锁屏公开；FGS 通知立即上屏；开跑前检测通知权限并引导系统设置（Android 13+ 默认拒权是首要原因）；设置页新增「打开系统通知设置」；
+  - 🐛 **修复校准页 NPE 闪退**（CalibrateFragment.getB/startAveraging）：采样协程在视图销毁后恢复不再崩溃，均值照常可保存；
+  - ✨ **地图页自动定位**：切到地图页自动居中当前位置（首个定位回调一次，手动拖动不受影响）；
+  - 🐛 距离字段「无」不再误报「未能提取」（今日未开跑是正常基线）；H5 捕获页兑底升级（内网主框架 302 转隧道 + JS 资源内网地址改写）。
 - **v1.8.2（2026-10-11）**
   - 🔍 **全面代码审计**：核心 12 文件逐行审读，修复 4 个功能缺陷 + 2 处错别字；
   - 🐛 **跑步中距离轮询接入 WebVPN 会话失效识别**：此前隧道会话过期时轮询拿到登录页 HTML，只报「未能提取: pmDel.distance」无从排查；现直接提示「WebVPN 会话已过期，请重新登录捕获」——至此发送测试/跑步轮询/手动查询/批量查询四个调用点全覆盖；

@@ -77,11 +77,14 @@ class H5CatcherActivity : AppCompatActivity() {
         /** v1.8.1：WebVPN 门户登录页（未登录显示认证入口；已登录 302 门户首页） */
         const val WEBVPN_LOGIN = "https://webvpn.dlut.edu.cn/login"
 
-        /** v1.8.1：带用户真实前缀的隧道 H5 直达 URL；无前缀时退回 0 占位版（仅未登录可达） */
-        fun tunnelH5Url(prefix: String): String =
-            if (prefix.isNotBlank() && prefix != "0")
-                "https://webvpn.dlut.edu.cn/http-8081/$prefix/mobilenew/?vpn-12-o1-202.118.65.138:8081"
-            else H5_TUNNEL
+        /** v1.8.1：带用户真实前缀的隧道 H5 直达 URL；v1.8.3 起无前缀时用本地计算的
+         * 确定性前缀（AES-CFB-128 固定密钥，与官方 App 抓包一致）——彻底消除 0 占位
+         * 版（已登录会话下必被网关当 host 解析为 http://0/ 不可达错误页） */
+        fun tunnelH5Url(prefix: String): String {
+            val p = if (prefix.isNotBlank() && prefix != "0") prefix
+            else com.dut.runmate.auth.SportAuth.tunnelPrefix("202.118.65.138")
+            return "https://webvpn.dlut.edu.cn/http-8081/$p/mobilenew/?vpn-12-o1-202.118.65.138:8081"
+        }
 
         /**
          * v1.6.2 · 嗅探器升级：响应完成后再上报（附 HTTP 状态码），
@@ -184,6 +187,13 @@ class H5CatcherActivity : AppCompatActivity() {
         password = intent.getStringExtra(EXTRA_PASSWORD) ?: ""
         // v1.8.1：恢复持久化的用户真实隧道前缀（上次门户扫描 / H5 捕获时记录）
         if (tunnelPrefix.isBlank()) tunnelPrefix = prefs.tunnelPrefix
+        // v1.8.3：前缀是确定性值（固定密钥加密目标 host，见 SportAuth）——
+        // 没有存档时直接本地计算，不再依赖门户扫描提取，从根上消除 0 占位不可达
+        if (tunnelPrefix.isBlank() || tunnelPrefix == "0") {
+            tunnelPrefix = com.dut.runmate.auth.SportAuth.tunnelPrefix("202.118.65.138")
+            prefs.tunnelPrefix = tunnelPrefix
+            Http.tunnelPrefixHint = tunnelPrefix
+        }
 
         // v1.5.1：不再强制要求 whistlekey——CAS 会话（CASTGC）同样可以完成
         // H5 鉴权（对齐官方 synCookies 注入 skey+TGT 的行为），两者至少有其一即可。
@@ -220,18 +230,48 @@ class H5CatcherActivity : AppCompatActivity() {
              * 「登录成功但令牌不自动填充」的根因。
              * 现改为：主框架 HTML 响应在返回 WebView 前由 OkHttp 取回，把嗅探器
              * <script> 插到 <head> 最前面——任何页面脚本运行前 XHR/fetch 已被接管。
+             *
+             * v1.8.3 新增两类拦截（校外 H5 捕获修复，SportAuth 原生通道的兜底路径）：
+             *  A) 主框架原始内网地址（H5 的 mobileCheckJump 落地页 location.href 指向
+             *     http://202.118.65.138:8081/…，校外不可达）→ 302 到隧道等价 URL；
+             *  B) 隧道内的 JS/JSON 资源 → 内容改写：响应体里的原始内网地址替换为隧道
+             *     地址。健康长跑 H5 的 axios 用 mobile-server-config.js 里写死的内网
+             *     BASE_URL 发请求，wengine 网关不改写 JS 内容——校外时这些 XHR 全部
+             *     超时，令牌交换永远失败，即用户实报「已登录却无法获取 token /
+             *     账号未捕获」的根因（官方 App 的 WebView 自带此改写所以校外能用）。
              */
             override fun shouldInterceptRequest(
                 v: WebView, req: WebResourceRequest
             ): WebResourceResponse? {
-                if (!req.isForMainFrame) return null
                 val u = req.url.toString()
-                if (!u.contains("mobilenew", ignoreCase = true)) return null
-                return try {
-                    interceptH5Document(v, u, req.requestHeaders)
-                } catch (_: Exception) {
-                    null      // 拦截失败 → 交回 WebView 默认加载（回到旧行为，页面仍可用）
+                if (req.isForMainFrame) {
+                    if (u.contains("mobilenew", ignoreCase = true)) {
+                        return try {
+                            interceptH5Document(v, u, req.requestHeaders)
+                        } catch (_: Exception) {
+                            null      // 拦截失败 → 交回 WebView 默认加载（回到旧行为）
+                        }
+                    }
+                    // v1.8.3 A：主框架内网直达 → 302 到隧道等价地址
+                    if (u.startsWith(com.dut.runmate.auth.SportAuth.SPORT_BASE)) {
+                        return try {
+                            redirectInternalToTunnel(u)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    return null
                 }
+                // v1.8.3 B：隧道 JS/JSON 资源内容改写（体内含内网地址才有必要动）
+                val bare = u.substringBefore('?')
+                if (u.contains("/http-8081/") && (bare.endsWith(".js") || bare.endsWith(".json"))) {
+                    return try {
+                        interceptAndRewrite(v, u, req.requestHeaders)
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                return null
             }
 
             override fun onPageStarted(v: WebView, url: String, favicon: android.graphics.Bitmap?) {
@@ -433,6 +473,53 @@ class H5CatcherActivity : AppCompatActivity() {
         try {
             CookieManager.getInstance().flush()
         } catch (_: Exception) {
+        }
+    }
+
+    /** v1.8.3 A：主框架原始内网 URL → 302 到隧道等价地址（校外不可达的内网导航自愈） */
+    private fun redirectInternalToTunnel(internalUrl: String): WebResourceResponse {
+        val pref = tunnelPrefix.ifBlank {
+            com.dut.runmate.auth.SportAuth.tunnelPrefix("202.118.65.138")
+        }
+        val tunneled = com.dut.runmate.auth.SportAuth.tunnelUrl(internalUrl, pref)
+        return WebResourceResponse(
+            "text/plain", "utf-8", 302, "Found",
+            mapOf("Location" to tunneled),
+            java.io.ByteArrayInputStream(ByteArray(0))
+        )
+    }
+
+    /**
+     * v1.8.3 B：取回隧道 JS/JSON 资源，体内含原始内网地址时替换为隧道地址后返回。
+     * 不含内网地址的资源返回 null 交回 WebView 默认加载（避免无谓的双取）。
+     */
+    private fun interceptAndRewrite(
+        v: WebView, url: String, reqHeaders: Map<String, String>
+    ): WebResourceResponse? {
+        val cookie = try { CookieManager.getInstance().getCookie(url) } catch (_: Exception) { null }
+        val rb = Request.Builder().url(url)
+            .header("User-Agent", v.settings.userAgentString)
+            .header("Accept", "*/*")
+        reqHeaders["Referer"]?.takeIf { it.isNotBlank() }?.let { rb.header("Referer", it) }
+        if (!cookie.isNullOrBlank()) rb.header("Cookie", cookie)
+        fetchClient.newCall(rb.build()).execute().use { r ->
+            val ct = r.header("Content-Type") ?: "application/javascript"
+            val bytes = r.body?.bytes() ?: return null
+            val text = try { String(bytes, Charsets.UTF_8) } catch (_: Exception) { return null }
+            if (!text.contains(com.dut.runmate.auth.SportAuth.SPORT_BASE)) return null
+            val pref = tunnelPrefix.ifBlank {
+                com.dut.runmate.auth.SportAuth.tunnelPrefix("202.118.65.138")
+            }
+            val tunneledBase = "https://webvpn.dlut.edu.cn/http-8081/$pref"
+            val patched = text.replace(com.dut.runmate.auth.SportAuth.SPORT_BASE, tunneledBase)
+            runOnUiThread {
+                log(getString(R.string.h5_log_rewrite, url.substringAfterLast('/').take(40)))
+            }
+            return WebResourceResponse(
+                ct.substringBefore(';').trim().ifBlank { "application/javascript" },
+                "utf-8", 200, "OK", mapOf("Access-Control-Allow-Origin" to "*"),
+                java.io.ByteArrayInputStream(patched.toByteArray(Charsets.UTF_8))
+            )
         }
     }
 
@@ -693,6 +780,16 @@ class H5CatcherActivity : AppCompatActivity() {
             absUrl = try {
                 java.net.URI(b.web.url).resolve(reqUrl).toString()
             } catch (_: Exception) { reqUrl }
+        }
+        // v1.8.3：嗅探到的也可能是原始内网地址（H5 axios 的内网 BASE_URL，内容
+        // 改写未覆盖到的路径）——转隧道 URL 才能校外回放，同时补齐隧道前缀
+        if (absUrl.startsWith(com.dut.runmate.auth.SportAuth.SPORT_BASE)) {
+            if (tunnelPrefix.isBlank() || tunnelPrefix == "0") {
+                tunnelPrefix = com.dut.runmate.auth.SportAuth.tunnelPrefix("202.118.65.138")
+                prefs.tunnelPrefix = tunnelPrefix
+                Http.tunnelPrefixHint = tunnelPrefix
+            }
+            absUrl = com.dut.runmate.auth.SportAuth.tunnelUrl(absUrl, tunnelPrefix)
         }
         if (tunnelPrefix.isNotBlank() && absUrl.contains("/http-8081/0/"))
             absUrl = absUrl.replace("/http-8081/0/", "/http-8081/$tunnelPrefix/")

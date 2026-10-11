@@ -82,8 +82,11 @@ class CalibrateFragment : Fragment() {
     }
 
     private fun refreshList() {
+        // v1.8.3：CheckpointSheet 回调可能晚于视图销毁到达（用户在弹窗开着时切页），
+        // 与 startAveraging 协程同源的 NPE 防护。
+        val bb = _b ?: return
         adapter.submit(store.all())
-        b.etName.setText(store.defaultName())
+        bb.etName.setText(store.defaultName())
     }
 
     private fun startAveraging() {
@@ -97,7 +100,11 @@ class CalibrateFragment : Fragment() {
         avgJob = ui.launch {
             var left = duration
             while (left > 0 && averaging) {
-                b.tvAvgStatus.text = getString(R.string.calib_running, left, samples.size)
+                // v1.8.3 崩溃修复（用户实报 NPE @ getB/startAveraging$1）：
+                // 协程 delay 后视图可能已销毁（切页/转屏 → onDestroyView 置 _b=null），
+                // 旧版 _b!! 在后台恢复时必崩。改为取局部引用，视图没了直接停。
+                val bb = _b ?: break
+                bb.tvAvgStatus.text = getString(R.string.calib_running, left, samples.size)
                 delay(1000)
                 left--
             }
@@ -108,10 +115,13 @@ class CalibrateFragment : Fragment() {
     private fun finishAveraging(completed: Boolean) {
         averaging = false
         avgJob?.cancel()
-        b.btnAvg.text = getString(R.string.calib_start)
+        // v1.8.3：视图已销毁（协程延迟恢复场景）时只停状态不碰 UI——
+        // 均值照常算出存 pending，用户切回页面后仍可保存，不再崩溃。
+        val bb = _b
+        bb?.btnAvg?.text = getString(R.string.calib_start)
         if (samples.size < 3) {
-            b.tvAvgStatus.text = getString(R.string.calib_need_more)
-            b.btnSave.isEnabled = false
+            bb?.tvAvgStatus?.text = getString(R.string.calib_need_more)
+            bb?.btnSave?.isEnabled = false
             return
         }
         // 精度加权平均
@@ -132,11 +142,11 @@ class CalibrateFragment : Fragment() {
         pending = doubleArrayOf(meanLat, meanLon, meanAcc)
         drift = maxDrift
         val g = GeoKit.wgs2gcj(meanLat, meanLon)
-        b.tvAvgStatus.text =
+        bb?.tvAvgStatus?.text =
             "均值 ${GeoKit.fmt7(meanLat)}, ${GeoKit.fmt7(meanLon)}\n" +
             "GCJ ${GeoKit.fmt7(g[0])}, ${GeoKit.fmt7(g[1])}\n" +
             "±${"%.1f".format(meanAcc)} m · 离散 ${"%.1f".format(maxDrift)} m · ${samples.size} 点"
-        b.btnSave.isEnabled = true
+        bb?.btnSave?.isEnabled = true
     }
 
     private var pending: DoubleArray? = null
@@ -224,6 +234,11 @@ class CalibrateFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        // v1.8.3：先停采样协程再置空 binding——旧版只置 _b=null，
+        // 协程还在 delay 循环里，恢复时 _b!! 直接 NPE（用户实报崩溃堆栈）。
+        averaging = false
+        avgJob?.cancel()
+        avgJob = null
         _b = null
         super.onDestroyView()
     }

@@ -262,6 +262,12 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="12dp" android:text="@string/pref_battery" />
 
+            <!-- v1.8.3：系统通知设置直达（锁屏显示修复） -->
+            <com.google.android.material.button.MaterialButton
+                style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnNotifSetting"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:text="@string/pref_notif_setting" />
+
             <com.google.android.material.button.MaterialButton
                 style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnExport"
                 android:layout_width="match_parent" android:layout_height="wrap_content"

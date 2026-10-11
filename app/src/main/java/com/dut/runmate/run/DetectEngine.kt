@@ -33,6 +33,10 @@ class DetectEngine(
         var graceLeftAt = 0L
         var missedCount = 0
         var lastDistM = -1
+        /** v1.8.3：进区时刻（毫秒）——区内长时间未确认打卡的周期性强提醒用 */
+        var enteredAtMs = 0L
+        /** v1.8.3：上次「打卡未确认」提醒时刻（限频） */
+        var lastNagAt = 0L
     }
 
     private val snaps = mutableListOf<Snap>()
@@ -116,6 +120,8 @@ class DetectEngine(
 
     private fun enterZone(s: Snap, nowMs: Long) {
         s.state = RunBus.CpState.IN_ZONE
+        s.enteredAtMs = nowMs      // v1.8.3：记录进区时刻
+        s.lastNagAt = 0L
         // v1.3.0 基线优化：RFID 注册往往先于区内首次轮询，若等到首次区内轮询才取基线，
         // 基线可能已包含 +100m 阶跃而永远检测不到增量。改用「进区前最后一次轮询距离」
         // （30s 内新鲜）作基线，进区后的首个轮询即可捕捉到阶跃。

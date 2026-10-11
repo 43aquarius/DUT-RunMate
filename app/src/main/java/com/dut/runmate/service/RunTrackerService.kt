@@ -70,6 +70,12 @@ class RunTrackerService : Service() {
     private var lastAnchor = 0L
     private var pollReqSeen = 0L
 
+    // v1.8.3：会话自动续期状态（WebVPN 过期时后台重跑原生链路）
+    private var renewing = false
+    private var lastRenewAt = 0L
+    // v1.8.3：接口异常强提醒限频（区内/宽限期 polling 失败时震动响音提醒用户）
+    private var lastApiErrAlertAt = 0L
+
     private val locListener = LocationListener { loc ->
         // v1.6.0：定位回调全隔离——部分 ROM 的网络定位带异常元数据时仅跳过该次，不闪退
         try {
@@ -121,8 +127,13 @@ class RunTrackerService : Service() {
         val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
+            // v1.8.3：锁屏可见性修复——Android 13+/MIUI 上通知渠道默认锁屏可见性
+            // 不一定跟随通知自身的 VISIBILITY_PUBLIC，显式设置渠道级锁屏公开，
+            // 否则部分 ROM 锁屏不显示跑步状态（用户实报「锁屏后没有显示」）
             notifMgr?.createNotificationChannel(
-                NotificationChannel(CH_ID, getString(R.string.ch_name), NotificationManager.IMPORTANCE_LOW)
+                NotificationChannel(CH_ID, getString(R.string.ch_name), NotificationManager.IMPORTANCE_LOW).apply {
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
             )
         }
 
@@ -179,9 +190,26 @@ class RunTrackerService : Service() {
         } catch (_: Exception) { }
 
         alert?.speak(getString(R.string.tts_started, store.count))
+        // v1.8.3：开跑即时反馈（TTS 引擎初始化需 1~3 秒，旧版只靠语音——引擎
+        // 没就绪时开场提示完全丢失；补提示音+震动，不依赖 TTS 就绪）
+        alert?.chime(AlertManager.Kind.OK)
+        alert?.vibrate(AlertManager.Kind.OK)
         RunBus.update {
             it.copy(running = true, fix = null, snaps = engine?.snapshot() ?: emptyList(),
                 stats = RunBus.Stats(), summary = null, apiErr = null, apiDistance = null)
+        }
+        // v1.8.3：开跑自检——API 模式开了但接口未配置/未捕获时强提醒（用户实报
+        // 「没打上卡也没有提醒」的隐因之一：核对链路死了却无声无息）。
+        // 放在状态重置之后，避免 apiErr 立即被清空。
+        if (prefs.apiEnabled) {
+            val prof = apiStore.distanceProfile()
+            if (prof == null || prof.url.isBlank() || prof.body.contains("抓包值") ||
+                prefs.apiToken.isBlank()) {
+                alert?.speak(getString(R.string.tts_api_unconfigured))
+                alert?.chime(AlertManager.Kind.WARN)
+                alert?.vibrate(AlertManager.Kind.WARN)
+                RunBus.update { it.copy(apiErr = getString(R.string.api_unconfigured_run)) }
+            }
         }
         startPoller()
     }
@@ -199,6 +227,7 @@ class RunTrackerService : Service() {
                 delay(500)
                 // v1.6.1：单轮全部隔离——任何一段异常只跳过本轮，循环继续
                 try {
+                    checkZoneNags()          // v1.8.3：区内长时间未确认打卡的周期性强提醒
                     pollOnce()
                 } catch (ce: CancellationException) {
                     throw ce
@@ -206,6 +235,33 @@ class RunTrackerService : Service() {
                     logSoft("pollLoop", e)
                 }
             }
+        }
+    }
+
+    /**
+     * v1.8.3：区内未确认打卡强提醒（用户实报「明明没有打上卡或未确认，却没有
+     * 震动响音提醒」）：进入检测区 ≥20 秒且仍未确认时，每 20 秒一次
+     * 语音+提示音+震动的组合提醒——不依赖 TTS 引擎就绪，震动/响音必定到达。
+     * 仅 API 模式（纯 GPS 模式无「确认」概念）。
+     */
+    private fun checkZoneNags() {
+        val eng = engine ?: return
+        if (!eng.apiMode) return
+        val now = SystemClock.elapsedRealtime()
+        for (s in eng.all) {
+            if (s.state != RunBus.CpState.IN_ZONE) continue
+            if (s.enteredAtMs <= 0L || now - s.enteredAtMs < 20_000L) continue
+            if (s.lastNagAt > 0L && now - s.lastNagAt < 20_000L) continue
+            s.lastNagAt = now
+            val a = alert ?: return
+            try {
+                a.speak(getString(R.string.tts_unconfirmed, s.cp.name))
+                a.chime(AlertManager.Kind.WARN)
+                a.vibrate(AlertManager.Kind.WARN)
+            } catch (e: Throwable) {
+                logSoft("zoneNag", e)
+            }
+            break   // 一轮只提醒一个点位（多点位同时在区的场景军见）
         }
     }
 
@@ -234,17 +290,20 @@ class RunTrackerService : Service() {
         val doneAt = SystemClock.elapsedRealtime()
         if (resp.error != null) {
             RunBus.update { it.copy(apiErr = "网络错误: ${resp.error}") }
+            alertApiFailure("网络错误")
             return
         }
         if (resp.code !in 200..299) {
             RunBus.update { it.copy(apiErr = "HTTP ${resp.code}") }
+            alertApiFailure("HTTP ${resp.code}")
             return
         }
         // v1.8.2：隧道会话失效识别（对齐接口页/批量查询 v1.8.0 行为）。
-        // 旧版此处只会在下面报「未能提取: pmDel.distance」——实际拿到的是登录页 HTML，
-        // 跑步中看到该提取错误完全无从排查；轮询器是最后一个未接 webvpn 判断的调用点。
+        // v1.8.3：识别到会话过期不再只报错——自动重跑原生链路续期（ SportAuth），
+        // 跑步中无需手动重新登录（需已保存学号密码）。
         if (Http.isWebvpnLoginRedirect(resp.finalUrl, resp.body, resp.url)) {
-            RunBus.update { it.copy(apiErr = "WebVPN 会话已过期，请重新登录捕获") }
+            RunBus.update { it.copy(apiErr = getString(R.string.api_webvpn_renewing)) }
+            maybeRenewSession()
             return
         }
         if (need) lastZonePoll = doneAt
@@ -263,7 +322,75 @@ class RunTrackerService : Service() {
                 logSoft("refreshNotification", e)
             }
         } else {
-            RunBus.update { it.copy(apiErr = "未能提取: ${prof.distPath}") }
+            // v1.8.3：「无」不是错误——今日未开始跑步时服务端 pmDel.distance = "无"，
+            // 属正常基线（首卡后变数字）；旧版报「未能提取」误导排查方向。
+            val raw = Http.extractRaw(resp.body, prof.distPath)
+            if (raw == "无") {
+                RunBus.update { it.copy(apiDistance = null, apiErr = null) }
+            } else {
+                RunBus.update { it.copy(apiErr = "未能提取: ${prof.distPath}") }
+            }
+        }
+    }
+
+    /**
+     * v1.8.3：核对链路异常强提醒（限频 60 秒）——仅在区内/宽限期（需要核对打卡）
+     * 时触发：语音+提示音+震动，用户实报「没打上卡却没有任何提醒」的根治之一。
+     */
+    private fun alertApiFailure(reason: String) {
+        val eng = engine ?: return
+        if (!eng.needsPoll()) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastApiErrAlertAt < 60_000L) return
+        lastApiErrAlertAt = now
+        val a = alert ?: return
+        try {
+            a.speak(getString(R.string.tts_api_error))
+            a.chime(AlertManager.Kind.WARN)
+            a.vibrate(AlertManager.Kind.WARN)
+        } catch (e: Throwable) {
+            logSoft("alertApiFailure", e)
+        }
+    }
+
+    /**
+     * v1.8.3：WebVPN 会话过期自动续期——后台重跑 SportAuth 原生链路（需已保存
+    学号密码），成功后刷新令牌/模板/Cookie，下个心跳自动恢复核对。限频 5 分钟，
+     * 同一时刻仅一次，失败则提示用户到「接口」页重新登录。
+     */
+    private fun maybeRenewSession() {
+        if (renewing) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastRenewAt < 5 * 60_000L) return
+        val number = prefs.wsNumber.trim()
+        val pwd = prefs.wsPwdDecoded()
+        if (number.isBlank() || pwd.isBlank()) {
+            RunBus.update { it.copy(apiErr = getString(R.string.api_webvpn_expired_manual)) }
+            return
+        }
+        renewing = true
+        lastRenewAt = now
+        scope?.launch(Dispatchers.IO) {
+            try {
+                when (val r = com.dut.runmate.auth.SportAuth.login(number, pwd)) {
+                    is com.dut.runmate.auth.SportAuth.Result.Ok -> {
+                        com.dut.runmate.auth.SportAuth.applySession(prefs, apiStore, r.s)
+                        RunBus.update { it.copy(apiErr = null) }
+                        // 立即触发一次核对（下个心跳 pollOnce 会用新令牌）
+                        RunBus.update { it.copy(pollReq = it.pollReq + 1) }
+                    }
+                    is com.dut.runmate.auth.SportAuth.Result.Err -> {
+                        RunBus.update {
+                            it.copy(apiErr = getString(
+                                R.string.api_webvpn_renew_fail, r.step, r.msg))
+                        }
+                    }
+                }
+            } catch (e: Throwable) {
+                logSoft("renewSession", e)
+            } finally {
+                renewing = false
+            }
         }
     }
 
@@ -321,8 +448,17 @@ class RunTrackerService : Service() {
                 is DetectEngine.Ev.Approach -> {
                     a.speak(getString(R.string.tts_approach, "${ev.distM}", ev.r.cp.name))
                     a.chime(AlertManager.Kind.INFO)
+                    // v1.8.3：接近提醒补轻震动（旧版只响音不震动，手机在口袋/嘌杂
+                    // 环境易错过；震动是唯一可靠通道）
+                    a.vibrate(AlertManager.Kind.INFO)
                 }
-                is DetectEngine.Ev.EnterZone -> a.speak(getString(R.string.tts_enter, ev.r.cp.name))
+                is DetectEngine.Ev.EnterZone -> {
+                    // v1.8.3：进区提醒从「仅语音」升为「语音+提示音+震动」——
+                    // TTS 未就绪/被系统杀掉时旧版完全无声，进区是核对流程的起点
+                    a.speak(getString(R.string.tts_enter, ev.r.cp.name))
+                    a.chime(AlertManager.Kind.OK)
+                    a.vibrate(AlertManager.Kind.OK)
+                }
                 is DetectEngine.Ev.Confirmed -> {
                     a.speak(getString(R.string.tts_confirmed, ev.r.cp.name))
                     a.chime(AlertManager.Kind.OK); a.vibrate(AlertManager.Kind.OK)
@@ -352,6 +488,9 @@ class RunTrackerService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
+            // v1.8.3：FGS 通知立即上屏（部分 ROM 默认延迟 10 秒+，跑步开始后
+            // 状态栏/锁屏长时间看不到入口）
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             // v1.5.0 锁屏显示：VISIBILITY_PUBLIC 在锁屏完整展示；
             // CATEGORY_WORKOUT 在 Android 12+ 归入「锻炼」分组（锁屏顶部胶囊入口）。
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -367,9 +506,14 @@ class RunTrackerService : Service() {
         val st = RunBus.state.value
         val apiTxt = st.apiDistance
             ?.let { "官方打卡 %d m".format(it.roundToInt()) }
-            ?: (if (st.apiErr?.contains("WebVPN") == true)
-                "官方打卡：会话过期，需重登录"   // v1.8.2：锁屏上直接可见会话状态，不用解锁查
-                else "官方打卡：待接口")
+            ?: (when {
+                st.apiErr?.contains("重连") == true || st.apiErr?.contains("续期") == true ->
+                    "官方打卡：会话过期，自动重连中…"   // v1.8.3：续期中状态上锁屏
+                st.apiErr?.contains("WebVPN") == true || st.apiErr?.contains("会话") == true ->
+                    "官方打卡：会话过期，需重登录"
+                st.apiErr != null -> "官方打卡：接口异常"
+                else -> "官方打卡：待接口"
+            })
         val gpsTxt = if (st.stats.meters >= 10)
             "GPS %.2f km".format(st.stats.meters / 1000.0)
         else "GPS 累积中"

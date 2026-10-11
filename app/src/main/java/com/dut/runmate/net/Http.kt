@@ -126,6 +126,20 @@ object Http {
      * 字符串值先直接转数，失败则提取首个数字（兼容实测的 "2700米"、"3.5km" 等格式）。
      */
     fun extractDouble(body: String, path: String): Double? {
+        val raw = extractRaw(body, path) ?: return null
+        return when (raw) {
+            is Number -> raw.toDouble()
+            is String -> parseNum(raw)
+            else -> null
+        }
+    }
+
+    /**
+     * v1.8.3：按 dot 路径提取原始值（Number/String/JSONArray/JSONObject）。
+     * 距离字段今日未开跑时为字符串「无」——extractDouble 判 null 无法与服务端
+     * 异常区分，调用方可用本函数识别「无」这一正常基线。
+     */
+    fun extractRaw(body: String, path: String): Any? {
         if (body.isBlank() || path.isBlank()) return null
         return try {
             var cur: Any? = JSONObject(body)
@@ -140,11 +154,7 @@ object Http {
                     else -> return null
                 }
             }
-            when (cur) {
-                is Number -> cur.toDouble()
-                is String -> parseNum(cur)
-                else -> null
-            }
+            cur
         } catch (_: Exception) { null }
     }
 

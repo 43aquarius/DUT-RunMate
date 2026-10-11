@@ -132,6 +132,16 @@
     <string name="ws_status_cas_only">CAS 统一认证已登录（%1$s）。微哨通道未通过，H5 捕获将走 CAS 鉴权，点「打开H5捕获」完成自动配置。</string>
     <string name="ws_login_cas_ok">CAS 统一认证成功，正在打开自动配置…（微哨通道未通过，不影响使用）</string>
 
+    <!-- v1.8.3：原生一键配置（SportAuth，不再依赖 WebView 嗅探） -->
+    <string name="ws_native_running">CAS 登录成功 ✓ 正在原生配置接口（WebVPN → 体育平台免密认证 → 令牌交换）…</string>
+    <string name="ws_native_fail">原生配置失败 · %1$s：%2$s\n已打开 H5 捕获页作为兜底，如页面能打开可手动完成。</string>
+    <string name="ws_native_fallback">原生配置未成功，已打开 H5 捕获页（兜底路径）</string>
+    <string name="ws_native_ok_title">✓ 一键配置成功</string>
+    <string name="ws_native_ok_body">姓名：%1$s\n学号：%2$s\nuserId：%3$s…\n距离接口验证：%4$s\n\n接口模板、令牌、隧道 Cookie 已全部自动填好，API 判定已开启。可直接到「跑步」页点「服务端距离」核对，或直接开始跑步。</string>
+    <string name="ws_native_dist">通过（当前距离 %1$s）</string>
+    <string name="ws_native_dist_none">通过（今日尚未开始跑步，打卡后显示距离）</string>
+    <string name="api_test_no_record">接口正常 · 距离字段为「无」（今日尚未开始跑步，打卡后出现数字）</string>
+
     <!-- v1.7.0 多账号（同时保存多个同学账号，切换查询各自距离） -->
     <string name="acct_add">＋ 添加</string>
     <string name="acct_add_hint">已清空输入框：填写新账号的学号密码后点「登录并自动配置」，登录成功即自动加入下方账号列表。</string>
@@ -180,6 +190,8 @@
     <string name="h5_log_portal_link">已从门户资源列表进入：%1$s</string>
     <string name="h5_log_tunnel_h5">正在通过 WebVPN 隧道打开健康长跑 H5…</string>
     <string name="h5_log_intercept">已拦截 H5 文档并预注入嗅探器（%1$d 字节，页面脚本运行前生效）</string>
+    <!-- v1.8.3：JS 内容改写（内网地址 → 隧道地址，校外 H5 捕获修复） -->
+    <string name="h5_log_rewrite">已改写 %1$s：内网地址 → 隧道地址（校外可用）</string>
     <string name="h5_log_skip_status">findExtExercise 返回 HTTP %1$d（会话未生效），等待 H5 重新发起…</string>
     <string name="h5_log_captured">捕获成功 userId=%1$s… amId=%2$s… pmId=%3$s… sign=%4$s…</string>
     <string name="h5_log_cookie_saved">已保存 WebVPN 隧道 Cookie（后台轮询用）</string>
@@ -215,6 +227,17 @@
     <string name="pref_battery_sub">加入白名单，防止跑步中进程被杀</string>
     <string name="pref_export">导出打卡点 JSON 到剪贴板</string>
     <string name="pref_export_done">已复制 %1$d 个点位，可粘贴备档</string>
+    <!-- v1.8.3：系统通知设置直达（锁屏显示修复链路的一环） -->
+    <string name="pref_notif_setting">打开系统通知设置（锁屏显示修复）</string>
+    <string name="notif_settings_fallback">请到系统设置 → 应用 → 跑伴 → 通知，开启通知与锁屏显示</string>
+    <string name="notif_blocked_title">通知未开启，锁屏将看不到跑步状态</string>
+    <string name="notif_blocked_msg">检测到本应用的通知权限未开启（或被系统关闭）。
+
+跑步过程中，官方打卡距离、点位提醒、漏卡警告都通过常驻通知显示在状态栏与锁屏——通知关闭时这些全部不可见（振动/语音提醒不受影响）。
+
+建议到系统设置中开启通知，并确认「锁屏通知」设为显示（MIUI/鸿蒙等系统的默认值不一定显示锁屏通知）。</string>
+    <string name="notif_blocked_open">去开启</string>
+    <string name="notif_blocked_anyway">仍要开始</string>
     <string name="pref_about">关于</string>
     <string name="pref_about_body">跑伴 RunMate v%1$s\n配合「i大工-体质测评-健康长跑」使用的独立辅助 App。\n打卡核对：轮询 findExtExercise，服务端距离增长且经过打卡区域即确认成功。\n坐标以 WGS-84 存储，自动换算 GCJ-02。\n仅供个人跑步提醒使用。</string>
 
@@ -231,6 +254,14 @@
     <string name="tts_missed">注意，%1$s未确认打卡，请减速返回或留意手机</string>
     <string name="tts_pass_gps">%1$s已通过，请自行确认打卡</string>
     <string name="tts_summary">本次结束：确认%1$d个，未确认%2$d个，用时%3$s</string>
+    <!-- v1.8.3：打卡核对异常与未确认提醒（用户实报「没打上卡也没有提醒」） -->
+    <string name="tts_unconfirmed">提醒，%1$s打卡尚未确认，请检查是否需要重新打卡</string>
+    <string name="tts_api_error">注意，官方接口异常，暂时无法核对打卡</string>
+    <string name="tts_api_unconfigured">提醒，接口尚未配置，无法核对打卡，请到接口页登录</string>
+    <string name="api_unconfigured_run">接口未配置：打卡核对不可用（到「接口」页登录后自动配置）</string>
+    <string name="api_webvpn_renewing">WebVPN 会话已过期，正在自动重连…</string>
+    <string name="api_webvpn_expired_manual">WebVPN 会话已过期且本机未保存登录信息，请到「接口」页重新登录</string>
+    <string name="api_webvpn_renew_fail">会话自动重连失败（%1$s：%2$s），请到「接口」页重新登录</string>
 
     <!-- 更新 -->
     <string name="pref_update">更新</string>

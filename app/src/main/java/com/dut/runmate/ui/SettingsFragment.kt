@@ -128,6 +128,19 @@ class SettingsFragment : Fragment() {
                 Toast.makeText(requireContext(), "请手动在系统设置中允许后台运行", Toast.LENGTH_LONG).show()
             }
         }
+        // v1.8.3：系统通知设置直达（锁屏显示修复链路的一环——Android 13+ 通知
+        // 权限被拒 / MIUI「锁屏通知」默认不展示时，只有系统设置里能改，用户
+        // 自己很难找到入口）。跑步开始时检测到通知被关也会引导到这里。
+        b.btnNotifSetting.setOnClickListener {
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, requireContext().packageName)
+                )
+            } catch (_: Exception) {
+                Toast.makeText(requireContext(), R.string.notif_settings_fallback, Toast.LENGTH_LONG).show()
+            }
+        }
         b.btnExport.setOnClickListener {
             val cm = requireActivity().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("runmate", store.exportJson()))

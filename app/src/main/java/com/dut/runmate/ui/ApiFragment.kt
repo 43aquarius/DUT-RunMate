@@ -227,18 +227,46 @@ class ApiFragment : Fragment() {
             }
 
             when {
-                casOk && wsOk -> {
-                    renderWsStatus()
-                    Toast.makeText(requireContext(),
-                        getString(R.string.ws_login_ok, prefs.wsName), Toast.LENGTH_SHORT).show()
-                    openH5Catcher(password)
-                }
                 casOk -> {
-                    // CAS 会话已建立（可完成自动配置），微哨通道单独失败不影响
+                    // v1.8.3：CAS 会话可用 → 原生一键配置（复刻 H5 全链路，不依赖
+                    // WebView 嗅探，校外网络同样可用——「账号未捕获」的根治方案）。
+                    // 微哨通道成功与否不影响（其 skey 仅校内直连 H5 用）。
                     renderWsStatus()
-                    Toast.makeText(requireContext(),
-                        getString(R.string.ws_login_cas_ok), Toast.LENGTH_LONG).show()
-                    openH5Catcher(password)
+                    b.tvWsStatus.text = getString(R.string.ws_native_running)
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        // ⚠ SportAuth.login 在 Dispatchers.IO 上回调 log —— 必须转主线程
+                        // 再触摸 TextView，否则 CalledFromWrongThreadException 直接闪退
+                        fun uiLog(line: String) {
+                            if (_b == null) return
+                            viewLifecycleOwner.lifecycleScope.launch(
+                                kotlinx.coroutines.Dispatchers.Main
+                            ) {
+                                if (_b != null) b.tvWsStatus.append("\n$line")
+                            }
+                        }
+                        val sr = com.dut.runmate.auth.SportAuth.login(
+                            number, password, freshCas = false
+                        ) { line -> uiLog(line) }
+                        if (_b == null) return@launch
+                        when (sr) {
+                            is com.dut.runmate.auth.SportAuth.Result.Ok -> {
+                                com.dut.runmate.auth.SportAuth.applySession(prefs, store, sr.s)
+                                b.etToken.setText(prefs.apiToken)
+                                b.swApiMode.isChecked = prefs.apiEnabled
+                                renderWsStatus()
+                                renderAccounts()
+                                showNativeOkDialog(sr.s)
+                            }
+                            is com.dut.runmate.auth.SportAuth.Result.Err -> {
+                                // 原生失败 → 退回 H5 捕获页（手动兜底路径）
+                                b.tvWsStatus.text =
+                                    getString(R.string.ws_native_fail, sr.step, sr.msg)
+                                Toast.makeText(requireContext(),
+                                    getString(R.string.ws_native_fallback), Toast.LENGTH_LONG).show()
+                                openH5Catcher(password)
+                            }
+                        }
+                    }
                 }
                 wsOk -> {
                     renderWsStatus()
@@ -265,6 +293,28 @@ class ApiFragment : Fragment() {
         it.putExtra(H5CatcherActivity.EXTRA_NUMBER, b.etWsNumber.text.toString().trim())
         if (password.isNotEmpty()) it.putExtra(H5CatcherActivity.EXTRA_PASSWORD, password)
         startActivity(it)
+    }
+
+    /**
+     * v1.8.3：原生一键配置成功弹窗——姓名/学号/班级 + 距离验证结果 + 使用提示。
+     * 替代旧版「登录成功 → 打开 H5 捕获页」的两步流程，一步到位。
+     */
+    private fun showNativeOkDialog(s: com.dut.runmate.auth.SportAuth.Session) {
+        if (_b == null) return
+        val distLine = if (s.distanceRaw == "无")
+            getString(R.string.ws_native_dist_none)
+        else
+            getString(R.string.ws_native_dist, s.distanceRaw)
+        val msg = getString(R.string.ws_native_ok_body,
+            s.name, s.number, s.userId.take(8), distLine)
+        try {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.ws_native_ok_title)
+                .setMessage(msg)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        } catch (_: Throwable) {
+        }
     }
 
     // ==================== v1.7.0 多账号 ====================
@@ -513,9 +563,13 @@ class ApiFragment : Fragment() {
                 var extractLine = p.title
                 if (p.distPath.isNotBlank()) {
                     val dv = Http.extractDouble(resp.body, p.distPath)
-                    extractLine = if (dv != null)
-                        getString(R.string.api_extracted, String.format("%.2f m", dv))
-                    else getString(R.string.api_extract_fail)
+                    extractLine = when {
+                        dv != null -> getString(R.string.api_extracted, String.format("%.2f m", dv))
+                        // v1.8.3：「无」= 今日尚未开跑（正常基线，不是配置错误）
+                        Http.extractRaw(resp.body, p.distPath) == "无" ->
+                            getString(R.string.api_test_no_record)
+                        else -> getString(R.string.api_extract_fail)
+                    }
                 }
                 b.tvApiExtract.text = extractLine
                 // v1.6.1：完整结果落内存，供「复制完整结果」一键取用

@@ -233,6 +233,9 @@ class RunFragment : Fragment() {
                     val headline = when {
                         webvpnExpired -> getString(R.string.api_hint_webvpn_expired)
                         ok && dv != null -> getString(R.string.run_query_ok, String.format("%.1f", dv))
+                        // v1.8.3：「无」= 今日尚未开跑（正常基线）
+                        ok && Http.extractRaw(resp.body, prof.distPath) == "无" ->
+                            getString(R.string.api_test_no_record)
                         ok -> getString(R.string.run_query_no_extract, prof.distPath)
                         else -> getString(R.string.run_query_http, resp.code, resp.ms)
                     }
@@ -296,9 +299,51 @@ class RunFragment : Fragment() {
 
     private fun askAndStart() {
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
-            == PackageManager.PERMISSION_GRANTED) startService()
+            == PackageManager.PERMISSION_GRANTED) checkNotifThenStart()
         else permLauncher.launch(arrayOf(
             Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+
+    /**
+     * v1.8.3：开跑前检查通知可用性（用户实报「锁屏后没有显示」的两大根因之一：
+     * Android 13+ POST_NOTIFICATIONS 被拒（含系统自动拒绝）时前台服务通知
+     * 状态栏/锁屏全部不显示；MainActivity 只在首启请求过一次，被拒后永远不会再问）。
+     * 不可用时弹窗说明并引导去系统设置开启，用户可选择「仍要开始」。
+     */
+    private fun checkNotifThenStart() {
+        val notifOn = try {
+            androidx.core.app.NotificationManagerCompat.from(requireContext()).areNotificationsEnabled()
+        } catch (_: Throwable) {
+            true
+        }
+        val permGranted = android.os.Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (notifOn && permGranted) {
+            startService()
+            return
+        }
+        try {
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.notif_blocked_title)
+                .setMessage(R.string.notif_blocked_msg)
+                .setPositiveButton(R.string.notif_blocked_open) { _, _ ->
+                    try {
+                        startActivity(android.content.Intent(
+                            android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS
+                        ).apply {
+                            putExtra(android.provider.Settings.EXTRA_APP_PACKAGE,
+                                requireContext().packageName)
+                        })
+                    } catch (_: Throwable) {
+                    }
+                }
+                .setNegativeButton(R.string.notif_blocked_anyway) { _, _ -> startService() }
+                .setNeutralButton(android.R.string.cancel, null)
+                .show()
+        } catch (_: Throwable) {
+            startService()   // 弹窗失败不拦跑步
+        }
     }
 
     private fun startService() {

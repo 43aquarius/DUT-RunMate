@@ -9,6 +9,7 @@ import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.FormBody
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.util.concurrent.TimeUnit
 
 /**
@@ -69,6 +70,24 @@ object CasAuth {
     /** 清空会话（登出/重登前调用，避免旧 CASTGC 干扰） */
     fun reset() {
         synchronized(cookieStore) { cookieStore.clear() }
+    }
+
+    /**
+     * v1.8.3：返回某 URL 应携带的 Cookie 请求头（按 domain/path 匹配过滤）。
+     * SportAuth 原生链路用——CAS 与 WebVPN 请求共用本 client 的 Cookie jar，
+     * 隧道请求需要从中取出 webvpn.dlut.edu.cn 域的 wengine_vpn_ticket 等会话。
+     */
+    fun cookieHeader(urlStr: String): String {
+        // v1.8.3 修正：表达式函数体内不允许 return——改块体
+        val url = urlStr.toHttpUrlOrNull() ?: return ""
+        return try {
+            synchronized(cookieStore) {
+                cookieStore.filter { it.matches(url) }
+                    .joinToString("; ") { "${it.name}=${it.value}" }
+            }
+        } catch (_: Exception) {
+            ""
+        }
     }
 
     /** 登录（IO 线程）。成功返回 CASTGC，失败返回网页端一致的具体错误文本。 */

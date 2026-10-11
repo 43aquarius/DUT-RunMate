@@ -71,6 +71,10 @@ class MapFragment : Fragment() {
     private var lastGpsFix: Location? = null
     private var lastNetFix: Location? = null
 
+    // v1.8.3：切到地图页后首次拿到定位自动居中一次（用户需求：每次切到地图页
+    // 默认直接定位到当前位置，不再落在校园中心）。
+    private var autoCentered = false
+
     // 大工凌水校区中心（WGS-84）
     private val campusWgs = doubleArrayOf(39.0853, 121.8085)
 
@@ -100,6 +104,13 @@ class MapFragment : Fragment() {
         b.map.minZoomLevel = 3.0
         b.map.controller.setZoom(18.0)
         b.map.controller.setCenter(toDisplay(campusWgs[0], campusWgs[1]))
+        // v1.8.3：切页默认定位到当前位置——已有定位（跑步中/预览）直接居中，
+        // 没有则等首个定位回调自动居中（autoCenterOnce）；都拿不到才停留在校园中心。
+        autoCentered = false
+        (RunBus.state.value.fix ?: bestFix())?.let {
+            autoCenterOnce(it)
+            showMyLocation(it.latitude, it.longitude, it.accuracy, LocGate.isNetwork(it))
+        }
         applyTileSource()
 
         // 事件层（底部）：空白处点按/长按 → 放置选点准星（不直接建点，先确认）
@@ -162,6 +173,7 @@ class MapFragment : Fragment() {
     private fun locateMe() {
         val f = RunBus.state.value.fix ?: bestFix()
         if (f != null) {
+            autoCentered = true      // v1.8.3：手动定位后不再自动居中（尊重用户手动拖动）
             b.map.controller.animateTo(toDisplay(f.latitude, f.longitude))
             b.map.controller.setZoom(19.0)
             if (LocGate.isNetwork(f)) {
@@ -176,6 +188,17 @@ class MapFragment : Fragment() {
         }
     }
 
+    /** v1.8.3：切页后的首次自动居中（仅一次，后续拖动/缩放不受影响） */
+    private fun autoCenterOnce(fix: Location) {
+        if (autoCentered) return
+        autoCentered = true
+        try {
+            b.map.controller.setCenter(toDisplay(fix.latitude, fix.longitude))
+            if (b.map.zoomLevelDouble < 17.0) b.map.controller.setZoom(18.0)
+        } catch (_: Exception) {
+        }
+    }
+
     /** GPS 新鲜（30s 内）优先，否则用最近一次网络定位 */
     private fun bestFix(): Location? {
         val g = lastGpsFix
@@ -187,6 +210,8 @@ class MapFragment : Fragment() {
         if (_b == null) return@LocationListener
         val loc = LocGate.normalize(raw)
         if (LocGate.isNetwork(raw)) lastNetFix = loc else lastGpsFix = loc
+        // v1.8.3：切页后首个定位自动居中一次（之后跟随交还用户）
+        autoCenterOnce(loc)
         bestFix()?.let {
             showMyLocation(it.latitude, it.longitude, it.accuracy, LocGate.isNetwork(it))
         }
