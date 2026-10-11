@@ -63,10 +63,14 @@
     <string name="alert_test_playing">正在播报测试，请留意听感与震感…</string>
     <string name="alert_test_tts_text">语音播报测试。如果你能听到这句话，说明语音通道正常。</string>
     <string name="alert_test_title">提醒通道自检结果</string>
-    <string name="alert_test_tts_ok">✓ 语音引擎就绪（跟随媒体音量，请确认媒体音量已开启）</string>
+    <string name="alert_test_tts_ok">✓ 语音引擎就绪（引擎：%1$s，跟随媒体音量，请确认媒体音量已开启）</string>
     <string name="alert_test_tts_bad">✗ 语音引擎异常：%1$s</string>
+    <string name="alert_test_tts_hint">无可用引擎时：系统设置 → 文字转语音（TTS）输出，安装/选择 Google、小爱、讯飞任一引擎并下载中文语音</string>
+    <string name="alert_test_tts_settings">去系统语音设置</string>
     <string name="alert_test_chime_ok">✓ 提示音已播报（走媒体/通知通道，听不到请调高音量）</string>
-    <string name="alert_test_vib_ok">✓ 震动已触发（无震感请检查系统「触感反馈」是否开启）</string>
+    <string name="alert_test_vib_ok">✓ 震动已下发（通知通道强波形）</string>
+    <string name="alert_test_vib_bad">✗ 震动未触发：%1$s</string>
+    <string name="alert_test_vib_hint">无震感请检查：系统设置 → 声音与触感 → 震动强度/触感反馈；以及勿扰模式是否拦截通知震动</string>
     <string name="alert_test_switch_off">注：部分提醒开关处于关闭状态，跑步时对应通道不会触发</string>
 
     <!-- 标定页 -->

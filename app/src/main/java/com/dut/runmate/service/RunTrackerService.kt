@@ -9,6 +9,11 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -67,6 +72,8 @@ class RunTrackerService : Service() {
     private var notifMgr: NotificationManager? = null
     /** v1.8.6：锁屏媒体卡片会话（音乐软件样式；标题=打卡距离、副标题=漏卡状态） */
     private var mediaSession: MediaSessionCompat? = null
+    // v1.8.7：锁屏媒体卡专辑图（实底不透明，artBitmap 懒建）
+    private var mediaArt: Bitmap? = null
 
     private var startAt = 0L
     private var sessionMeters = 0.0
@@ -506,9 +513,15 @@ class RunTrackerService : Service() {
             .setSmallIcon(R.drawable.ic_run)
             .setContentTitle(getString(R.string.notif_title))
             .setContentText(text)
+            // v1.8.7：锁屏卡片实底色（用户实报「卡片背景透明」）——
+            // setColor+setColorized 使 5~10 的锁屏媒体卡获得实心品牌蓝背景
+            // （MediaStyle 允许 pre-O colorized）；11+ 锁屏系统媒体卡的底色
+            // 取自 setColor/专辑图（见 pushMediaMeta 的 artBitmap），不再透出壁纸
+            .setColor(0xFF1151FF.toInt())          // md_tertiary 品牌蓝
+            .setColorized(true)
             // v1.8.6：锁屏改为音乐软件样式的媒体卡片（用户澄清：不是显示整个主页面，
             // 而是一个框框里只显示关键信息）。Android 11+ 锁屏/QS 媒体区、5~10 锁屏
-            // 白底媒体卡；卡片标题/副标题来自 MediaSession 元数据（pushMediaMeta）
+            // 媒体卡；卡片标题/副标题来自 MediaSession 元数据（pushMediaMeta）
             .setStyle(MediaNotif.MediaStyle()
                 .setMediaSession(mediaSession?.sessionToken)
                 .setShowActionsInCompactView(0, 1))
@@ -530,8 +543,12 @@ class RunTrackerService : Service() {
      * v1.8.6：锁屏显示改造——用户澄清「不是显示整个主页面，而是像音乐软件的锁屏
      * 显示一样，一个框里只显示关键信息（当前打卡距离、有没有漏卡）」。
      * 实现 = MediaSession + MediaStyle 前台通知：Android 11+ 锁屏/快捷设置顶部
-     * 媒体区、Android 5~10 锁屏白底媒体卡，标题/副标题/按钮由系统渲染。
+     * 媒体区、Android 5~10 锁屏媒体卡，标题/副标题/按钮由系统渲染。
      * v1.8.4 的 setShowWhenLocked（整页显示在锁屏上）随之移除（MainActivity）。
+     *
+     * v1.8.7：卡片底色不透明——11+ 系统媒体卡背景取专辑图/通知色，5~10 取
+     * colorized 通知色；无专辑图时部分 ROM 直接透出壁纸（用户实报「背景
+     * 透明」）。新增 artBitmap()：纯色渐变实底专辑图 + 通知 setColor/ setColorized 双保险。
      */
     private fun setupMediaSession() {
         if (mediaSession != null) return
@@ -581,14 +598,41 @@ class RunTrackerService : Service() {
     private fun pushMediaMeta(title: String, subtitle: String) {
         val s = mediaSession ?: return
         try {
+            val art = artBitmap()   // v1.8.7：实底专辑图——锁屏媒体卡背景不透明
             s.setMetadata(MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
                 .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, subtitle)
                 .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
                 .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, subtitle)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, art)
+                .putBitmap(MediaMetadataCompat.METADATA_KEY_ART, art)
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)  // 不渲染进度条
                 .build())
         } catch (e: Throwable) { logSoft("pushMediaMeta", e) }
+    }
+
+    /**
+     * v1.8.7：媒体卡片专辑图——512×512 品牌蓝渐变实底（ARGB 全不透明）。
+     * 11+ 锁屏系统媒体卡以专辑图作卡片背景（无图时部分 ROM 透出壁纸=
+     * 用户实报「背景透明」）；同时作为卡片左下角缩略图，观感对齐音乐软件。
+     * 先 eraseColor 打实底，渐变绘制失败也保证不透明。
+     */
+    private fun artBitmap(): Bitmap {
+        mediaArt?.let { return it }
+        val size = 512
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        try {
+            bmp.eraseColor(0xFF1151FF.toInt())   // md_tertiary
+            val c = Canvas(bmp)
+            val p = Paint()
+            p.shader = LinearGradient(
+                0f, 0f, 0f, size.toFloat(),
+                0xFF1151FF.toInt(), 0xFF0A2A80.toInt(),
+                Shader.TileMode.CLAMP)
+            c.drawRect(0f, 0f, size.toFloat(), size.toFloat(), p)
+        } catch (_: Throwable) { }
+        mediaArt = bmp
+        return bmp
     }
 
     /** v1.5.0：通知文本 = 官方打卡距离 + 自测 GPS 里程 + 点位状态（锁屏可见） */
@@ -686,6 +730,7 @@ class RunTrackerService : Service() {
             mediaSession?.apply { isActive = false; release() }
         } catch (_: Exception) { }
         mediaSession = null
+        mediaArt = null   // v1.8.7：随会话释放；不 recycle（SystemUI 可能仍持引用）
         scope?.cancel(); scope = null
         engine = null
         alert?.shutdown(); alert = null

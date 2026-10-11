@@ -86,7 +86,9 @@ class SettingsFragment : Fragment() {
         b.swVibrate.setOnCheckedChangeListener { _, c -> prefs.vibrateEnabled = c }
 
         // v1.8.6：测试提醒——当场播报语音+提示音+震动，4.5s 后弹出三通道自检结果。
-        // 用户实报三通道全部无效后的自查入口：TTS 引擎状态、音量通道、开关状态一目了然。
+        // v1.8.7：自检改为「真实结果」——旧版「✓ 震动已触发」是写死的静态文案，
+        // 用户实报「显示触发了但手机没震」。现按 AlertManager 的 ttsState/
+        // ttsEngineLabel/vibState 如实展示，失败附排查指引与系统设置入口。
         b.btnTestAlert.setOnClickListener {
             val am = com.dut.runmate.alert.AlertManager(requireContext(), prefs)
             am.initTts()
@@ -99,13 +101,20 @@ class SettingsFragment : Fragment() {
             }, 1500L)
             // 播报完成后展示诊断 + 释放引擎
             view?.postDelayed({
-                val ttsLine = if (am.ttsState.isBlank())
-                    getString(R.string.alert_test_tts_ok)
+                val ttsOk = am.ttsState.isBlank()
+                val ttsLine = if (ttsOk)
+                    getString(R.string.alert_test_tts_ok, am.ttsEngineLabel.ifBlank { "系统默认" })
                 else getString(R.string.alert_test_tts_bad, am.ttsState)
+                val vibOk = am.vibState.isBlank()
+                val vibLine = if (vibOk)
+                    getString(R.string.alert_test_vib_ok)
+                else getString(R.string.alert_test_vib_bad, am.vibState)
                 val sb = buildString {
                     append(ttsLine).append('\n')
                     append(getString(R.string.alert_test_chime_ok)).append('\n')
-                    append(getString(R.string.alert_test_vib_ok))
+                    append(vibLine)
+                    if (!vibOk) append('\n').append(getString(R.string.alert_test_vib_hint))
+                    if (!ttsOk) append('\n').append(getString(R.string.alert_test_tts_hint))
                     if (!prefs.ttsEnabled || !prefs.chimeEnabled || !prefs.vibrateEnabled)
                         append("\n\n").append(getString(R.string.alert_test_switch_off))
                 }
@@ -116,6 +125,21 @@ class SettingsFragment : Fragment() {
                     android.app.AlertDialog.Builder(requireContext())
                         .setTitle(R.string.alert_test_title)
                         .setMessage(sb)
+                        .apply {
+                            // v1.8.7：TTS 不可用时的修复入口——直达系统 TTS 设置
+                            if (!ttsOk) setNeutralButton(R.string.alert_test_tts_settings) { _, _ ->
+                                try {
+                                    // Settings.ACTION_TTS_SETTINGS 是隐藏常量（公开
+                                    // SDK 无此引用），运行期 action 字符串全设备可用
+                                    startActivity(Intent("android.settings.TTS_SETTINGS"))
+                                } catch (_: Throwable) {
+                                    try {
+                                        Toast.makeText(requireContext(),
+                                            R.string.alert_test_tts_hint, Toast.LENGTH_LONG).show()
+                                    } catch (_: Throwable) { }
+                                }
+                            }
+                        }
                         .setPositiveButton(android.R.string.ok, null)
                         .show()
                 } catch (_: Throwable) { }
