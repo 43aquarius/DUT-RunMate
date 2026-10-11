@@ -2,7 +2,8 @@
 
 > 适用对象：本人调试用途（配合《跑伴 RunMate》App 的「接口」页）
 > 逆向基线：i大工 3.3.12.75026（`cn.edu.dlut.ws`，微哨 Ruijie Whistle 平台）
-> 文档日期：2026-10-11 · **v1.8.2 更新：WebVPN 会话失效识别补齐最后一个调用点（跑步轮询器）——至此发送测试/跑步轮询/手动查询/批量查询全部覆盖（§11）**
+> 文档日期：2026-10-11 · **v1.8.3 更新：原生认证链全量实测归档（§13）——免登录抓包/免 H5 嗅探，纯 HTTP 复刻健康长跑 H5 认证全流程（CAS→WebVPN→免密跳转→令牌交换），校外可用；距离字段「无」=今日未开跑正常基线（§11）**
+> v1.8.2 更新：WebVPN 会话失效识别补齐最后一个调用点（跑步轮询器）——至此发送测试/跑步轮询/手动查询/批量查询全部覆盖（§11）
 > v1.8.1 更新：隧道前缀段行为勘误——登录会话下必须用真实前缀，占位 0 会被网关当目标 host 解析（§3.4/§3.5）；§11 新增「http://0/mobilenew/」错误行
 > v1.8.0 更新：所有连接默认不依赖校园网——默认全程 WebVPN 隧道（§0/§3.4/§3.5）、WebVPN 会话过期自动识别（§11）、多账号隧道优先建议（§12）
 > 历史更新：v1.7.0 服务器 202.118.65.138:8081 角色详解（§2.1）、WebSocket 通道实锤（§3.3）、WebVPN 隧道机制补全（§3.4）、常见错误对照表（§11）、多账号使用说明（§12）
@@ -21,6 +22,8 @@
 - ✅ 跑伴 v1.7.0 起支持**多账号**：每人一套配置，一键切换、一键查全部人距离（§12）；
 - ✅ 跑伴 v1.8.0 起**所有连接默认不依赖校园网**：默认一律走 WebVPN 隧道（webvpn.dlut.edu.cn
   为公网域名，校内校外通用，与 i大工 官方 App 校外行为一致）；模板预填的也是隧道地址；
+- ✅ 跑伴 v1.8.3 起**原生一键配置**：登录后不再依赖 H5 捕获页嗅探，App 内纯 HTTP 完成
+  全套认证链直接拿到令牌（§13，校外同样可用）；
 - ⚠️ 接口在内网 `202.118.65.138:8081`（服务器角色详解见 §2.1）：**校内 Wi-Fi 可直连（明文 HTTP，
   v1.8.0 起降级为手动入口）**；校外直连会报 `failed to connect` 超时（§11）；隧道会话过期会
   被 302 回登录页（v1.8.0 起自动识别并提示，§11）；
@@ -499,3 +502,85 @@ H5 免密通过 → 嗅探器捕获 findExtExercise 全套参数。CAS 页面出
   不存在「校内捕获的直连快照拿到校外失效」的问题（反之隧道地址在校内也能用，只是多一跳）；
   旧版本在校内捕获的直连快照拿到校外仍会 failed to connect（v1.8.0 起重新捕获一次即换成隧道地址）；
 - 多人凭据集中存在一部手机上，注意保管；官方令牌每次捕获独立，删除账号即删除其全部凭据。
+
+---
+
+## 13. 原生认证链（v1.8.3 全量实测归档，跑伴 SportAuth）
+
+> 本章是「校外已登录却拿不到令牌 / 账号未捕获 / webvpn 会话未建立或已过期」问题的
+> 根治方案归档：**不打开任何 WebView、不做任何嗅探**，纯 HTTP 请求复刻健康长跑 H5
+> （Vue SPA）内部的完整认证流程。2026-10-11 沙箱用真实账号逐步实测通过（findExtExercise
+> 返回 PASS）。跑伴 v1.8.3 起登录成功即自动走这条链完成一键配置。
+
+### 13.1 背景：H5 捕获为什么在校外必然失败
+
+健康长跑 H5（`/mobilenew/`）是 Vue SPA，其 `mobile-server-config.js` 把 API BASE_URL
+**写死为内网地址** `http://202.118.65.138:8081/service/…`。wengine 网关只改写 HTML 主文档
+里的链接，**不改写 JS 资源内容**——因此 H5 内部的 axios 请求永远直连内网地址：
+
+- 校内：直连可达，一切正常（H5 捕获可用）；
+- 校外：内网不可达，H5 的令牌交换永远失败 → 嗅探器抓不到 200 的 findExtExercise
+  → 「账号未捕获」。
+
+i大工 官方 App 校外能用是因为其 WebView **自带内网 URL 改写**（把内网地址重写为隧道
+地址）；第三方 WebView 没有这个能力。跑伴 v1.8.3 的 H5 捕获页也补了这个改写（主框架
+内网地址 302 转隧道 + 隧道 JS/JSON 资源体内内网地址替换），但主通道已换成下面的原生链。
+
+### 13.2 完整链路（七步，全部隧道化）
+
+```
+① CAS 统一认证        POST sso.dlut.edu.cn/cas/login（DES rsa 字段，见 §10）→ CASTGC
+② WebVPN 统一身份     GET webvpn.dlut.edu.cn/login → 取 #cas-login 链接 → 跟随跳转链
+                      → Cookie: wengine_vpn_ticket=…（门户会话建立）
+③ 隧道前缀            本地计算（见 13.4），无需请求任何接口
+④ 体育平台免密跳转    GET {隧道}/service/cas/mobileCheckJump?vpn-12-o1-202.118.65.138:8081
+                      → wengine 服务端代出 CAS 票据 → 302 落地页含 user_account=<64hex>
+                      （一次性，短时效；从落地页 HTML 里正则提取）
+⑤ 令牌交换            POST {隧道}/service/login/mobile/noPassCheck
+                      {"username":"<user_account>","sys_id":"iscpMobile","sign":…}
+                      → PASS + token（"userId:hex"）+ user_id + 姓名/学号/班级
+⑥ 学期/时段 ID        POST {隧道}/service/mobile/extExercise/findExeRule
+                      {"userId":…,"sign":…} → amId / pmId（响应可能为空体：直接跳过，
+                      下一步不带 amId/pmId 也能 PASS）
+⑦ 距离验证            POST {隧道}/service/mobile/extExercise/findExtExercise
+                      {"userId":…,"amId":…,"pmId":…,"sign":…}
+                      Authorization: <token> → PASS + pmDel.distance
+```
+
+步骤 ④~⑦ 的请求头：`Authorization: <token>`（⑤ 之后才有）+ `Cookie: wengine_vpn_ticket=…`
++ `Content-Type: application/json;charset=UTF-8` + 微哨 UA。⑤ 的 username 用的是 ④
+落地页的一次性 `user_account`（不是学号）——这是 H5 内部实现的关键细节。
+
+### 13.3 请求签名算法（H5 app.js 的 S()+u()）
+
+```
+sign = SHA1( 按 key 字典序的 "k=v" 用 & 连接（跳过空值与 sign 本身）
+             + "&key=8d6c5b73a50d4707bd71c93882ddbc8b" ).toUpperCase()
+```
+
+密钥为 H5 前端内置（webpack 模块内明文）。已用抓包基准向量验证：
+`{userId,amId,pmId}` → `A549594F98EF0D857E81A39FB13CC1AFFB125DD8`。
+
+### 13.4 隧道前缀算法（portal.js encrypt()，全局确定性）
+
+```
+prefix = hex(IV) + hex(AES-CFB-128(key,IV,host))[:len(host)*2]
+key = IV = "Wxzxvpn2023key@$"（wrdvpnKey/wrdvpnIV，全网固定）
+host = "202.118.65.138" → 57787a78…c2e3（60 hex，与官方 App 抓包一致）
+```
+
+AES-CFB-128 = 全块反馈（16 字节段）；host 不足一块不需填充（流式特性）。**前缀与登录
+用户无关、与时间无关**——同一目标 host 永远得到同一前缀（v1.8.1 曾误判为「用户绑定」，
+实为占位 0 不是合法密文才被网关拒绝）。
+
+### 13.5 距离字段「无」的语义
+
+未开跑时 `pmDel.distance` 是字符串 `"无"`（不是 0 也不是 null）——**这是正常基线**，
+打卡后变数字。v1.8.3 起接口页/跑步页/轮询三处均不再把它误报为「未能提取」。
+
+### 13.6 会话时效与自动重连
+
+- wengine_vpn_ticket（门户会话）：数小时级过期；过期后隧道请求被 302 回 `/login`；
+- token（体育平台令牌）：与门户会话独立，较长时效；
+- 跑伴 v1.8.3 起跑步轮询检测到 302 回登录页 → 自动重跑 ①~⑦（需本机已保存学号密码，
+  限频 5 分钟）→ 新令牌落库 → 下个心跳自动恢复核对。
