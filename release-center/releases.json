@@ -1,17 +1,28 @@
 {
   "repo": "43aquarius/DUT-RunMate",
   "latest": {
-    "versionName": "1.8.3",
-    "versionCode": 16,
+    "versionName": "1.8.4",
+    "versionCode": 17,
     "date": "2026-10-11",
-    "apkFile": "DUT-RunMate_v1.8.3.apk",
-    "sha256": "81dbed7159826ec5f8517ab5bef57f2f904360cda7b85d6dfb67342d2f23999d",
-    "sizeBytes": 6008877,
+    "apkFile": "DUT-RunMate_v1.8.4.apk",
+    "sha256": "150bd63740c3fb74a4e68fcf6976ba1d33b309e02f6b440a84a697fa56f7ab2f",
+    "sizeBytes": 6008633,
     "minSdk": 24,
     "targetSdk": 34,
-    "notes": "【重大】原生一键配置 · 五项问题修复（WebVPN/token · 提醒 · 锁屏 · 校准闪退 · 地图定位）\n\n- 原生一键配置（问题「已登录却拿不到 token / 账号未捕获 / webvpn 会话未建立或已过期」根治）：接口页登录成功后不再依赖 H5 捕获页嗅探——App 内原生复刻健康长跑 H5 的完整认证链（CAS 统一认证 → WebVPN 统一身份 → 隧道前缀本地计算 → 体育平台 CAS 免密跳转 → noPassCheck 令牌交换 → findExeRule/findExtExercise 验证），一次登录直接配好令牌、模板、Cookie，校外网络同样可用。此前 H5 捕获在校外必然失败的根因是健康长跑 H5 内部请求写死内网地址（官方 App 的 WebView 自带改写，第三方 WebView 没有）\n- 会话自动重连：跑步中 WebVPN 会话过期不再需要手动处理——已保存学号密码时后台自动重跑原生链路（限频 5 分钟），锁屏通知显示「自动重连中」状态\n- 打卡提醒补全（问题「没打上卡或未确认却没有任何提醒」）：进入检测区 ≥20 秒仍未确认打卡时，每 20 秒一次「语音+提示音+震动」组合强提醒；进区/接近/确认事件全部补上震动；核对链路异常（网络错误/HTTP 失败）在区内时限频 60 秒强提醒；开跑时接口未配置立即语音+响音提醒——全部不依赖 TTS 引擎就绪，震动/响音必定到达\n- 锁屏显示修复（问题「锁屏后看不到应用」）：通知渠道显式设置锁屏公开（Android 13+/MIUI 渠道默认不跟随通知自身可见性）；前台服务通知立即上屏；开跑前检测通知权限，被拒时弹窗引导去系统设置（Android 13+ 通知权限被系统默认拒绝是锁屏看不到的首要原因）；设置页新增「打开系统通知设置」直达按钮\n- 校准页闪退修复（CalibrateFragment NPE @ getB/startAveraging）：均值采样协程在页面销毁后恢复时触摸已置空的视图导致 NPE——现在视图销毁先取消协程，循环内判空直接停，均值结果照常保留可保存\n- 地图页自动定位（问题「切到地图页默认落在校园中心」）：每次切到地图页，已有定位直接居中到当前位置，没有则等首个定位回调自动居中一次；手动拖动/定位按钮不再被自动居中打断\n- 顺带修复：距离字段「无」不再误报「未能提取」（今日尚未开跑是正常基线，接口页/跑步页/轮询三处一致）；H5 捕获页兜底升级（内网主框架 302 转隧道、隧道 JS 资源内网地址改写为隧道地址）\n\n覆盖安装：签名与 v1.5+ 一致，直接覆盖升级，打卡点/账号/配置全部保留。"
+    "notes": "【修复】标定页「添加打卡点」只能看到一个点位 · 锁屏后看不到应用\n\n- 标定页底部点位列表修复：旧版列表控件（RecyclerView）嵌在整页滚动容器里，在部分机型上只测出第一个条目的高度——无论保存了多少个点都只显示一个。本版改为逐条渲染，所有已保存点位必然完整展示（点击可编辑、× 可删除）\n- 锁屏显示（补全 v1.8.3）：上一版已让跑步通知在锁屏可见，但应用本身仍被锁屏挡住。本版新增：跑步进行中锁屏后，按电源键/亮屏直接显示跑步界面，无需解锁；停止跑步立即恢复正常锁屏。注意需保持跑伴在跑步前处于前台（不要先按 Home 再锁屏）\n- 地图页「操场环线」说明：它是大工操场跑道的参考轨迹线（蓝色），仅用于对照选点与跑位参考，不参与打卡检测计算，可随时开关"
   },
   "history": [
+    {
+      "versionName": "1.8.3",
+      "versionCode": 16,
+      "date": "2026-10-11",
+      "apkFile": "DUT-RunMate_v1.8.3.apk",
+      "sha256": "81dbed7159826ec5f8517ab5bef57f2f904360cda7b85d6dfb67342d2f23999d",
+      "sizeBytes": 6008877,
+      "minSdk": 24,
+      "targetSdk": 34,
+      "notes": "【重大】原生一键配置 · 五项问题修复（WebVPN/token · 提醒 · 锁屏 · 校准闪退 · 地图定位）\n\n- 原生一键配置（问题「已登录却拿不到 token / 账号未捕获 / webvpn 会话未建立或已过期」根治）：接口页登录成功后不再依赖 H5 捕获页嗅探——App 内原生复刻健康长跑 H5 的完整认证链（CAS 统一认证 → WebVPN 统一身份 → 隧道前缀本地计算 → 体育平台 CAS 免密跳转 → noPassCheck 令牌交换 → findExeRule/findExtExercise 验证），一次登录直接配好令牌、模板、Cookie，校外网络同样可用。此前 H5 捕获在校外必然失败的根因是健康长跑 H5 内部请求写死内网地址（官方 App 的 WebView 自带改写，第三方 WebView 没有）\n- 会话自动重连：跑步中 WebVPN 会话过期不再需要手动处理——已保存学号密码时后台自动重跑原生链路（限频 5 分钟），锁屏通知显示「自动重连中」状态\n- 打卡提醒补全（问题「没打上卡或未确认却没有任何提醒」）：进入检测区 ≥20 秒仍未确认打卡时，每 20 秒一次「语音+提示音+震动」组合强提醒；进区/接近/确认事件全部补上震动；核对链路异常（网络错误/HTTP 失败）在区内时限频 60 秒强提醒；开跑时接口未配置立即语音+响音提醒——全部不依赖 TTS 引擎就绪，震动/响音必定到达\n- 锁屏显示修复（问题「锁屏后看不到应用」）：通知渠道显式设置锁屏公开（Android 13+/MIUI 渠道默认不跟随通知自身可见性）；前台服务通知立即上屏；开跑前检测通知权限，被拒时弹窗引导去系统设置（Android 13+ 通知权限被系统默认拒绝是锁屏看不到的首要原因）；设置页新增「打开系统通知设置」直达按钮\n- 校准页闪退修复（CalibrateFragment NPE @ getB/startAveraging）：均值采样协程在页面销毁后恢复时触摸已置空的视图导致 NPE——现在视图销毁先取消协程，循环内判空直接停，均值结果照常保留可保存\n- 地图页自动定位（问题「切到地图页默认落在校园中心」）：每次切到地图页，已有定位直接居中到当前位置，没有则等首个定位回调自动居中一次；手动拖动/定位按钮不再被自动居中打断\n- 顺带修复：距离字段「无」不再误报「未能提取」（今日尚未开跑是正常基线，接口页/跑步页/轮询三处一致）；H5 捕获页兜底升级（内网主框架 302 转隧道、隧道 JS 资源内网地址改写为隧道地址）\n\n覆盖安装：签名与 v1.5+ 一致，直接覆盖升级，打卡点/账号/配置全部保留。"
+    },
     {
       "versionName": "1.8.2",
       "versionCode": 15,
@@ -142,62 +153,6 @@
       "githubTag": "v1.3.0",
       "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases",
       "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.3.0.apk"
-    },
-    {
-      "versionName": "1.2.0",
-      "versionCode": 4,
-      "date": "2026-10-09",
-      "apkFile": "DUT-RunMate_v1.2.0.apk",
-      "sha256": "1d31d21435596c31d29372e40c587605b18f3e2d3e26e6cc3771f4d4ca83c49c",
-      "sizeBytes": 5870477,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "【增强】坐标归一与轮询核对\n\n- 网络定位 GCJ-02 自动转 WGS-84，GPS 新鲜时忽略低精度网络坐标（检测圈不再抖动）\n- 打卡核对轮询：进区高频轮询 + 15s 锚点轮询维持基线新鲜",
-      "githubTag": "v1.2.0",
-      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases",
-      "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.2.0.apk"
-    },
-    {
-      "versionName": "1.1.0",
-      "versionCode": 3,
-      "date": "2026-10-08",
-      "apkFile": "DUT-RunMate_v1.1.0.apk",
-      "sha256": "45c6ddc7cd4d6e4cbbd5d3af08b0271da8364cf3e32a1c40887f58a8ca045506",
-      "sizeBytes": 5863212,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "【新功能】应用内检查更新\n\n- 设置 → 更新：可填写发布服务器地址（本站，国内直连），留空则仅用 GitHub\n- 每天启动时自动静默检查；发现新版本弹窗展示说明\n- 下载带进度条 + SHA256 校验（服务器通道），一键安装\n- Android 8+ 自动引导「安装未知应用」授权\n\n配套发布中心上线：版本预览、扫码下载、直链下载。",
-      "githubTag": "v1.1.0",
-      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.1.0",
-      "githubApkUrl": "https://github.com/43aquarius/DUT-RunMate/releases/download/v1.1.0/DUT-RunMate_v1.1.0.apk"
-    },
-    {
-      "versionName": "1.0.1",
-      "versionCode": 2,
-      "date": "2026-10-08",
-      "apkFile": "DUT-RunMate_v1.0.1.apk",
-      "sha256": "aebe1a788a76ac3cf8ecc48e4288bda123852da40892e45fa008da001a76647d",
-      "sizeBytes": 5839432,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "【修复】地图无数据\n\n原因：v1.0 图源为 Esri / OSM，国内网络无法访问。\n\n- 图源整体换为高德瓦片：卫星 18 级、街道矢量 20 级，国内直连秒开\n- 新增 GCJ-02 坐标换算层：图钉压住的位置就是真实地面位置\n- 「我的位置」蓝点自绘，不再偏移数百米",
-      "githubTag": "v1.0.1",
-      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.0.1",
-      "githubApkUrl": "https://github.com/43aquarius/DUT-RunMate/releases/download/v1.0.1/DUT-RunMate_v1.0.1.apk"
-    },
-    {
-      "versionName": "1.0.0",
-      "versionCode": 1,
-      "date": "2026-10-08",
-      "apkFile": "DUT-RunMate_v1.0.apk",
-      "sha256": "5564f074f145e6965b73b4092b02863d43b5c7916f46adc1fc95dd6302f3e759",
-      "sizeBytes": 5836879,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "首个版本：打卡点录入（现场标定/地图选点）、耳机语音提醒、API 距离判定、接口调试页。",
-      "githubTag": "v1.0.0",
-      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.0.0",
-      "githubApkUrl": "https://github.com/43aquarius/DUT-RunMate/releases/download/v1.0.0/DUT-RunMate_v1.0.apk"
     }
   ]
 }

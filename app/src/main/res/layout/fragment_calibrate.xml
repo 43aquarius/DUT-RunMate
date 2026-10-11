@@ -113,10 +113,13 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="24dp" android:text="@string/add_point" />
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvCalib" android:layout_width="match_parent"
+            <!-- v1.8.4：RecyclerView(wrap_content) 嵌在 ScrollView 里，部分 ROM 只测出
+                 一个 item 的高度（用户实测：无论存多少点都只显示一个）。点位数量少
+                 无需回收复用，改为 LinearLayout 手动渲染，全部条目必然完整展开。 -->
+            <LinearLayout
+                android:id="@+id/layCalib" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:layout_marginTop="8dp"
-                android:nestedScrollingEnabled="false" />
+                android:orientation="vertical" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

@@ -14,12 +14,12 @@ import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.dut.runmate.R
 import com.dut.runmate.data.Checkpoint
 import com.dut.runmate.data.CheckpointStore
 import com.dut.runmate.data.Prefs
 import com.dut.runmate.databinding.FragmentCalibrateBinding
+import com.dut.runmate.databinding.ItemCpEditBinding
 import com.dut.runmate.geo.GeoKit
 import com.dut.runmate.geo.LocGate
 import kotlinx.coroutines.CoroutineScope
@@ -38,7 +38,6 @@ class CalibrateFragment : Fragment() {
     private val b get() = _b!!
     private val prefs by lazy { Prefs.get(requireContext()) }
     private val store by lazy { CheckpointStore.get(requireContext().filesDir) }
-    private lateinit var adapter: CalibPointAdapter
 
     private val samples = mutableListOf<DoubleArray>()   // [lat, lon, acc]
     private var averaging = false
@@ -61,10 +60,6 @@ class CalibrateFragment : Fragment() {
 
     override fun onViewCreated(v: View, savedInstanceState: Bundle?) {
         super.onViewCreated(v, savedInstanceState)
-        adapter = CalibPointAdapter(store) { cp -> CheckpointSheet.show(this, store, cp) { refreshList() } }
-        b.rvCalib.adapter = adapter
-        b.rvCalib.layoutManager = LinearLayoutManager(requireContext())
-
         b.chip20.isChecked = true
         b.chipsDur.setOnCheckedStateChangeListener { _, ids ->
             duration = when (ids.firstOrNull()) {
@@ -85,7 +80,26 @@ class CalibrateFragment : Fragment() {
         // v1.8.3：CheckpointSheet 回调可能晚于视图销毁到达（用户在弹窗开着时切页），
         // 与 startAveraging 协程同源的 NPE 防护。
         val bb = _b ?: return
-        adapter.submit(store.all())
+        // v1.8.4：RecyclerView(wrap_content) 嵌 ScrollView 在部分 ROM 只测出一个 item
+        // 高度（用户实测只能看到一个点位），改为 LinearLayout 逐条渲染，全部展开。
+        bb.layCalib.removeAllViews()
+        val inf = layoutInflater
+        store.all().forEach { cp ->
+            val ib = ItemCpEditBinding.inflate(inf, bb.layCalib, false)
+            ib.tvName.text = cp.name
+            val g = GeoKit.wgs2gcj(cp.lat, cp.lon)
+            ib.tvCoords.text =
+                "WGS ${GeoKit.fmt7(cp.lat)}, ${GeoKit.fmt7(cp.lon)}\n" +
+                "GCJ ${GeoKit.fmt7(g[0])}, ${GeoKit.fmt7(g[1])} · 半径${cp.radius}m"
+            ib.btnDelete.setOnClickListener {
+                store.delete(cp.id)
+                refreshList()
+            }
+            ib.root.setOnClickListener {
+                CheckpointSheet.show(this@CalibrateFragment, store, cp) { refreshList() }
+            }
+            bb.layCalib.addView(ib.root)
+        }
         bb.etName.setText(store.defaultName())
     }
 
@@ -153,8 +167,9 @@ class CalibrateFragment : Fragment() {
     private var drift = 0.0
 
     private fun savePoint() {
+        val bs = _b ?: return      // v1.8.4：与 refreshList 同源的判空防护
         val p = pending ?: return
-        val name = b.etName.text.toString().ifBlank { store.defaultName() }
+        val name = bs.etName.text.toString().ifBlank { store.defaultName() }
         store.upsert(
             Checkpoint(
                 name = name,
@@ -165,8 +180,8 @@ class CalibrateFragment : Fragment() {
             )
         )
         pending = null
-        b.btnSave.isEnabled = false
-        b.tvAvgStatus.text = "已保存「$name」"
+        bs.btnSave.isEnabled = false
+        bs.tvAvgStatus.text = "已保存「$name」"
         Toast.makeText(requireContext(), "已保存 $name", Toast.LENGTH_SHORT).show()
         refreshList()
     }
