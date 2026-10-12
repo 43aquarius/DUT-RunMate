@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v1.8.8：CAS 二次认证（短信 MFA）对话框。
+  学校 CAS 启用 MFA 后登录需要：图形验证码 → 发短信 → 输入短信码完成登录。
+  与网页端 sso.dlut.edu.cn 二次认证页一一对应（PM1 / recheckcode / cas/code）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="12dp">
+
+    <!-- v1.8.8：手机尾号提示运行时 setText（mfa_phone_fmt + 尾号）；
+         静态占位避免 format string 被当作纯文本 -->
+    <TextView
+        android:id="@+id/tvMfaPhone"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        tools:text="验证码将发送至尾号 3918 的手机" xmlns:tools="http://schemas.android.com/tools" />
+
+    <ImageView
+        android:id="@+id/imgMfaCode"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="12dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:contentDescription="@string/mfa_captcha_desc"
+        android:scaleType="fitCenter"
+        android:padding="4dp" />
+
+    <EditText
+        android:id="@+id/etMfaGraphic"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:hint="@string/mfa_graphic_hint"
+        android:inputType="textVisiblePassword"
+        android:maxLength="5"
+        android:importantForAutofill="no" />
+
+    <Button
+        android:id="@+id/btnMfaSend"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/mfa_send_sms" />
+
+    <EditText
+        android:id="@+id/etMfaSms"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="@string/mfa_sms_hint"
+        android:inputType="number"
+        android:maxLength="6"
+        android:importantForAutofill="no" />
+
+    <TextView
+        android:id="@+id/tvMfaErr"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorError"
+        android:visibility="gone" />
+
+</LinearLayout>

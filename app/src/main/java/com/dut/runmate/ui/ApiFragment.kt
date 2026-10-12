@@ -1,9 +1,14 @@
 package com.dut.runmate.ui
 
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -23,7 +28,9 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class ApiFragment : Fragment() {
 
@@ -182,6 +189,8 @@ class ApiFragment : Fragment() {
             var wsOk = false
             var casErr = ""
             var wsErr = ""
+            // v1.8.8：学校 CAS 启用短信二次认证（MFA）时暂存，待用户在对话框完成
+            var mfa: com.dut.runmate.auth.CasAuth.Result.MfaRequired? = null
 
             // —— 通道 1：CAS 统一认证 ——
             try {
@@ -190,6 +199,9 @@ class ApiFragment : Fragment() {
                         casOk = true
                         prefs.casTgt = r.castgc
                     }
+                    // v1.8.8：凭据已验对，学校要求短信二次认证（实测：账号密码无误，
+                    // 旧版遇到此页无 CASTGC 又无错误文案，兜底误报「密码错误」）
+                    is com.dut.runmate.auth.CasAuth.Result.MfaRequired -> mfa = r
                     is com.dut.runmate.auth.CasAuth.Result.Err -> casErr = r.msg
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -227,47 +239,11 @@ class ApiFragment : Fragment() {
             }
 
             when {
-                casOk -> {
-                    // v1.8.3：CAS 会话可用 → 原生一键配置（复刻 H5 全链路，不依赖
-                    // WebView 嗅探，校外网络同样可用——「账号未捕获」的根治方案）。
-                    // 微哨通道成功与否不影响（其 skey 仅校内直连 H5 用）。
-                    renderWsStatus()
-                    b.tvWsStatus.text = getString(R.string.ws_native_running)
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        // ⚠ SportAuth.login 在 Dispatchers.IO 上回调 log —— 必须转主线程
-                        // 再触摸 TextView，否则 CalledFromWrongThreadException 直接闪退
-                        fun uiLog(line: String) {
-                            if (_b == null) return
-                            viewLifecycleOwner.lifecycleScope.launch(
-                                kotlinx.coroutines.Dispatchers.Main
-                            ) {
-                                if (_b != null) b.tvWsStatus.append("\n$line")
-                            }
-                        }
-                        val sr = com.dut.runmate.auth.SportAuth.login(
-                            number, password, freshCas = false
-                        ) { line -> uiLog(line) }
-                        if (_b == null) return@launch
-                        when (sr) {
-                            is com.dut.runmate.auth.SportAuth.Result.Ok -> {
-                                com.dut.runmate.auth.SportAuth.applySession(prefs, store, sr.s)
-                                b.etToken.setText(prefs.apiToken)
-                                b.swApiMode.isChecked = prefs.apiEnabled
-                                renderWsStatus()
-                                renderAccounts()
-                                showNativeOkDialog(sr.s)
-                            }
-                            is com.dut.runmate.auth.SportAuth.Result.Err -> {
-                                // 原生失败 → 退回 H5 捕获页（手动兜底路径）
-                                b.tvWsStatus.text =
-                                    getString(R.string.ws_native_fail, sr.step, sr.msg)
-                                Toast.makeText(requireContext(),
-                                    getString(R.string.ws_native_fallback), Toast.LENGTH_LONG).show()
-                                openH5Catcher(password)
-                            }
-                        }
-                    }
-                }
+                casOk -> startNativeConfig(number, password)
+                // v1.8.8：CAS 要短信二次认证——弹 MFA 对话框（图形码→发短信→输短信码
+                // → CASTGC），完成后与直登同路径；用户取消时若微哨通道成功仍可走
+                // H5 捕获页兜底。优先于 wsOk：拿到 CASTGC 才能走原生一键配置。
+                mfa != null -> showMfaDialog(mfa!!, number, password, wsOk)
                 wsOk -> {
                     renderWsStatus()
                     Toast.makeText(requireContext(),
@@ -281,6 +257,185 @@ class ApiFragment : Fragment() {
                 }
             }
         }
+    }
+
+    /**
+     * v1.8.8：CAS 凭据就绪（直登 Ok 或 MFA 完成）后的原生一键配置。
+     * 从 doLogin 的 casOk 分支提取——MFA 对话框完成回调与直登共用同一路径。
+     */
+    private fun startNativeConfig(number: String, password: String) {
+        if (_b == null) return
+        // v1.8.3：CAS 会话可用 → 原生一键配置（复刻 H5 全链路，不依赖
+        // WebView 嗅探，校外网络同样可用——「账号未捕获」的根治方案）。
+        renderWsStatus()
+        b.tvWsStatus.text = getString(R.string.ws_native_running)
+        viewLifecycleOwner.lifecycleScope.launch {
+            // ⚠ SportAuth.login 在 Dispatchers.IO 上回调 log —— 必须转主线程
+            // 再触摸 TextView，否则 CalledFromWrongThreadException 直接闪退
+            fun uiLog(line: String) {
+                if (_b == null) return
+                viewLifecycleOwner.lifecycleScope.launch(
+                    kotlinx.coroutines.Dispatchers.Main
+                ) {
+                    if (_b != null) b.tvWsStatus.append("\n$line")
+                }
+            }
+            val sr = com.dut.runmate.auth.SportAuth.login(
+                number, password, freshCas = false
+            ) { line -> uiLog(line) }
+            if (_b == null) return@launch
+            when (sr) {
+                is com.dut.runmate.auth.SportAuth.Result.Ok -> {
+                    com.dut.runmate.auth.SportAuth.applySession(prefs, store, sr.s)
+                    b.etToken.setText(prefs.apiToken)
+                    b.swApiMode.isChecked = prefs.apiEnabled
+                    renderWsStatus()
+                    renderAccounts()
+                    showNativeOkDialog(sr.s)
+                }
+                is com.dut.runmate.auth.SportAuth.Result.Err -> {
+                    // 原生失败 → 退回 H5 捕获页（手动兜底路径）
+                    b.tvWsStatus.text =
+                        getString(R.string.ws_native_fail, sr.step, sr.msg)
+                    Toast.makeText(requireContext(),
+                        getString(R.string.ws_native_fallback), Toast.LENGTH_LONG).show()
+                    openH5Catcher(password)
+                }
+            }
+        }
+    }
+
+    /**
+     * v1.8.8：学校 CAS 新启用短信二次认证（MFA）——凭据已验对（login() 返回
+     * MfaRequired，实测：账号密码无误），需用户交互完成：
+     *   ① /cas/code 拉图形验证码（点图刷新）
+     *   ② 输图形码 → recheckcode 发短信（Set-Cookie 反馈码）
+     *   ③ 输短信码 → POST PM1 提交 → 服务端发 CASTGC
+     * 与网页端 sso.dlut.edu.cn 二次认证页一一对应；三原语必须在 login() 之后
+     * 同进程调用（CAS 会话存 CasAuth 共享 Cookie jar，进程重启作废）。
+     * 短信码错误可重试（同一 execution，Spring Webflow 允许）；重试需重新
+     * 输图形码（旧图形码已消耗），对话框重拉时自动刷新。
+     */
+    private fun showMfaDialog(
+        mfa: com.dut.runmate.auth.CasAuth.Result.MfaRequired,
+        number: String, password: String, wsOk: Boolean
+    ) {
+        if (_b == null) return
+        val view = layoutInflater.inflate(R.layout.dialog_mfa, null)
+        val tvPhone = view.findViewById<TextView>(R.id.tvMfaPhone)
+        val imgCode = view.findViewById<ImageView>(R.id.imgMfaCode)
+        val etGraphic = view.findViewById<EditText>(R.id.etMfaGraphic)
+        val btnSend = view.findViewById<Button>(R.id.btnMfaSend)
+        val etSms = view.findViewById<EditText>(R.id.etMfaSms)
+        val tvErr = view.findViewById<TextView>(R.id.tvMfaErr)
+
+        tvPhone.text = getString(R.string.mfa_intro) + "\n" +
+            getString(R.string.mfa_phone_fmt, mfa.phoneTail.ifBlank { "****" })
+
+        fun showErr(res: Int) {
+            tvErr.setText(res); tvErr.visibility = View.VISIBLE
+        }
+
+        // ① 图形验证码：拉取 + 点击刷新
+        fun loadCaptcha() {
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                val bytes = com.dut.runmate.auth.CasAuth.fetchCaptcha()
+                withContext(Dispatchers.Main) {
+                    if (_b == null) return@withContext
+                    if (bytes == null) {
+                        showErr(R.string.mfa_fb_network_error)
+                    } else {
+                        tvErr.visibility = View.GONE
+                        imgCode.setImageBitmap(
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size))
+                    }
+                }
+            }
+        }
+        imgCode.setOnClickListener { loadCaptcha() }
+        loadCaptcha()
+
+        // ② 发送短信验证码（需图形码；反馈码来自 Set-Cookie，与网页端同源）
+        btnSend.setOnClickListener {
+            val graphic = etGraphic.text.toString().trim()
+            if (graphic.isBlank()) { showErr(R.string.mfa_need_graphic); return@setOnClickListener }
+            btnSend.isEnabled = false
+            btnSend.setText(R.string.mfa_sending)
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                val fb = com.dut.runmate.auth.CasAuth.sendMfaSms(graphic)
+                withContext(Dispatchers.Main) {
+                    if (_b == null) return@withContext
+                    btnSend.isEnabled = true
+                    btnSend.setText(R.string.mfa_send_sms)
+                    when (fb) {
+                        "success" -> {
+                            showErr(R.string.mfa_send_ok)
+                            loadCaptcha()   // 图形码已消耗，为下一步刷新备用
+                        }
+                        "img_code_error" -> {
+                            showErr(R.string.mfa_fb_img_code_error)
+                            loadCaptcha()
+                        }
+                        "error1" -> showErr(R.string.mfa_fb_error1)
+                        "error2" -> showErr(R.string.mfa_fb_error2)
+                        "get_times_more" -> showErr(R.string.mfa_fb_get_times_more)
+                        "user_not_exist" -> showErr(R.string.mfa_fb_user_not_exist)
+                        "network_error" -> showErr(R.string.mfa_fb_network_error)
+                        else -> {
+                            tvErr.text = getString(R.string.mfa_fb_unknown, fb)
+                            tvErr.visibility = View.VISIBLE
+                        }
+                    }
+                }
+            }
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.mfa_title)
+            .setView(view)
+            .setPositiveButton(R.string.mfa_submit) { _, _ ->
+                val sms = etSms.text.toString().trim()
+                if (sms.isBlank()) {
+                    Toast.makeText(requireContext(), R.string.mfa_need_sms, Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                b.btnWsLogin.isEnabled = false
+                b.tvWsStatus.text = getString(R.string.mfa_submitting)
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val r2 = com.dut.runmate.auth.CasAuth.submitMfa(sms, mfa.execution)
+                    if (_b == null) return@launch
+                    b.btnWsLogin.isEnabled = true
+                    when (r2) {
+                        is com.dut.runmate.auth.CasAuth.Result.Ok -> {
+                            // 与直登成功同路径：落盘 + 原生一键配置
+                            prefs.casTgt = r2.castgc
+                            prefs.wsNumber = number
+                            prefs.wsPwdSaved = android.util.Base64.encodeToString(
+                                password.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+                            renderWsStatus()
+                            startNativeConfig(number, password)
+                        }
+                        is com.dut.runmate.auth.CasAuth.Result.Err -> {
+                            // 短信码错/过期：可重试（同 execution），重拉对话框重输
+                            b.tvWsStatus.text = getString(R.string.ws_login_fail, r2.msg)
+                            Toast.makeText(requireContext(), r2.msg, Toast.LENGTH_LONG).show()
+                            showMfaDialog(mfa, number, password, wsOk)
+                        }
+                        else -> {}
+                    }
+                }
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ ->
+                if (wsOk) {
+                    // 微哨通道已成功：仍可走 H5 捕获页兜底
+                    renderWsStatus()
+                    openH5Catcher(password)
+                } else {
+                    b.tvWsStatus.text = getString(R.string.ws_login_fail,
+                        "未完成短信二次认证（学校新要求，网页/客户端登录均需短信验证）")
+                }
+            }
+            .show()
     }
 
     private fun openH5Catcher(password: String) {

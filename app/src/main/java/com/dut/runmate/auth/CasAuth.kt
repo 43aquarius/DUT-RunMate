@@ -43,6 +43,15 @@ object CasAuth {
     sealed class Result {
         /** castgc：CAS 全局会话 Cookie 值（TGT-xxx） */
         data class Ok(val castgc: String) : Result()
+
+        /**
+         * v1.8.8：学校 CAS 要求二次认证（短信验证码 MFA）。
+         * execution：二次认证表单的 execution/RelayState 值（如 e1s2）；
+         * phoneTail：提示发码的手机尾号（如 3918，展示用）。
+         * 后续用 fetchCaptcha → sendMfaSms → submitMfa 完成验证拿 CASTGC。
+         */
+        data class MfaRequired(val execution: String, val phoneTail: String) : Result()
+
         data class Err(val msg: String) : Result()
     }
 
@@ -138,6 +147,17 @@ object CasAuth {
                 if (!castgc.isNullOrBlank()) {
                     return@withContext Result.Ok(castgc)
                 }
+
+                // v1.8.8：二次认证（短信 MFA）——凭据已验对，服务端要求短信验证码。
+                // 页面特征：PM1 输入框 + 「二次认证」标题；execution 从 e1s1 变为 e1s2。
+                if (body.contains("PM1") && body.contains("二次认证")) {
+                    val ex = Regex("""name="execution"\s+value="([^"]+)"""")
+                        .find(body)?.groupValues?.get(1) ?: "e1s2"
+                    val tail = Regex("""尾号(\d+)""")
+                        .find(body)?.groupValues?.get(1) ?: ""
+                    return@withContext Result.MfaRequired(ex, tail)
+                }
+
                 // 失败：解析网页端同款错误文本
                 val err = Regex(
                     """id="errormsghide"[^>]*>\s*([^<]*)"""
@@ -151,6 +171,94 @@ object CasAuth {
             Result.Err("网络错误：${e.message ?: "无法连接学校认证服务"}")
         }
     }
+
+    // ================= v1.8.8：二次认证（短信 MFA） =================
+    // 以下三个原语必须在 login() 返回 MfaRequired 之后、同一进程内调用——
+    // CAS 会话（JSESSIONIDCAS / devInfo Cookie）存在本对象共享 Cookie jar 里，
+    // 换进程或 reset() 后二次认证流程作废，需重新走 login()。
+
+    /**
+     * 图形验证码图片字节（JPEG）。MFA 对话框展示用；点击图片刷新 = 重新请求。
+     * 返回 null = 网络失败（调用方提示重试）。
+     */
+    fun fetchCaptcha(): ByteArray? = try {
+        client.newCall(
+            Request.Builder()
+                .url("https://$HOST/cas/code?${System.nanoTime()}")
+                .header("User-Agent", UA)
+                .build()
+        ).execute().use { it.body?.bytes() }
+    } catch (e: Exception) {
+        null
+    }
+
+    /**
+     * 发送短信验证码（需先输图形验证码）。返回服务端反馈码（来自
+     * Set-Cookie recheck_mobile_error_info，与网页端轮询的 cookie 同源）：
+     *  success=已发送 / img_code_error=图形码错 / error1=太频繁(10分钟) /
+     *  error2=超100次/天 / get_times_more=一分钟内重复 / user_not_exist=未绑手机 /
+     *  network_error=本机网络失败
+     */
+    fun sendMfaSms(graphicCode: String): String {
+        // 清掉 jar 里可能残留的上一轮反馈，防止网络失败时读到旧值
+        synchronized(cookieStore) {
+            cookieStore.removeAll { it.name == "recheck_mobile_error_info" }
+        }
+        return try {
+            val url = "https://$HOST/cas/recheckcode" +
+                "?code=" + java.net.URLEncoder.encode(graphicCode, "UTF-8") +
+                "&" + Math.random()
+            client.newCall(
+                Request.Builder().url(url).header("User-Agent", UA).build()
+            ).execute().use { r ->
+                // 反馈写在响应 Set-Cookie 里（浏览器用隐藏 <img> 请求，无正文）
+                r.headers("Set-Cookie")
+                    .firstOrNull { it.startsWith("recheck_mobile_error_info=") }
+                    ?.substringAfter("=")?.substringBefore(";")?.trim()
+                    ?: ""
+            }
+        } catch (e: Exception) {
+            "network_error"
+        }
+    }
+
+    /**
+     * 提交二次认证短信码（PM1）。成功返回 CASTGC；失败返回网页端错误文本
+     * （验证码错误/过期等——Spring Webflow 同一 execution 可重试）。
+     */
+    suspend fun submitMfa(smsCode: String, execution: String): Result =
+        withContext(Dispatchers.IO) {
+            try {
+                val form = FormBody.Builder()
+                    .add("PM1", smsCode.trim())
+                    .add("RelayState", execution)
+                    .add("execution", execution)
+                    .add("_eventId", "submit")
+                    .build()
+                client.newCall(
+                    Request.Builder().url(LOGIN_PAGE)
+                        .header("User-Agent", UA)
+                        .header("Referer", LOGIN_PAGE)
+                        .post(form)
+                        .build()
+                ).execute().use { r ->
+                    val body = r.body?.string() ?: ""
+                    val castgc = synchronized(cookieStore) {
+                        cookieStore.firstOrNull {
+                            it.name == "CASTGC" && it.value.isNotBlank()
+                        }?.value
+                    }
+                    if (!castgc.isNullOrBlank()) return@withContext Result.Ok(castgc)
+                    val err = Regex(
+                        """id="errormsghide"[^>]*>\s*([^<]*)"""
+                    ).find(body)?.groupValues?.get(1)?.trim()
+                        ?.replace("<br/>", "")?.replace("<br>", "")
+                    Result.Err(err?.takeIf { it.isNotBlank() } ?: "验证码错误或已过期，请重试")
+                }
+            } catch (e: Exception) {
+                Result.Err("网络错误：${e.message ?: "无法连接学校认证服务"}")
+            }
+        }
 }
 
 /**

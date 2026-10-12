@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.7-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.8-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -30,13 +30,13 @@
 - 🏃 **实测打卡机制**（v1.2.0 抓包确认）：健康长跑为操场 RFID 读卡器计圈，官方距离每次经过读卡器 +100m 阶跃，`findExtExercise` 接口一次返回全部状态（详见 API 文档 §3）；
 - 👁 **随时定位预览**（v1.3.0）：不开跑步也能在首页/地图实时查看位置、定位源与精度（GPS 蓝/网络橙徽章）、最近点位距离与方向；
 - 🔒 **数据全部留在本机**：不联网上传、不读取 i大工 其他数据、不需要 root。
-- 🔄 **应用内自更新**（v1.1.0 起）：自建服务器（发布中心）+ GitHub Release 双通道，每天自动检查，下载带 SHA256 校验；
+- 🔄 **应用内自更新**（v1.1.0 起）：GitHub Release 优先 + 发布中心服务器兜底（v1.8.5 起每次进入 App 自动检查），下载带 SHA256 校验；
 
 > 判定逻辑说明：官方成绩以服务端记录的距离为准，因此「距离接口的增量」比单纯 GPS 进出圈更可靠 —— 这正是本 App 的核心判定依据。
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.7.apk`（约 6.1 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.8.apk`（约 6.3 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -105,7 +105,7 @@ app/src/main/java/com/dut/runmate/
 ├── geo/GeoKit.kt · LocGate.kt                          # WGS-84 ↔ GCJ-02 转换 + 定位源归一
 ├── auth/WhistleAuth.kt · CasAuth.kt                    # 微哨/CAS 统一认证登录（协议复刻）
 ├── data/CheckpointStore.kt · Prefs.kt · Accounts.kt · api/ApiStore.kt   # 点位/设置/多账号/接口模板本机存储
-├── alert/AlertManager.kt                               # TTS 语音（导航通道）+ 提示音 + 震动
+├── alert/AlertManager.kt                               # 预录语音（res/raw）+ 提示音 + 震动
 ├── update/Updater.kt · UpdateFlow.kt                   # 应用内更新（服务器 + GitHub 双通道）
 └── ui/
     ├── RunFragment.kt · RadarView.kt                   # 跑步页：定位预览、状态、雷达、小结
@@ -117,7 +117,7 @@ app/src/main/java/com/dut/runmate/
     └── CheckpointSheet.kt · PointAdapters.kt           # 点位编辑面板与列表
 ```
 
-**技术栈**：Kotlin · AndroidX · Material Components · osmdroid 6.1.18（开源地图框架 + 高德瓦片，含超源缩放） · OkHttp 4.12 · 前台服务 + WakeLock · TTS
+**技术栈**：Kotlin · AndroidX · Material Components · osmdroid 6.1.18（开源地图框架 + 高德瓦片，含超源缩放） · OkHttp 4.12 · 前台服务 + WakeLock · MediaPlayer 预录语音
 
 ## 坐标系说明（重要，别踩坑）
 
@@ -128,6 +128,10 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.8（2026-10-12）**
+  - 🔐 **登录失败根因修复（学校新启短信二次认证）**：经真实账号实测定位——账号密码验证通过，是学校统一认证近期新增「短信二次认证」环节（图形验证码 + 手机短信验证码），旧版不认识该页面误报「用户名或密码错误」。现登录自动弹出二次认证对话框：输图形码 → 发送短信（反馈码逐项提示：图形码错/太频繁/一分钟内重复等）→ 输短信码完成登录并自动继续原生一键配置；短信码错可重试（同一 execution），跑步中自动续期遇到 MFA 转明确报错引导回「接口」页；
+  - 🔊 **语音提醒改预录音频（弃用 TTS 引擎）**：9 条预录语音随 App 打包（z-ai TTS 生成 + loudnorm -16LUFS 响度归一 + Ogg Vorbis），MediaPlayer USAGE_MEDIA 播放——彻底摆脱系统 TTS 引擎缺失/无中文语音数据的 ROM 差异；「没打上卡」漏卡警告等 9 个场景全设备一致；「测试提醒」即点即播并显示真实播放结果；
+  - 🗺️ **移除地图页「操场环线」**：仅参考显示、不参与检测，按用户要求删除（chipRoute/campus_route.json/绘制代码一并清理）。
 - **v1.8.7（2026-10-11）**
   - 🔊 **TTS 引擎多链兜底（用户实报「TTS 引擎不可用」）**：旧版只试系统默认引擎一次，国产 ROM 默认引擎缺失/损坏/无中文语音数据时语音直接判死。现按「引擎链」逐个尝试：系统默认 → Google → 小爱 → 讯飞 → 百度 → 三星 → PackageManager 扫描出的其余引擎（TTS_SERVICE 系统服务发现，不写死名单），初始化失败或缺中文语音数据自动换下一个；自检展示当前引擎名，TTS 不可用时弹窗提供「去系统语音设置」直达入口；
   - 📳 **震动补「通知震动」属性（用户实报「显示触发但手机没震」）**：旧调用不带属性（系统归为 UNKNOWN 用法），部分 ROM 在静音/勿扰/触感策略下静默吞掉；现按 API 30+/26+/24+ 三级挂 USAGE_NOTIFICATION 属性归入系统通知震动通道；「测试提醒」自检由写死的静态文案改为真实调用结果（vibState 诊断：无震动模块/调用异常/开关未开），失败附排查指引；三档波形再加长；

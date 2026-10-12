@@ -58,15 +58,12 @@
     <string name="notif_verify">立即核对</string>
     <string name="media_card_waiting">官方打卡：待接口</string>
 
-    <!-- v1.8.6：测试提醒 -->
+    <!-- v1.8.6：测试提醒；v1.8.8：语音改预录音（随 App 打包，不再依赖系统 TTS 引擎） -->
     <string name="pref_test_alert">测试提醒（语音+提示音+震动）</string>
     <string name="alert_test_playing">正在播报测试，请留意听感与震感…</string>
-    <string name="alert_test_tts_text">语音播报测试。如果你能听到这句话，说明语音通道正常。</string>
     <string name="alert_test_title">提醒通道自检结果</string>
-    <string name="alert_test_tts_ok">✓ 语音引擎就绪（引擎：%1$s，跟随媒体音量，请确认媒体音量已开启）</string>
-    <string name="alert_test_tts_bad">✗ 语音引擎异常：%1$s</string>
-    <string name="alert_test_tts_hint">无可用引擎时：系统设置 → 文字转语音（TTS）输出，安装/选择 Google、小爱、讯飞任一引擎并下载中文语音</string>
-    <string name="alert_test_tts_settings">去系统语音设置</string>
+    <string name="alert_test_voice_ok">✓ 预录语音已播放（随 App 打包、全设备一致；跟随媒体音量，请确认媒体音量已开启）</string>
+    <string name="alert_test_voice_bad">✗ 预录语音播放异常：%1$s</string>
     <string name="alert_test_chime_ok">✓ 提示音已播报（走媒体/通知通道，听不到请调高音量）</string>
     <string name="alert_test_vib_ok">✓ 震动已下发（通知通道强波形）</string>
     <string name="alert_test_vib_bad">✗ 震动未触发：%1$s</string>
@@ -91,7 +88,6 @@
     <string name="map_hint">点按地图放置橙色准星 → 拖动微调、放大核对位置 → 确认添加打卡点。\n拖动图钉调整已有点位，点按图钉编辑。图源为高德：街道 20 级，卫星 18 级（更深自动放大）。</string>
     <string name="map_tile_sat">卫星</string>
     <string name="map_tile_street">街道</string>
-    <string name="map_route">操场环线</string>
     <string name="map_locate">回到我的位置</string>
     <string name="map_loc_net_toast">当前为网络定位，精度较低，仅作参考</string>
     <string name="map_loc_none">暂无定位，请到室外开阔处等待 GPS…</string>
@@ -233,7 +229,7 @@
     <string name="pref_poll_interval">轮询间隔（秒）</string>
     <string name="pref_grace">出区宽限期（秒）</string>
     <string name="pref_alert">提醒方式</string>
-    <string name="pref_tts">语音播报（耳机）</string>
+    <string name="pref_tts">语音提醒（预录语音，跟媒体音量）</string>
     <string name="pref_chime">提示音</string>
     <string name="pref_vibrate">震动</string>
     <string name="pref_api">API 判定</string>
@@ -269,22 +265,35 @@
     <string name="notif_title">跑步进行中</string>
     <string name="notif_stop">结束</string>
 
-    <!-- TTS 文案 -->
-    <string name="tts_started">跑步提醒已启动，共%1$d个点位</string>
-    <string name="tts_approach">前方%1$s米，%2$s，请准备</string>
-    <string name="tts_enter">已进入%1$s检测区</string>
-    <string name="tts_confirmed">%1$s，打卡成功</string>
-    <string name="tts_missed">注意，%1$s未确认打卡，请减速返回或留意手机</string>
-    <string name="tts_pass_gps">%1$s已通过，请自行确认打卡</string>
-    <string name="tts_summary">本次结束：确认%1$d个，未确认%2$d个，用时%3$s</string>
-    <!-- v1.8.3：打卡核对异常与未确认提醒（用户实报「没打上卡也没有提醒」） -->
-    <string name="tts_unconfirmed">提醒，%1$s打卡尚未确认，请检查是否需要重新打卡</string>
-    <string name="tts_api_error">注意，官方接口异常，暂时无法核对打卡</string>
-    <string name="tts_api_unconfigured">提醒，接口尚未配置，无法核对打卡，请到接口页登录</string>
+    <!-- v1.8.8：TTS 动态文案已随 TTS 引擎一并移除（语音改 res/raw 预录音，
+         文案见 gen_voice_clips.sh 的 CLIPS 表）；保留非语音文案 -->
     <string name="api_unconfigured_run">接口未配置：打卡核对不可用（到「接口」页登录后自动配置）</string>
     <string name="api_webvpn_renewing">WebVPN 会话已过期，正在自动重连…</string>
     <string name="api_webvpn_expired_manual">WebVPN 会话已过期且本机未保存登录信息，请到「接口」页重新登录</string>
     <string name="api_webvpn_renew_fail">会话自动重连失败（%1$s：%2$s），请到「接口」页重新登录</string>
+
+    <!-- v1.8.8：CAS 短信二次认证（MFA）——学校统一认证新启用的登录第二道验证。
+         凭据验对后需：图形验证码 → 发短信 → 输入短信码，才发 CASTGC。 -->
+    <string name="mfa_title">短信二次认证</string>
+    <string name="mfa_intro">学校统一认证近期启用了短信二次认证：账号密码验证通过后，还需图形验证码 + 短信验证码两步完成登录。</string>
+    <string name="mfa_phone_fmt">验证码将发送至尾号 %1$s 的手机</string>
+    <string name="mfa_captcha_desc">图形验证码，点击刷新</string>
+    <string name="mfa_graphic_hint">图形验证码（点图片可刷新）</string>
+    <string name="mfa_send_sms">发送短信验证码</string>
+    <string name="mfa_sms_hint">短信验证码</string>
+    <string name="mfa_submit">完成登录</string>
+    <string name="mfa_sending">发送中…</string>
+    <string name="mfa_send_ok">✓ 已发送，请查收短信（部分手机会拦截，注意查看）</string>
+    <string name="mfa_need_graphic">请先输入图形验证码</string>
+    <string name="mfa_need_sms">请输入收到的短信验证码</string>
+    <string name="mfa_submitting">正在验证…</string>
+    <string name="mfa_fb_img_code_error">图形验证码错误，请重新输入</string>
+    <string name="mfa_fb_error1">发送太频繁（10 分钟内多次），请稍后再试</string>
+    <string name="mfa_fb_error2">今日发送次数已达上限，请明天再试</string>
+    <string name="mfa_fb_get_times_more">一分钟内请勿重复发送</string>
+    <string name="mfa_fb_user_not_exist">账号未绑定手机号，请联系学校认证服务处理</string>
+    <string name="mfa_fb_network_error">网络失败，请重试</string>
+    <string name="mfa_fb_unknown">发送失败（%1$s），请重试</string>
 
     <!-- 更新 -->
     <string name="pref_update">更新</string>

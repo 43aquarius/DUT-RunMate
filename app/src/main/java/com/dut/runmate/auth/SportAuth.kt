@@ -167,6 +167,11 @@ object SportAuth {
                 when (val r = CasAuth.login(number, password)) {
                     is CasAuth.Result.Err ->
                         return@withContext Result.Err("CAS 登录", r.msg)
+                    // v1.8.8：学校 CAS 开启短信二次认证——无头链路（跑步中自动续期）
+                    // 无法完成图形验证码+短信码，转明确报错引导回「接口」页手动登录
+                    is CasAuth.Result.MfaRequired ->
+                        return@withContext Result.Err("二次认证",
+                            "学校已开启短信二次认证，自动续期无法完成；请到「接口」页重新登录")
                     else -> {}
                 }
             } else {

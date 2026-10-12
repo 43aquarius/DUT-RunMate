@@ -24,14 +24,12 @@ import com.dut.runmate.geo.LocGate
 import com.dut.runmate.map.AmapTileSource
 import com.dut.runmate.run.RunBus
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
-import org.osmdroid.views.overlay.Polyline
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -56,7 +54,6 @@ class MapFragment : Fragment() {
     private val prefs by lazy { Prefs.get(requireContext()) }
     private val store by lazy { CheckpointStore.get(requireContext().filesDir) }
 
-    private var routeLine: Polyline? = null
     private val circles = mutableListOf<Polygon>()
     private val markers = mutableListOf<Marker>()
     private var myLocMarker: Marker? = null
@@ -131,9 +128,9 @@ class MapFragment : Fragment() {
         b.chipSat.setOnCheckedChangeListener { _, c2 -> if (c2) { prefs.tileSat = true; applyTileSource() } }
         b.chipStreet.setOnCheckedChangeListener { _, c2 -> if (c2) { prefs.tileSat = false; applyTileSource() } }
 
-        // 操场环线
-        b.chipRoute.isChecked = false
-        b.chipRoute.setOnCheckedChangeListener { _, c2 -> setRouteVisible(c2) }
+        // v1.8.8：操场环线开关已移除（用户拍板「没什么作用」；检测只看
+        // CheckpointStore，环线仅参考显示）——chipRoute/campus_route.json/
+        // setRouteVisible 一并删除
 
         // 回到我（GPS 为 WGS-84，显示前转 GCJ-02）
         b.fabLocate.setOnClickListener { locateMe() }
@@ -215,33 +212,6 @@ class MapFragment : Fragment() {
         bestFix()?.let {
             showMyLocation(it.latitude, it.longitude, it.accuracy, LocGate.isNetwork(it))
         }
-    }
-
-    private fun setRouteVisible(on: Boolean) {
-        if (on && routeLine == null) {
-            try {
-                val txt = requireContext().resources
-                    .openRawResource(R.raw.campus_route).bufferedReader().readText()
-                val arr = JSONObject(txt).getJSONArray("points")
-                val pts = ArrayList<GeoPoint>(arr.length())
-                for (i in 0 until arr.length()) {
-                    val p = arr.getJSONArray(i)          // [lon, lat]（WGS-84）
-                    pts.add(toDisplay(p.getDouble(1), p.getDouble(0)))
-                }
-                routeLine = Polyline(b.map).apply {
-                    outlinePaint.color = Color.parseColor("#FF1151FF")
-                    outlinePaint.strokeWidth = 4f
-                    setPoints(pts)
-                }
-                b.map.overlays.add(routeLine)
-            } catch (_: Exception) { }
-        }
-        routeLine?.let { l ->
-            val idx = b.map.overlays.indexOf(l)
-            if (on && idx < 0) b.map.overlays.add(l)
-            if (!on && idx >= 0) b.map.overlays.remove(l)
-        }
-        b.map.invalidate()
     }
 
     private fun rebuild() {
@@ -444,7 +414,6 @@ class MapFragment : Fragment() {
         _b = null
         // 视图销毁：清空所有绑定旧 MapView 的覆盖物引用，视图重建后全部重画
         // （否则蓝点/精度圈/准星持有已销毁地图的 Marker，切页返回后不再显示）
-        routeLine = null
         circles.clear()
         markers.clear()
         myLocMarker = null

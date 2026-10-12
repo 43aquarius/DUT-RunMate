@@ -86,35 +86,31 @@ class SettingsFragment : Fragment() {
         b.swVibrate.setOnCheckedChangeListener { _, c -> prefs.vibrateEnabled = c }
 
         // v1.8.6：测试提醒——当场播报语音+提示音+震动，4.5s 后弹出三通道自检结果。
-        // v1.8.7：自检改为「真实结果」——旧版「✓ 震动已触发」是写死的静态文案，
-        // 用户实报「显示触发了但手机没震」。现按 AlertManager 的 ttsState/
-        // ttsEngineLabel/vibState 如实展示，失败附排查指引与系统设置入口。
+        // v1.8.8：语音改预录音（res/raw/voice_*.ogg 随 App 打包）——彻底不依赖
+        // 系统 TTS 引擎（连续两轮修「引擎不可用」的终结方案）：即点即播、
+        // 无初始化等待；自检展示 voiceState（真实播放结果）。
         b.btnTestAlert.setOnClickListener {
             val am = com.dut.runmate.alert.AlertManager(requireContext(), prefs)
-            am.initTts()
             try {
                 Toast.makeText(requireContext(), R.string.alert_test_playing, Toast.LENGTH_SHORT).show()
             } catch (_: Throwable) { }
-            // TTS 引擎初始化需 1~3 秒：先等 1.5s 再统一触发三通道
+            // 立即触发三通道（预录语音无初始化延迟）
+            try { am.testAlert() } catch (_: Throwable) { }
+            // 播放完成后展示诊断 + 释放播放器
             view?.postDelayed({
-                try { am.testAlert(getString(R.string.alert_test_tts_text)) } catch (_: Throwable) { }
-            }, 1500L)
-            // 播报完成后展示诊断 + 释放引擎
-            view?.postDelayed({
-                val ttsOk = am.ttsState.isBlank()
-                val ttsLine = if (ttsOk)
-                    getString(R.string.alert_test_tts_ok, am.ttsEngineLabel.ifBlank { "系统默认" })
-                else getString(R.string.alert_test_tts_bad, am.ttsState)
+                val voiceOk = am.voiceState.isBlank()
+                val voiceLine = if (voiceOk)
+                    getString(R.string.alert_test_voice_ok)
+                else getString(R.string.alert_test_voice_bad, am.voiceState)
                 val vibOk = am.vibState.isBlank()
                 val vibLine = if (vibOk)
                     getString(R.string.alert_test_vib_ok)
                 else getString(R.string.alert_test_vib_bad, am.vibState)
                 val sb = buildString {
-                    append(ttsLine).append('\n')
+                    append(voiceLine).append('\n')
                     append(getString(R.string.alert_test_chime_ok)).append('\n')
                     append(vibLine)
                     if (!vibOk) append('\n').append(getString(R.string.alert_test_vib_hint))
-                    if (!ttsOk) append('\n').append(getString(R.string.alert_test_tts_hint))
                     if (!prefs.ttsEnabled || !prefs.chimeEnabled || !prefs.vibrateEnabled)
                         append("\n\n").append(getString(R.string.alert_test_switch_off))
                 }
@@ -125,21 +121,6 @@ class SettingsFragment : Fragment() {
                     android.app.AlertDialog.Builder(requireContext())
                         .setTitle(R.string.alert_test_title)
                         .setMessage(sb)
-                        .apply {
-                            // v1.8.7：TTS 不可用时的修复入口——直达系统 TTS 设置
-                            if (!ttsOk) setNeutralButton(R.string.alert_test_tts_settings) { _, _ ->
-                                try {
-                                    // Settings.ACTION_TTS_SETTINGS 是隐藏常量（公开
-                                    // SDK 无此引用），运行期 action 字符串全设备可用
-                                    startActivity(Intent("android.settings.TTS_SETTINGS"))
-                                } catch (_: Throwable) {
-                                    try {
-                                        Toast.makeText(requireContext(),
-                                            R.string.alert_test_tts_hint, Toast.LENGTH_LONG).show()
-                                    } catch (_: Throwable) { }
-                                }
-                            }
-                        }
                         .setPositiveButton(android.R.string.ok, null)
                         .show()
                 } catch (_: Throwable) { }
