@@ -98,27 +98,32 @@ class SettingsFragment : Fragment() {
             try { am.testAlert() } catch (_: Throwable) { }
             // 播放完成后展示诊断 + 释放播放器
             view?.postDelayed({
+                // v1.8.10 崩溃修复：4.5s 延迟期间用户可能已切走设置页，Fragment
+                // 脱离宿主后再调 getString()/requireContext() 会抛
+                // IllegalStateException("not attached to a context")（用户实报闪退，
+                // SettingsFragment.kt:103）。现在：播放器无条件释放（防泄漏），
+                // 已脱离则直接放弃弹窗（am.shutdown 幂等，UI 不再被触摸）。
+                try { am.shutdown() } catch (_: Throwable) { }
+                val act = activity as? AppCompatActivity ?: return@postDelayed
+                if (!isAdded) return@postDelayed
                 val voiceOk = am.voiceState.isBlank()
                 val voiceLine = if (voiceOk)
-                    getString(R.string.alert_test_voice_ok)
-                else getString(R.string.alert_test_voice_bad, am.voiceState)
+                    act.getString(R.string.alert_test_voice_ok)
+                else act.getString(R.string.alert_test_voice_bad, am.voiceState)
                 val vibOk = am.vibState.isBlank()
                 val vibLine = if (vibOk)
-                    getString(R.string.alert_test_vib_ok)
-                else getString(R.string.alert_test_vib_bad, am.vibState)
+                    act.getString(R.string.alert_test_vib_ok)
+                else act.getString(R.string.alert_test_vib_bad, am.vibState)
                 val sb = buildString {
                     append(voiceLine).append('\n')
-                    append(getString(R.string.alert_test_chime_ok)).append('\n')
+                    append(act.getString(R.string.alert_test_chime_ok)).append('\n')
                     append(vibLine)
-                    if (!vibOk) append('\n').append(getString(R.string.alert_test_vib_hint))
+                    if (!vibOk) append('\n').append(act.getString(R.string.alert_test_vib_hint))
                     if (!prefs.ttsEnabled || !prefs.chimeEnabled || !prefs.vibrateEnabled)
-                        append("\n\n").append(getString(R.string.alert_test_switch_off))
+                        append("\n\n").append(act.getString(R.string.alert_test_switch_off))
                 }
                 try {
-                    am.shutdown()
-                } catch (_: Throwable) { }
-                try {
-                    android.app.AlertDialog.Builder(requireContext())
+                    android.app.AlertDialog.Builder(act)
                         .setTitle(R.string.alert_test_title)
                         .setMessage(sb)
                         .setPositiveButton(android.R.string.ok, null)

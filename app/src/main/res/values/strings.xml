@@ -303,6 +303,10 @@
     <string name="mfa_fb_network_error">网络失败，请重试</string>
     <string name="mfa_fb_session_error">验证通道已失效（本次登录会话过期），正在重新发起登录，请稍候再输验证码</string>
     <string name="mfa_fb_unknown">发送失败（%1$s），请重试</string>
+    <!-- v1.8.10：PM1 提交回登录页（会话被服务端重置）时的用户解释。
+         实测（2026-10-12 全链路探针）：协议格式无误、服务端状态机健壮，
+         该情形源于学校服务波动重置会话；自动重登后需重发短信（受 1 分钟/次限频）。 -->
+    <string name="mfa_session_lost">本次验证会话被学校服务重置（服务波动，不是密码或验证码错误）。已自动重新登录，请在弹出的新对话框里重新获取短信验证码（一分钟内请勿重复发送）。</string>
 
     <!-- 更新 -->
     <string name="pref_update">更新</string>

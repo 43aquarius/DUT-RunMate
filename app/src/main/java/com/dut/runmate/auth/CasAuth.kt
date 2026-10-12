@@ -2,6 +2,7 @@ package com.dut.runmate.auth
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.Cookie
 import okhttp3.CookieJar
@@ -112,48 +113,69 @@ object CasAuth {
         }
     }
 
-    /** 登录（IO 线程）。成功返回 CASTGC，失败返回网页端一致的具体错误文本。 */
+    /**
+     * 登录（IO 线程）。成功返回 CASTGC，失败返回网页端一致的具体错误文本。
+     *
+     * v1.8.10 加固（全链路实测 2026-10-12，协议与网页端逐字节对齐）：
+     *  1. 人节奏：登录页 GET → 凭据 POST 之间固定 2.5s 间隔（浏览器用户填表耗时，
+     *     学校服务对过快的自动化节奏会重置会话）；
+     *  2. 请求头对齐 Chrome：补 Origin / Accept-Language / Accept(text/html) /
+     *     Upgrade-Insecure-Requests；
+     *  3. 表单字段序对齐网页端 login12.js 实际提交序：rsa,ul,pl,sl,lt,execution,_eventId；
+     *  4. RESET 自动重试：响应为无错误文案的登录页（服务端重置本次会话，非凭据错）
+     *     时自动换新会话重试，最多 3 轮——对学校服务波动免疫。
+     */
     suspend fun login(number: String, password: String): Result = withContext(Dispatchers.IO) {
         try {
             if (number.isBlank() || password.isBlank())
                 return@withContext Result.Err("请输入学号和密码")
 
-            reset()
+            var attempts = 0
+            while (true) {
+                attempts++
+                reset()
 
-            // 1) 登录页：lt / execution / form action
-            val pageBody = client.newCall(
-                Request.Builder().url(LOGIN_PAGE).header("User-Agent", UA).build()
-            ).execute().use { it.body?.string() ?: "" }
+                // 1) 登录页：lt / execution / form action
+                val pageBody = client.newCall(
+                    Request.Builder().url(LOGIN_PAGE).header("User-Agent", UA).build()
+                ).execute().use { it.body?.string() ?: "" }
 
-            val lt = Regex("""name="lt"\s+value="([^"]+)"""").find(pageBody)?.groupValues?.get(1)
-            val execution =
-                Regex("""name="execution"\s+value="([^"]+)"""").find(pageBody)?.groupValues?.get(1)
-            val action =
-                Regex("""<form id="loginForm" action="([^"]+)"""").find(pageBody)?.groupValues?.get(1)
-            if (lt.isNullOrBlank() || execution.isNullOrBlank() || action.isNullOrBlank()) {
-                return@withContext Result.Err("CAS 页面解析失败（学校服务可能升级中），请改用 H5 捕获页手动登录")
-            }
-            val postUrl = if (action.startsWith("http")) action else "https://$HOST$action"
+                val lt = Regex("""name="lt"\s+value="([^"]+)"""").find(pageBody)?.groupValues?.get(1)
+                val execution =
+                    Regex("""name="execution"\s+value="([^"]+)"""").find(pageBody)?.groupValues?.get(1)
+                val action =
+                    Regex("""<form id="loginForm" action="([^"]+)"""").find(pageBody)?.groupValues?.get(1)
+                if (lt.isNullOrBlank() || execution.isNullOrBlank() || action.isNullOrBlank()) {
+                    return@withContext Result.Err("CAS 页面解析失败（学校服务可能升级中），请改用 H5 捕获页手动登录")
+                }
+                val postUrl = if (action.startsWith("http")) action else "https://$HOST$action"
 
-            // 2) 提交（凭据经 des.js 三重 DES 藏进 rsa 字段）
-            val form = FormBody.Builder()
-                .add("lt", lt)
-                .add("execution", execution)
-                .add("_eventId", "submit")
-                .add("ul", number.length.toString())
-                .add("pl", password.length.toString())
-                .add("sl", "0")
-                .add("rsa", DesCore.strEnc("$number$password$lt", "1", "2", "3"))
-                .build()
+                // v1.8.10：人节奏（GET→POST 过快被学校服务重置会话）
+                try { delay(2500) } catch (e: CancellationException) { throw e }
 
-            client.newCall(
-                Request.Builder().url(postUrl)
-                    .header("User-Agent", UA)
-                    .header("Referer", LOGIN_PAGE)
-                    .post(form)
+                // 2) 提交（凭据经 des.js 三重 DES 藏进 rsa；字段序=网页端 login12.js 实际提交序）
+                val form = FormBody.Builder()
+                    .add("rsa", DesCore.strEnc("$number$password$lt", "1", "2", "3"))
+                    .add("ul", number.length.toString())
+                    .add("pl", password.length.toString())
+                    .add("sl", "0")
+                    .add("lt", lt)
+                    .add("execution", execution)
+                    .add("_eventId", "submit")
                     .build()
-            ).execute().use { r ->
-                val body = r.body?.string() ?: ""
+
+                val body = client.newCall(
+                    Request.Builder().url(postUrl)
+                        .header("User-Agent", UA)
+                        .header("Referer", LOGIN_PAGE)
+                        .header("Origin", "https://$HOST")
+                        .header("Accept-Language", "zh-CN,zh;q=0.9")
+                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                        .header("Upgrade-Insecure-Requests", "1")
+                        .post(form)
+                        .build()
+                ).execute().use { it.body?.string() ?: "" }
+
                 val castgc = synchronized(cookieStore) {
                     cookieStore.firstOrNull { it.name == "CASTGC" && it.value.isNotBlank() }?.value
                 }
@@ -162,8 +184,8 @@ object CasAuth {
                 }
 
                 // v1.8.8：二次认证（短信 MFA）——凭据已验对，服务端要求短信验证码。
-                // 页面特征：PM1 输入框 + 「二次认证」标题；execution 从 e1s1 变为 e1s2。
-                if (body.contains("PM1") && body.contains("二次认证")) {
+                val mfaPage = body.contains("PM1") && body.contains("二次认证")
+                if (mfaPage) {
                     val ex = Regex("""name="execution"\s+value="([^"]+)"""")
                         .find(body)?.groupValues?.get(1) ?: "e1s2"
                     val tail = Regex("""尾号(\d+)""")
@@ -176,8 +198,21 @@ object CasAuth {
                     """id="errormsghide"[^>]*>\s*([^<]*)"""
                 ).find(body)?.groupValues?.get(1)?.trim()
                     ?.replace("<br/>", "")?.replace("<br>", "")
-                Result.Err(err?.takeIf { it.isNotBlank() } ?: "用户名或密码错误（CAS 统一认证）")
+
+                // v1.8.10：RESET 识别——登录页但【无错误文案】：会话被学校服务重置
+                //（凭据本身没问题），换新会话自动重试，最多 3 轮。
+                if (err.isNullOrBlank() && body.contains("<form id=\"loginForm\"")) {
+                    if (attempts < 3) continue
+                    return@withContext Result.Err(
+                        "学校认证服务连续重置本次会话（服务波动），请稍后重试，" +
+                            "或改用「重新捕获H5参数」页登录")
+                }
+                return@withContext Result.Err(
+                    err?.takeIf { it.isNotBlank() } ?: "用户名或密码错误（CAS 统一认证）")
             }
+            // while(true) 的所有出口都是 return@withContext，永不落到此行；
+            // 显式 throw 仅为满足 withContext 的类型推断（Unit→Result 编译错误）
+            throw IllegalStateException("unreachable")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -254,6 +289,11 @@ object CasAuth {
                     Request.Builder().url(LOGIN_PAGE)
                         .header("User-Agent", UA)
                         .header("Referer", LOGIN_PAGE)
+                        // v1.8.10：与 login() 同一套浏览器同构头（实测对齐 Chrome 抓包）
+                        .header("Origin", "https://$HOST")
+                        .header("Accept-Language", "zh-CN,zh;q=0.9")
+                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                        .header("Upgrade-Insecure-Requests", "1")
                         .post(form)
                         .build()
                 ).execute().use { r ->

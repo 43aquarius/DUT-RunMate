@@ -452,8 +452,11 @@ class ApiFragment : Fragment() {
                         }
                         is com.dut.runmate.auth.CasAuth.Result.Err -> {
                             // 会话已丢失（回到密码页等）：重开整个登录流程
+                            // v1.8.10：给用户讲清楚发生了什么（服务重置≠密码/验证码错），
+                            // 并提示重发短信的限频规则，避免连续重试烧掉当日短信配额
                             b.tvWsStatus.text = getString(R.string.ws_login_fail, r2.msg)
-                            Toast.makeText(requireContext(), r2.msg, Toast.LENGTH_LONG).show()
+                            Toast.makeText(requireContext(),
+                                R.string.mfa_session_lost, Toast.LENGTH_LONG).show()
                             doLogin()
                         }
                         else -> {}
