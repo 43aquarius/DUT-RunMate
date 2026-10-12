@@ -177,6 +177,27 @@ class H5CatcherActivity : AppCompatActivity() {
     private var webvpnStage = 0
     private var portalScanned = false
 
+    /**
+     * v1.8.6：/login 弹回自动重试计数。
+     * 学校开启短信二次认证后，「H5 弹回 /login → 自动重点 cas-login」的循环只会反复轮换
+     * JSESSIONIDCAS 会话，把用户正在输入的图形验证码/短信会话全部作废（用户实报：
+     * 「验证码过期或无效」「第二次发送 get_session_error」「页面一直在自动刷新」）。
+     * 满 2 轮后停止自动重试，等用户手动登录；手动登录成功落回门户时仍会自动进 H5。
+     */
+    private var webvpnRetryCount = 0
+
+    /** v1.8.6：自动重试已停止的提示只记一次 */
+    private var webvpnHaltNotified = false
+
+    /**
+     * v1.8.6：人工验证模式——页面出现短信二次认证/双重认证/图形验证码 UI 时置位，
+     * 冻结自动导航（不再自动点 cas-login）；落到非认证页时同步复位。
+     */
+    private var manualAuthMode = false
+
+    /** v1.8.6：人工验证引导只提示一次 */
+    private var manualAuthHinted = false
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -197,7 +218,12 @@ class H5CatcherActivity : AppCompatActivity() {
 
         // v1.5.1：不再强制要求 whistlekey——CAS 会话（CASTGC）同样可以完成
         // H5 鉴权（对齐官方 synCookies 注入 skey+TGT 的行为），两者至少有其一即可。
-        if (prefs.wsSkey.isBlank() && prefs.casTgt.isBlank()) {
+        // v1.8.6：学校开启短信二次认证后，原生登录（CAS/微哨）拿不到会话，本页的
+        // 「自动填表 + 手动短信验证」成为唯一登录路径——因此只要学号+密码齐备，
+        // 无已保存会话也允许进入（跳过 Cookie 注入，页面内照样自动填表）。
+        val hasCredential = prefs.wsSkey.isNotBlank() || prefs.casTgt.isNotBlank()
+        val hasFormCredential = number.isNotBlank() && password.isNotBlank()
+        if (!hasCredential && !hasFormCredential) {
             Toast.makeText(this, R.string.h5_no_session, Toast.LENGTH_LONG).show()
             finish()
             return
@@ -287,6 +313,9 @@ class H5CatcherActivity : AppCompatActivity() {
             override fun onPageFinished(v: WebView, url: String) {
                 super.onPageFinished(v, url)
                 injectSniffer()
+                // v1.8.6：先同步维护人工验证模式（非认证页立即复位，
+                // 保证用户完成验证后的落地页能正常走自动进 H5），再做各自动流程
+                detectManualAuthPage(url)
                 maybeAutoFillCas(url)
                 maybeAutoFillWebvpn(url)
                 maybeWebvpnPostLogin(v, url)
@@ -298,6 +327,8 @@ class H5CatcherActivity : AppCompatActivity() {
              * 当作目标 host 解析并重定向到 http://0/mobilenew/ → 不可达（即用户
              * 实报的错误页）。检测到该失败时自动转回门户 /login 重新走登录流程
              * 拿真实前缀，最多重试 2 次防循环。
+             * v1.8.6：manualAuthMode（用户正在页面上做短信/图形验证）时不再自动跳转，
+             * 避免把用户正在填的验证页冲掉。
              */
             override fun onReceivedError(
                 v: WebView, req: WebResourceRequest, err: android.webkit.WebResourceError
@@ -306,7 +337,7 @@ class H5CatcherActivity : AppCompatActivity() {
                 if (!req.isForMainFrame) return
                 val u = req.url.toString()
                 val badPrefix = u.startsWith("http://0/") || u.contains("/http-8081/0/")
-                if (badPrefix && prefixFallbackCount < 2) {
+                if (badPrefix && prefixFallbackCount < 2 && !manualAuthMode) {
                     prefixFallbackCount++
                     log(getString(R.string.h5_log_prefix_rejected))
                     webvpnStage = 1
@@ -371,7 +402,12 @@ class H5CatcherActivity : AppCompatActivity() {
             cm.setCookie(".dlut.edu.cn", "CASTGC=${prefs.casTgt}")
         }
         cm.flush()
-        log(getString(if (prefs.wsSkey.isNotBlank()) R.string.h5_log_cookie else R.string.h5_log_cookie_cas))
+        log(when {
+            prefs.wsSkey.isNotBlank() -> getString(R.string.h5_log_cookie)
+            prefs.casTgt.isNotBlank() -> getString(R.string.h5_log_cookie_cas)
+            // v1.8.6：无已保存会话（首次登录/二次认证场景）——页面内自动填表登录
+            else -> getString(R.string.h5_log_no_cookie)
+        })
 
         // v1.8.1：默认 WebVPN 隧道。已记录真实前缀 → 直达 H5（会话过期则 302 /login
         // 自动重登）；无前缀 → 门户 /login（未登录自动走统一认证；已登录 302 门户首页）。
@@ -575,6 +611,19 @@ class H5CatcherActivity : AppCompatActivity() {
                     url.substringAfter("webvpn.dlut.edu.cn").startsWith("/login") &&
                     !url.contains("cas_login=true")
             if (plainLogin && webvpnStage >= 3) {
+                // v1.8.6：重试上限——两轮自动重登仍被弹回说明会话建立不了（典型：学校
+                // 短信二次认证未完成）。继续循环只会反复刷新页面、轮换会话，把用户手动
+                // 输入到一半的验证码全部作废（用户实报「一直在自动刷新」的根因之二）。
+                // 停止重试，等用户手动登录；登录成功落回门户时仍会自动进 H5（见 postLogin）。
+                if (webvpnRetryCount >= 2) {
+                    if (!webvpnHaltNotified) {
+                        webvpnHaltNotified = true
+                        setStatus(getString(R.string.h5_status_manual_login))
+                        log(getString(R.string.h5_log_auto_halt))
+                    }
+                    return
+                }
+                webvpnRetryCount++
                 webvpnTriedFill = false
                 casTriedFill = false
                 webvpnStage = 1
@@ -584,6 +633,8 @@ class H5CatcherActivity : AppCompatActivity() {
                 return
             }
         }
+        // v1.8.6：人工验证模式（用户正在页面上做短信/图形验证）不再自动点击登录入口
+        if (manualAuthMode) return
         val isWebvpnLogin = url.contains("webvpn.dlut.edu.cn") &&
                 url.substringAfter("webvpn.dlut.edu.cn").startsWith("/login")
         if (!isWebvpnLogin) return
@@ -634,16 +685,36 @@ class H5CatcherActivity : AppCompatActivity() {
      * 门户首页，旧条件（stage>=2）会把这种落地当成「没走过认证」而跳过扫描，
      * 卡在门户页进不了 H5；②找不到长跑链接时从任意隧道链接提取用户前缀，
      * 用真实前缀直达（不再盲目载 0 占位版——已登录会话下必失败）。
+     *
+     * v1.8.6 · 自动刷新死循环根治（用户实报「点进去后一直在自动刷新」）：
+     * 旧版把【隧道 CAS 认证页】（webvpn.dlut.edu.cn/https/<前缀>/cas/login，由
+     * /login?cas_login=true 302 而来）当成「已登录落地页”——它不是 /login 开头
+     * 就直接扫描+load(隧道 H5)，把正在进行的 CAS 密码提交/二次认证页冲掉；H5
+     * 无会话又被 302 回 /login，maybeAutoFillWebvpn 重置重试再点 cas-login……
+     * 无限循环，每次循环都轮换 JSESSIONIDCAS 会话 → 图形验证码/短信会话全部
+     * 作废（「验证码过期或无效」「第二次发送 get_session_error」的根因）。
+     * 修复：①含 /cas/login 的页面（密码表单页/二次认证页，真实域或隧道域）一律
+     * 不算登录完成、绝不导航；②已经在隧道 H5 页（/http-8081/）不必「重进」；
+     * ③portalScanned 改由「落到纯 /login」复位——用户手动登录成功落回门户后
+     * 仍能自动进 H5，不再依赖 stage 回退。
      */
     private fun maybeWebvpnPostLogin(v: WebView, url: String) {
-        if (webvpnStage < 1 || webvpnStage >= 3) return
+        // 铁律：CAS 认证页（密码表单/二次认证页）绝不算「登录完成」
+        if (url.contains("/cas/login")) return
+        if (webvpnStage < 1) return
         if (!url.contains("webvpn.dlut.edu.cn")) return
         val path = url.substringAfter("webvpn.dlut.edu.cn")
+        // 已经在健康长跑 H5（隧道 URL）——无需重进，嗅探器照常捕获
+        if (path.startsWith("/http-8081/")) return
         // 纯登录页不算；但 cas_login=true 回跳（票据验证中/已登录）视为登录完成
-        if (path.startsWith("/login") && !url.contains("cas_login=true")) return
+        if (path.startsWith("/login") && !url.contains("cas_login=true")) {
+            // 新一轮登录尝试开始：允许本轮完成后的 postLogin 扫描接管（含手动登录）
+            portalScanned = false
+            return
+        }
+        if (portalScanned) return
         webvpnStage = 3
         log(getString(R.string.h5_log_webvpn_ok))
-        if (portalScanned) return
         portalScanned = true
         // 门户页：①点击资源列表里的健康长跑链接（用户专属前缀，最可靠）；
         // ②没有长跑链接时从任意隧道链接提取前缀，真实前缀直达（v1.8.1 新增）
@@ -725,12 +796,104 @@ class H5CatcherActivity : AppCompatActivity() {
         }
     }
 
-    /** JS 嗅探器回调：所有 XHR/fetch 都会到这里 */
+    /** JS 噅探器回调：所有 XHR/fetch 都会到这里 */
     private inner class SniffBridge {
         @JavascriptInterface
         fun onCapture(json: String) {
             runOnUiThread { handleCapture(json) }
         }
+
+        /** v1.8.6：二次认证页助手回调——短信发送成功（图形验证码已自动刷新） */
+        @JavascriptInterface
+        fun on2faSent() {
+            runOnUiThread { log(getString(R.string.h5_log_2fa_sent)) }
+        }
+    }
+
+    /**
+     * v1.8.6 · 页面级人工验证检测。
+     * 学校开启 CAS 短信二次认证后，自动流程只能完成到密码提交，短信/图形验证码必须
+     * 由用户在页面上手动完成。检测到验证 UI 时：置 manualAuthMode（冻结自动导航）、
+     * 状态栏与日志提示操作步骤（只提示一次）、注入二次认证页助手。落到非认证页时
+     * 同步复位（登录成功后的门户/H5 页恢复正常自动流程）。
+     */
+    private fun detectManualAuthPage(url: String) {
+        val isAuthPage = url.contains("/cas/login") ||
+                (url.contains("webvpn.dlut.edu.cn") &&
+                        url.substringAfter("webvpn.dlut.edu.cn").startsWith("/login"))
+        if (!isAuthPage) {
+            manualAuthMode = false      // 同步复位：非认证页（门户/H5）恢复正常自动流程
+            return
+        }
+        val js = """
+            (function(){
+              try {
+                var pm1 = document.getElementById('PM1');
+                if (pm1) return 'CAS_2FA';
+                var sl = document.getElementById('second_login_layer');
+                if (sl && (sl.style.display !== 'none' || sl.offsetParent !== null)) return 'WEBVPN_2STEP';
+                var sms = document.querySelector('.sms-field');
+                if (sms && sms.offsetParent !== null) return 'WEBVPN_SMS_TAB';
+                var cap = document.getElementById('captcha-wrap');
+                if (cap && cap.offsetParent !== null) return 'WEBVPN_CAPTCHA';
+                return '';
+              } catch(e) { return ''; }
+            })()
+        """.trimIndent()
+        b.web.evaluateJavascript(js) { r ->
+            val kind = r?.trim('"') ?: ""
+            if (kind.isBlank()) return@evaluateJavascript
+            manualAuthMode = true
+            if (!manualAuthHinted) {
+                manualAuthHinted = true
+                setStatus(getString(R.string.h5_status_manual_auth))
+                log(getString(R.string.h5_log_manual_auth))
+            }
+            if (kind == "CAS_2FA") {
+                // 二次认证操作步骤引导（页面重新加载后重发，防错过）
+                log(getString(R.string.h5_log_cas_2fa_steps))
+                inject2FAHelper()
+            }
+        }
+    }
+
+    /**
+     * v1.8.6 · 二次认证页助手（修「第二次发送验证码 get_session_error」）：
+     * 学校 CAS 二次认证页的「获取验证码」请求（recheckcode?code=图形码）会【消耗】
+     * 当前图形验证码，但「发送成功」与「非法请求 get_session_error」两个分支页面都
+     * 不刷新图片——用户第二次点「获取验证码」带的还是已消费的旧码 → 服务端再次报
+     * get_session_error/图形码错误，死循环。
+     * 本助手监视页面提示：一旦出现「验证码已发送」或「非法请求」立即自动刷新图形
+     * 验证码图片并清空输入框，用户照新图输入即可，重复发送与首次一样顺畅。
+     */
+    private fun inject2FAHelper() {
+        val js = """
+            (function(){
+              if (window.__rm2fa) return; window.__rm2fa = 1;
+              var acted = false;
+              var timer = setInterval(function(){
+                try {
+                  var msg = document.getElementById('errormsg');
+                  var t = msg ? (msg.textContent || '') : '';
+                  // 已发送(\u5df2\u53d1\u9001) / 非法请求(\u975e\u6cd5\u8bf7\u6c42 = get_session_error)
+                  if (/\u5df2\u53d1\u9001|\u975e\u6cd5\u8bf7\u6c42/.test(t)) {
+                    if (!acted) {
+                      acted = true;
+                      var img = document.getElementById('codeImage_mobile');
+                      var code = document.getElementById('code');
+                      if (img) img.src = 'code?' + Math.random();
+                      if (code) code.value = '';
+                      try { RunMate.on2faSent(); } catch(e) {}
+                    }
+                  } else if (acted) {
+                    acted = false;   // 提示变化（新的一次发送）后允许再次触发
+                  }
+                } catch(e) {}
+              }, 500);
+              setTimeout(function(){ clearInterval(timer); }, 15 * 60 * 1000);
+            })()
+        """.trimIndent()
+        b.web.evaluateJavascript(js, null)
     }
 
     private fun handleCapture(json: String) {

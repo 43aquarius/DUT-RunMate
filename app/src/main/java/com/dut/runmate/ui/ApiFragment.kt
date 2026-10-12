@@ -202,6 +202,8 @@ class ApiFragment : Fragment() {
                     // v1.8.8：凭据已验对，学校要求短信二次认证（实测：账号密码无误，
                     // 旧版遇到此页无 CASTGC 又无错误文案，兜底误报「密码错误」）
                     is com.dut.runmate.auth.CasAuth.Result.MfaRequired -> mfa = r
+                    // v1.8.9：MfaRetry 只会由 submitMfa 返回，login() 不会出现——占位保证穷尽
+                    is com.dut.runmate.auth.CasAuth.Result.MfaRetry -> casErr = r.msg
                     is com.dut.runmate.auth.CasAuth.Result.Err -> casErr = r.msg
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -355,6 +357,9 @@ class ApiFragment : Fragment() {
         imgCode.setOnClickListener { loadCaptcha() }
         loadCaptcha()
 
+        // v1.8.9：持有对话框引用（get_session_error 时需主动关闭后重开登录流程）
+        var dialog: androidx.appcompat.app.AlertDialog? = null
+
         // ② 发送短信验证码（需图形码；反馈码来自 Set-Cookie，与网页端同源）
         btnSend.setOnClickListener {
             val graphic = etGraphic.text.toString().trim()
@@ -369,18 +374,35 @@ class ApiFragment : Fragment() {
                     btnSend.setText(R.string.mfa_send_sms)
                     when (fb) {
                         "success" -> {
+                            // v1.8.9 关键修复：发送成功后【绝不】再拉 /cas/code！
+                            // 实测对比网页端：官方页面仅在错误分支刷新图形码，成功分支
+                            // 从不刷新——短信已发出后服务端流程进入「待提交短信码」状态，
+                            // 此时再请求 /cas/code 会重置二次认证流程：提交短信码必报
+                            // 「验证码过期或无效」（用户实报问题1），之后的再次发送也
+                            // 会报 get_session_error（用户实报问题2）。需要重发时用户
+                            // 自己点图片刷新（此时会重新发送，流程重新推进，安全）。
                             showErr(R.string.mfa_send_ok)
-                            loadCaptcha()   // 图形码已消耗，为下一步刷新备用
+                            etGraphic.setText("")
                         }
                         "img_code_error" -> {
                             showErr(R.string.mfa_fb_img_code_error)
                             loadCaptcha()
+                            etGraphic.setText("")
                         }
                         "error1" -> showErr(R.string.mfa_fb_error1)
                         "error2" -> showErr(R.string.mfa_fb_error2)
                         "get_times_more" -> showErr(R.string.mfa_fb_get_times_more)
                         "user_not_exist" -> showErr(R.string.mfa_fb_user_not_exist)
                         "network_error" -> showErr(R.string.mfa_fb_network_error)
+                        // v1.8.9：get_session_error = 本次登录会话已被服务端作废
+                        // （旧流程状态被重置/过期），唯一恢复方式 = 重新 login()。
+                        // 自动重开登录流程，用户只需在新弹出的对话框里重新验证。
+                        "get_session_error" -> {
+                            dialog?.dismiss()
+                            Toast.makeText(requireContext(),
+                                R.string.mfa_fb_session_error, Toast.LENGTH_LONG).show()
+                            doLogin()
+                        }
                         else -> {
                             tvErr.text = getString(R.string.mfa_fb_unknown, fb)
                             tvErr.visibility = View.VISIBLE
@@ -390,7 +412,7 @@ class ApiFragment : Fragment() {
             }
         }
 
-        MaterialAlertDialogBuilder(requireContext())
+        dialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.mfa_title)
             .setView(view)
             .setPositiveButton(R.string.mfa_submit) { _, _ ->
@@ -415,11 +437,24 @@ class ApiFragment : Fragment() {
                             renderWsStatus()
                             startNativeConfig(number, password)
                         }
-                        is com.dut.runmate.auth.CasAuth.Result.Err -> {
-                            // 短信码错/过期：可重试（同 execution），重拉对话框重输
+                        is com.dut.runmate.auth.CasAuth.Result.MfaRetry -> {
+                            // v1.8.9：短信码未过但流程仍在二次认证页——用响应页的
+                            // 【新 execution】重开对话框（实测 PM1 提交后 e1s2→e1s3
+                            // 推进，旧值作废；旧版用旧值重试 = 永远「验证码过期或
+                            // 无效」）。新对话框会重新拉图形码（此时流程允许）。
                             b.tvWsStatus.text = getString(R.string.ws_login_fail, r2.msg)
                             Toast.makeText(requireContext(), r2.msg, Toast.LENGTH_LONG).show()
-                            showMfaDialog(mfa, number, password, wsOk)
+                            showMfaDialog(
+                                com.dut.runmate.auth.CasAuth.Result.MfaRequired(
+                                    r2.execution,
+                                    r2.phoneTail.ifBlank { mfa.phoneTail }),
+                                number, password, wsOk)
+                        }
+                        is com.dut.runmate.auth.CasAuth.Result.Err -> {
+                            // 会话已丢失（回到密码页等）：重开整个登录流程
+                            b.tvWsStatus.text = getString(R.string.ws_login_fail, r2.msg)
+                            Toast.makeText(requireContext(), r2.msg, Toast.LENGTH_LONG).show()
+                            doLogin()
                         }
                         else -> {}
                     }
@@ -440,7 +475,10 @@ class ApiFragment : Fragment() {
 
     private fun openH5Catcher(password: String) {
         val hasCredential = prefs.casTgt.isNotBlank() || prefs.wsSkey.isNotBlank()
-        if (!hasCredential) {
+        // v1.8.9：无已保存会话但学号+密码已填 → 也允许进入（学校开启短信二次认证后
+        // 的兜底路径：页面自动填表，短信验证在页面上手动完成，捕获器不会再打扰）
+        val hasForm = b.etWsNumber.text.toString().trim().isNotBlank() && password.isNotBlank()
+        if (!hasCredential && !hasForm) {
             b.tvWsStatus.text = getString(R.string.ws_status_none)
             return
         }

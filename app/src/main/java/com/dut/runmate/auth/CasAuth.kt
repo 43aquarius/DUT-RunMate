@@ -52,6 +52,19 @@ object CasAuth {
          */
         data class MfaRequired(val execution: String, val phoneTail: String) : Result()
 
+        /**
+         * v1.8.9：短信码提交未通过但流程仍在二次认证页（可继续重试）。
+         * 实测（2026-10-12）：PM1 提交后 Spring Webflow 的 execution 会推进
+         * （e1s2 → e1s3），旧 execution 立即作废——重试必须用响应页里的新值，
+         * 否则永远报「验证码错误或已过期」（用户实报「每次登录都显示验证码
+         * 过期或无效」的根因之一）。
+         */
+        data class MfaRetry(
+            val msg: String,
+            val execution: String,
+            val phoneTail: String
+        ) : Result()
+
         data class Err(val msg: String) : Result()
     }
 
@@ -223,8 +236,10 @@ object CasAuth {
     }
 
     /**
-     * 提交二次认证短信码（PM1）。成功返回 CASTGC；失败返回网页端错误文本
-     * （验证码错误/过期等——Spring Webflow 同一 execution 可重试）。
+     * 提交二次认证短信码（PM1）。成功返回 CASTGC；仍停在二次认证页时返回
+     * MfaRetry（携带响应页的新 execution——实测 PM1 提交后 execution 推进
+     * e1s2→e1s3，重试必须用新值，旧值作废）；会话丢失（回到密码登录页等）
+     * 返回 Err，调用方需重新 login()。
      */
     suspend fun submitMfa(smsCode: String, execution: String): Result =
         withContext(Dispatchers.IO) {
@@ -253,7 +268,19 @@ object CasAuth {
                         """id="errormsghide"[^>]*>\s*([^<]*)"""
                     ).find(body)?.groupValues?.get(1)?.trim()
                         ?.replace("<br/>", "")?.replace("<br>", "")
-                    Result.Err(err?.takeIf { it.isNotBlank() } ?: "验证码错误或已过期，请重试")
+                    // v1.8.9：仍是二次认证页 → 流程还活着，提取新 execution 供重试
+                    if (body.contains("PM1") && body.contains("二次认证")) {
+                        val newEx = Regex("""name="execution"\s+value="([^"]+)"""")
+                            .find(body)?.groupValues?.get(1) ?: execution
+                        val tail = Regex("""尾号(\d+)""")
+                            .find(body)?.groupValues?.get(1) ?: ""
+                        return@withContext Result.MfaRetry(
+                            err?.takeIf { it.isNotBlank() } ?: "验证码错误或已过期，请重试",
+                            newEx, tail
+                        )
+                    }
+                    // 回到密码登录页 / 其他页面 → 会话丢失，需重新 login()
+                    Result.Err(err?.takeIf { it.isNotBlank() } ?: "会话已过期，请重新登录")
                 }
             } catch (e: Exception) {
                 Result.Err("网络错误：${e.message ?: "无法连接学校认证服务"}")

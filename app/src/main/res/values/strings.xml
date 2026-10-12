@@ -206,6 +206,14 @@
     <string name="h5_log_cas_page">已进入统一身份认证页，自动填表提交…</string>
     <string name="h5_log_webvpn_ok">WebVPN 登录成功，正在重新进入健康长跑 H5…</string>
     <string name="h5_log_webvpn_retry">WebVPN 会话未完全建立，自动重试登录流程…</string>
+    <!-- v1.8.9：短信二次认证下的 H5 捕获页（自动流程冻结 + 手动引导 + 死循环根治） -->
+    <string name="h5_status_manual_auth">需要短信/图形验证：请在页面中手动完成，成功后自动继续</string>
+    <string name="h5_status_manual_login">已停止自动重试：请在页面手动登录（支持短信验证码），成功后自动继续</string>
+    <string name="h5_log_manual_auth">⚠ 检测到需要人工验证（短信二次认证/图形验证码）——已暂停自动导航，请直接在页面上完成验证；登录成功后会自动进入健康长跑并捕获参数</string>
+    <string name="h5_log_cas_2fa_steps">二次认证步骤：①输入图形验证码 → ②点「获取验证码」收短信 → ③输入短信验证码 → ④点「立即登录」。注意：每次发送短信后图形验证码都会被消耗，App 已帮你自动刷新，照新图输入即可</string>
+    <string name="h5_log_2fa_sent">短信相关提示已出现：图形验证码已自动刷新并清空输入框，请照新图输入后再操作（重复发送/提交前都请用新图形码）</string>
+    <string name="h5_log_auto_halt">⚠ 自动登录多次未成功，已停止自动重试（继续循环只会反复刷新页面、作废验证码）。请在页面中手动登录（支持短信验证码），成功后会自动继续捕获</string>
+    <string name="h5_log_no_cookie">无已保存会话：页面将自动填写账号密码提交；学校已开启短信二次认证时，请按页面提示手动完成验证</string>
     <string name="h5_log_portal_link">已从门户资源列表进入：%1$s</string>
     <string name="h5_log_tunnel_h5">正在通过 WebVPN 隧道打开健康长跑 H5…</string>
     <string name="h5_log_intercept">已拦截 H5 文档并预注入嗅探器（%1$d 字节，页面脚本运行前生效）</string>
@@ -283,16 +291,17 @@
     <string name="mfa_sms_hint">短信验证码</string>
     <string name="mfa_submit">完成登录</string>
     <string name="mfa_sending">发送中…</string>
-    <string name="mfa_send_ok">✓ 已发送，请查收短信（部分手机会拦截，注意查看）</string>
+    <string name="mfa_send_ok">✓ 已发送，请查收短信（部分手机会拦截，注意查看）。若需重发：先点上方图片刷新图形码、输入新码后再点发送</string>
     <string name="mfa_need_graphic">请先输入图形验证码</string>
     <string name="mfa_need_sms">请输入收到的短信验证码</string>
     <string name="mfa_submitting">正在验证…</string>
-    <string name="mfa_fb_img_code_error">图形验证码错误，请重新输入</string>
+    <string name="mfa_fb_img_code_error">图形验证码错误，请重新输入（图片已刷新）</string>
     <string name="mfa_fb_error1">发送太频繁（10 分钟内多次），请稍后再试</string>
     <string name="mfa_fb_error2">今日发送次数已达上限，请明天再试</string>
     <string name="mfa_fb_get_times_more">一分钟内请勿重复发送</string>
     <string name="mfa_fb_user_not_exist">账号未绑定手机号，请联系学校认证服务处理</string>
     <string name="mfa_fb_network_error">网络失败，请重试</string>
+    <string name="mfa_fb_session_error">验证通道已失效（本次登录会话过期），正在重新发起登录，请稍候再输验证码</string>
     <string name="mfa_fb_unknown">发送失败（%1$s），请重试</string>
 
     <!-- 更新 -->
