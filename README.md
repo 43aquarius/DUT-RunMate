@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.10-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.11-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.10.apk`（约 6.3 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.11.apk`（约 6.3 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,7 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.11（2026-10-12）** —— 登录二次认证失败分流（网络/会话/服务端细分 + 同码自动找回，实测推翻「会话被重置」旧结论）+ 全部临时弹窗改为需手动确认的对话框 + 服务启动失败改通知
 - **v1.8.10（2026-10-12）** —— 登录「会话已过期」实测根治 + 设置页闪退修复
   - 修复设置页「测试提醒」4.5 秒延迟回调在 Fragment 脱离后崩溃（IllegalStateException: not attached to a context）；
   - 真实账号全链路实测（验证码自动识别+真实短信+错码探针）：协议格式无误、服务端状态机健壮，「会话已过期」为学校服务波动重置会话所致；
