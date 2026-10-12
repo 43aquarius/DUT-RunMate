@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.8-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.9-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.8.apk`（约 6.3 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.9.apk`（约 6.3 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,12 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.9（2026-10-12）** —— 二次认证三连修 + H5 捕获页死循环根治
+  - 修复「点发送短信就自动刷新图形码，之后提交总报验证码过期或无效」：实测发送成功后再请求图形码会重置服务端二次认证流程，现对齐网页端行为（成功后不刷新，需要重发时点图片手动刷新）
+  - 修复「第二次发送验证码 get_session_error」：同根因；现自动重启登录流程重新弹窗，不再卡死
+  - 修复短信码输错后重试永远失败：自动采用服务端返回的新会话状态重试
+  - 根治「重新捕获 H5 参数」页面无限自动刷新：认证页不再被误判为已登录；检测到短信/图形验证界面时暂停自动化并提示操作步骤，手动完成验证后自动继续捕获
+  - 无已保存会话也可进入 H5 捕获页（自动填表 + 页面内完成验证）；清理操场环线遗留数据文件
 - **v1.8.8（2026-10-12）**
   - 🔐 **登录失败根因修复（学校新启短信二次认证）**：经真实账号实测定位——账号密码验证通过，是学校统一认证近期新增「短信二次认证」环节（图形验证码 + 手机短信验证码），旧版不认识该页面误报「用户名或密码错误」。现登录自动弹出二次认证对话框：输图形码 → 发送短信（反馈码逐项提示：图形码错/太频繁/一分钟内重复等）→ 输短信码完成登录并自动继续原生一键配置；短信码错可重试（同一 execution），跑步中自动续期遇到 MFA 转明确报错引导回「接口」页；
   - 🔊 **语音提醒改预录音频（弃用 TTS 引擎）**：9 条预录语音随 App 打包（z-ai TTS 生成 + loudnorm -16LUFS 响度归一 + Ogg Vorbis），MediaPlayer USAGE_MEDIA 播放——彻底摆脱系统 TTS 引擎缺失/无中文语音数据的 ROM 差异；「没打上卡」漏卡警告等 9 个场景全设备一致；「测试提醒」即点即播并显示真实播放结果；
