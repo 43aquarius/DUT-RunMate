@@ -58,6 +58,9 @@ class RunTrackerService : Service() {
         const val MEDIA_ACT_VERIFY = "com.dut.runmate.media.VERIFY"
         const val MEDIA_ACT_STOP = "com.dut.runmate.media.STOP"
         const val CH_ID = "runmate_run"
+
+        /** v1.8.11：服务启动失败提醒渠道（高优先级，长文案可展开阅读） */
+        const val CH_ERR_ID = "runmate_run_err"
         const val NID = 1001
     }
 
@@ -126,12 +129,30 @@ class RunTrackerService : Service() {
                 } catch (e: Throwable) {
                     logSoft("startRun", e)
                     RunBus.update { it.copy(running = false, apiErr = "启动失败：${e.javaClass.simpleName}") }
+                    // v1.8.11：后台 Service 无法弹对话框（无 Activity 窗口）——
+                    // 启动失败提示改高优先级通知（完整文案可展开，点按进入 App；
+                    // 用户要求所有提示可完整阅读，原 Toast 长文案显示不全）
                     try {
-                        android.widget.Toast.makeText(
-                            applicationContext,
-                            "跑步服务启动异常：${e.javaClass.simpleName}，已记录到崩溃日志",
-                            android.widget.Toast.LENGTH_LONG
-                        ).show()
+                        if (Build.VERSION.SDK_INT >= 26) {
+                            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                                .createNotificationChannel(
+                                    NotificationChannel(CH_ERR_ID,
+                                        getString(R.string.ch_err_name),
+                                        NotificationManager.IMPORTANCE_HIGH))
+                        }
+                        val pi = android.app.PendingIntent.getActivity(
+                            this, 0,
+                            packageManager.getLaunchIntentForPackage(packageName),
+                            android.app.PendingIntent.FLAG_IMMUTABLE)
+                        val msg = "跑步服务启动异常：${e.javaClass.simpleName}，已记录到崩溃日志"
+                        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                            .notify(9001, NotificationCompat.Builder(this, CH_ERR_ID)
+                                .setSmallIcon(android.R.drawable.stat_notify_error)
+                                .setContentTitle(getString(R.string.ch_err_title))
+                                .setStyle(NotificationCompat.BigTextStyle().bigText(msg))
+                                .setContentIntent(pi)
+                                .setAutoCancel(true)
+                                .build())
                     } catch (_: Throwable) {
                     }
                     try { stopSelf() } catch (_: Throwable) {}

@@ -105,7 +105,7 @@ class CalibrateFragment : Fragment() {
 
     private fun startAveraging() {
         if (lastFix == null) {
-            Toast.makeText(requireContext(), R.string.calib_need_more, Toast.LENGTH_SHORT).show()
+            Notice.show(this, R.string.calib_need_more)
             return
         }
         samples.clear()
@@ -182,7 +182,7 @@ class CalibrateFragment : Fragment() {
         pending = null
         bs.btnSave.isEnabled = false
         bs.tvAvgStatus.text = "已保存「$name」"
-        Toast.makeText(requireContext(), "已保存 $name", Toast.LENGTH_SHORT).show()
+        Notice.show(this, "已保存 $name")
         refreshList()
     }
 

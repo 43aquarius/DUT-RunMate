@@ -148,10 +148,9 @@ class MapFragment : Fragment() {
         b.btnPickCancel.setOnClickListener { clearPick() }
 
         // 定位源状态徽章：点按弹出 GPS/网络定位说明（回答「为什么显示网络定位」）
+        // v1.8.11：Toast 改需手动确认对话框（长文案完整可读）
         b.chipLocStatus.setOnClickListener {
-            android.widget.Toast.makeText(
-                requireContext(), R.string.loc_net_education, android.widget.Toast.LENGTH_LONG
-            ).show()
+            Notice.show(this, R.string.loc_net_education)
         }
         renderLocChip(null)
 
@@ -174,14 +173,10 @@ class MapFragment : Fragment() {
             b.map.controller.animateTo(toDisplay(f.latitude, f.longitude))
             b.map.controller.setZoom(19.0)
             if (LocGate.isNetwork(f)) {
-                android.widget.Toast.makeText(
-                    requireContext(), R.string.map_loc_net_toast, android.widget.Toast.LENGTH_SHORT
-                ).show()
+                Notice.show(this, R.string.map_loc_net_toast)
             }
         } else {
-            android.widget.Toast.makeText(
-                requireContext(), R.string.map_loc_none, android.widget.Toast.LENGTH_SHORT
-            ).show()
+            Notice.show(this, R.string.map_loc_none)
         }
     }
 

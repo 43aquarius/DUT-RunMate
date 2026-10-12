@@ -69,7 +69,8 @@ class ApiFragment : Fragment() {
         b.etToken.setText(prefs.apiToken)
         b.btnTokenSave.setOnClickListener {
             prefs.apiToken = b.etToken.text.toString().trim()
-            Toast.makeText(requireContext(), "令牌已保存", Toast.LENGTH_SHORT).show()
+            // v1.8.11：临时弹窗改需手动确认的对话框（用户实报 Toast 显示不全）
+            Notice.show(this, "令牌已保存")
         }
         b.swApiMode.isChecked = prefs.apiEnabled
         b.swApiMode.setOnCheckedChangeListener { _, c -> prefs.apiEnabled = c }
@@ -86,7 +87,7 @@ class ApiFragment : Fragment() {
             } else {
                 clearActiveAccount()
                 renderAccounts()
-                Toast.makeText(requireContext(), "已清除本机保存的登录信息", Toast.LENGTH_SHORT).show()
+                Notice.show(this, "已清除本机保存的登录信息")
             }
             true
         }
@@ -103,13 +104,13 @@ class ApiFragment : Fragment() {
         // v1.6.1：一键复制完整测试结果（旧版底部 Toast 一闪而过无法查看复制）
         b.btnCopyResult.setOnClickListener {
             if (lastResultText.isBlank()) {
-                Toast.makeText(requireContext(), R.string.api_result_none, Toast.LENGTH_SHORT).show()
+                Notice.show(this, R.string.api_result_none)
             } else {
                 runCatching {
                     val cm = requireActivity().getSystemService(
                         android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                     cm.setPrimaryClip(android.content.ClipData.newPlainText("runmate", lastResultText))
-                    Toast.makeText(requireContext(), R.string.pref_crash_copied, Toast.LENGTH_SHORT).show()
+                    Notice.show(this, R.string.pref_crash_copied)
                 }
             }
         }
@@ -248,8 +249,7 @@ class ApiFragment : Fragment() {
                 mfa != null -> showMfaDialog(mfa!!, number, password, wsOk)
                 wsOk -> {
                     renderWsStatus()
-                    Toast.makeText(requireContext(),
-                        getString(R.string.ws_login_ok, prefs.wsName), Toast.LENGTH_SHORT).show()
+                    Notice.show(this@ApiFragment, getString(R.string.ws_login_ok, prefs.wsName))
                     openH5Catcher(password)
                 }
                 else -> {
@@ -299,8 +299,8 @@ class ApiFragment : Fragment() {
                     // 原生失败 → 退回 H5 捕获页（手动兜底路径）
                     b.tvWsStatus.text =
                         getString(R.string.ws_native_fail, sr.step, sr.msg)
-                    Toast.makeText(requireContext(),
-                        getString(R.string.ws_native_fallback), Toast.LENGTH_LONG).show()
+                    Notice.show(this@ApiFragment, getString(R.string.ws_native_fallback),
+                        getString(R.string.ws_native_fail_title))
                     openH5Catcher(password)
                 }
             }
@@ -315,12 +315,23 @@ class ApiFragment : Fragment() {
      *   ③ 输短信码 → POST PM1 提交 → 服务端发 CASTGC
      * 与网页端 sso.dlut.edu.cn 二次认证页一一对应；三原语必须在 login() 之后
      * 同进程调用（CAS 会话存 CasAuth 共享 Cookie jar，进程重启作废）。
-     * 短信码错误可重试（同一 execution，Spring Webflow 允许）；重试需重新
-     * 输图形码（旧图形码已消耗），对话框重拉时自动刷新。
+     * 短信码错误可重试（MfaRetry 携带新 execution）；重试需重新输图形码。
+     *
+     * v1.8.11 重做（用户实报「验证会话被学校服务重置」+「临时弹窗显示不全」）：
+     *  1. 短信码为空不再关对话框——点「完成登录」直接在原对话框内提示，避免
+     *     整个 MFA 流程作废重来（旧版按钮一点就关，白填一遍）；
+     *  2. 失败按 ErrKind 分流（旧版一切失败都报「会话被重置」并强制重登，误导）：
+     *     - NETWORK：本机网络异常，CAS 会话未受影响——重开同一对话框（execution
+     *       与已填短信码保留），直接再点「完成登录」即可；
+     *     - SESSION_LOST：先自动重登 + 用同一短信码重提一次（若短信码绑定在
+     *       账号而非会话上，用户无感救回）；仍失败才开新对话框重发短信；
+     *     - SERVER_ERROR/OTHER：提示后重开同一对话框供重试；
+     *  3. 全部提示改 Notice（需手动确认，长文案可完整阅读）。
      */
     private fun showMfaDialog(
         mfa: com.dut.runmate.auth.CasAuth.Result.MfaRequired,
-        number: String, password: String, wsOk: Boolean
+        number: String, password: String, wsOk: Boolean,
+        prefillSms: String = ""
     ) {
         if (_b == null) return
         val view = layoutInflater.inflate(R.layout.dialog_mfa, null)
@@ -333,9 +344,14 @@ class ApiFragment : Fragment() {
 
         tvPhone.text = getString(R.string.mfa_intro) + "\n" +
             getString(R.string.mfa_phone_fmt, mfa.phoneTail.ifBlank { "****" })
+        if (prefillSms.isNotBlank()) etSms.setText(prefillSms)
 
         fun showErr(res: Int) {
             tvErr.setText(res); tvErr.visibility = View.VISIBLE
+        }
+
+        fun showErrText(s: String) {
+            tvErr.text = s; tvErr.visibility = View.VISIBLE
         }
 
         // ① 图形验证码：拉取 + 点击刷新
@@ -375,8 +391,8 @@ class ApiFragment : Fragment() {
                     when (fb) {
                         "success" -> {
                             // v1.8.9 关键修复：发送成功后【绝不】再拉 /cas/code！
-                            // 实测对比网页端：官方页面仅在错误分支刷新图形码，成功分支
-                            // 从不刷新——短信已发出后服务端流程进入「待提交短信码」状态，
+                            // 官方页面仅在错误分支刷新图形码，成功分支从不刷新——
+                            // 短信已发出后服务端流程进入「待提交短信码」状态，
                             // 此时再请求 /cas/code 会重置二次认证流程：提交短信码必报
                             // 「验证码过期或无效」（用户实报问题1），之后的再次发送也
                             // 会报 get_session_error（用户实报问题2）。需要重发时用户
@@ -399,70 +415,130 @@ class ApiFragment : Fragment() {
                         // 自动重开登录流程，用户只需在新弹出的对话框里重新验证。
                         "get_session_error" -> {
                             dialog?.dismiss()
-                            Toast.makeText(requireContext(),
-                                R.string.mfa_fb_session_error, Toast.LENGTH_LONG).show()
+                            Notice.show(this@ApiFragment,
+                                getString(R.string.mfa_fb_session_error),
+                                getString(R.string.mfa_title))
                             doLogin()
                         }
-                        else -> {
-                            tvErr.text = getString(R.string.mfa_fb_unknown, fb)
-                            tvErr.visibility = View.VISIBLE
-                        }
+                        else -> showErrText(getString(R.string.mfa_fb_unknown, fb))
                     }
                 }
             }
         }
 
-        dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.mfa_title)
-            .setView(view)
-            .setPositiveButton(R.string.mfa_submit) { _, _ ->
-                val sms = etSms.text.toString().trim()
-                if (sms.isBlank()) {
-                    Toast.makeText(requireContext(), R.string.mfa_need_sms, Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-                b.btnWsLogin.isEnabled = false
-                b.tvWsStatus.text = getString(R.string.mfa_submitting)
-                viewLifecycleOwner.lifecycleScope.launch {
-                    val r2 = com.dut.runmate.auth.CasAuth.submitMfa(sms, mfa.execution)
-                    if (_b == null) return@launch
-                    b.btnWsLogin.isEnabled = true
-                    when (r2) {
-                        is com.dut.runmate.auth.CasAuth.Result.Ok -> {
-                            // 与直登成功同路径：落盘 + 原生一键配置
-                            prefs.casTgt = r2.castgc
-                            prefs.wsNumber = number
-                            prefs.wsPwdSaved = android.util.Base64.encodeToString(
-                                password.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-                            renderWsStatus()
-                            startNativeConfig(number, password)
-                        }
-                        is com.dut.runmate.auth.CasAuth.Result.MfaRetry -> {
-                            // v1.8.9：短信码未过但流程仍在二次认证页——用响应页的
-                            // 【新 execution】重开对话框（实测 PM1 提交后 e1s2→e1s3
-                            // 推进，旧值作废；旧版用旧值重试 = 永远「验证码过期或
-                            // 无效」）。新对话框会重新拉图形码（此时流程允许）。
+        // v1.8.11：提交逻辑提取（按钮提交 / 网络错误重试 / 会话找回重提 共用）。
+        // attemptRescue：SESSION_LOST 时是否尝试「重登+同码重提」自动找回（只试一层，
+        // 防递归循环）
+        fun doSubmit(sms: String, execution: String, attemptRescue: Boolean) {
+            b.btnWsLogin.isEnabled = false
+            b.tvWsStatus.text = getString(R.string.mfa_submitting)
+            viewLifecycleOwner.lifecycleScope.launch {
+                val r2 = com.dut.runmate.auth.CasAuth.submitMfa(sms, execution)
+                if (_b == null) return@launch
+                b.btnWsLogin.isEnabled = true
+                when (r2) {
+                    is com.dut.runmate.auth.CasAuth.Result.Ok -> {
+                        // 与直登成功同路径：落盘 + 原生一键配置
+                        prefs.casTgt = r2.castgc
+                        prefs.wsNumber = number
+                        prefs.wsPwdSaved = android.util.Base64.encodeToString(
+                            password.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+                        renderWsStatus()
+                        startNativeConfig(number, password)
+                    }
+                    is com.dut.runmate.auth.CasAuth.Result.MfaRetry -> {
+                        // 短信码未过但流程仍在二次认证页——用响应页的
+                        // 【新 execution】重开对话框（实测 PM1 提交后 e1s2→e1s3
+                        // 推进，旧值作废）。新对话框会重新拉图形码（此时流程允许）。
+                        b.tvWsStatus.text = getString(R.string.ws_login_fail, r2.msg)
+                        Notice.show(this@ApiFragment, r2.msg, getString(R.string.mfa_title))
+                        showMfaDialog(
+                            com.dut.runmate.auth.CasAuth.Result.MfaRequired(
+                                r2.execution,
+                                r2.phoneTail.ifBlank { mfa.phoneTail }),
+                            number, password, wsOk)
+                    }
+                    is com.dut.runmate.auth.CasAuth.Result.Err -> when (r2.kind) {
+                        // v1.8.11：网络异常——CAS 会话大概率还活着，同一 execution
+                        // 直接重试即可，不重登不重发短信（重发反而烧短信配额）
+                        com.dut.runmate.auth.CasAuth.Result.ErrKind.NETWORK -> {
                             b.tvWsStatus.text = getString(R.string.ws_login_fail, r2.msg)
-                            Toast.makeText(requireContext(), r2.msg, Toast.LENGTH_LONG).show()
+                            Notice.show(this@ApiFragment,
+                                getString(R.string.mfa_net_retry, r2.msg),
+                                getString(R.string.mfa_title))
                             showMfaDialog(
                                 com.dut.runmate.auth.CasAuth.Result.MfaRequired(
-                                    r2.execution,
-                                    r2.phoneTail.ifBlank { mfa.phoneTail }),
-                                number, password, wsOk)
+                                    execution, mfa.phoneTail),
+                                number, password, wsOk, prefillSms = sms)
                         }
-                        is com.dut.runmate.auth.CasAuth.Result.Err -> {
-                            // 会话已丢失（回到密码页等）：重开整个登录流程
-                            // v1.8.10：给用户讲清楚发生了什么（服务重置≠密码/验证码错），
-                            // 并提示重发短信的限频规则，避免连续重试烧掉当日短信配额
+                        // v1.8.11：会话真没了——先自动「重登 + 同一短信码重提」找回
+                        com.dut.runmate.auth.CasAuth.Result.ErrKind.SESSION_LOST -> {
+                            if (attemptRescue) {
+                                b.tvWsStatus.text = getString(R.string.mfa_rescuing)
+                                val re = com.dut.runmate.auth.CasAuth.login(number, password)
+                                if (_b == null) return@launch
+                                when (re) {
+                                    // 重登后学校又要二次认证 → 同一短信码自动重提一次
+                                    // （若短信码绑定账号而非会话，直接救回，用户无感）
+                                    is com.dut.runmate.auth.CasAuth.Result.MfaRequired ->
+                                        doSubmit(sms, re.execution, attemptRescue = false)
+                                    // 重登直出 CASTGC（学校未再要求 MFA）→ 直接走原生配置
+                                    is com.dut.runmate.auth.CasAuth.Result.Ok -> {
+                                        prefs.casTgt = re.castgc
+                                        prefs.wsNumber = number
+                                        prefs.wsPwdSaved = android.util.Base64.encodeToString(
+                                            password.toByteArray(Charsets.UTF_8),
+                                            android.util.Base64.NO_WRAP)
+                                        renderWsStatus()
+                                        startNativeConfig(number, password)
+                                    }
+                                    // 重登失败（Err/MfaRetry——login 不返回 MfaRetry，穷举）：
+                                    // 如实提示，走完整重登流程
+                                    else -> {
+                                        val em = when (re) {
+                                            is com.dut.runmate.auth.CasAuth.Result.Err -> re.msg
+                                            is com.dut.runmate.auth.CasAuth.Result.MfaRetry -> re.msg
+                                            else -> "登录失败"
+                                        }
+                                        b.tvWsStatus.text = getString(R.string.ws_login_fail, em)
+                                        Notice.show(this@ApiFragment,
+                                            getString(R.string.mfa_session_lost_resend),
+                                            getString(R.string.mfa_title))
+                                        doLogin()
+                                    }
+                                }
+                            } else {
+                                // 已尝试过自动找回仍失败：开新流程重新发短信
+                                b.tvWsStatus.text = getString(R.string.ws_login_fail, r2.msg)
+                                Notice.show(this@ApiFragment,
+                                    getString(R.string.mfa_session_lost_resend),
+                                    getString(R.string.mfa_title))
+                                doLogin()
+                            }
+                        }
+                        // SERVER_ERROR / OTHER：服务端异常或未知响应——提示后重开
+                        // 同一对话框（execution 保留），稍后重试即可
+                        else -> {
                             b.tvWsStatus.text = getString(R.string.ws_login_fail, r2.msg)
-                            Toast.makeText(requireContext(),
-                                R.string.mfa_session_lost, Toast.LENGTH_LONG).show()
-                            doLogin()
+                            Notice.show(this@ApiFragment, r2.msg, getString(R.string.mfa_title))
+                            showMfaDialog(
+                                com.dut.runmate.auth.CasAuth.Result.MfaRequired(
+                                    execution, mfa.phoneTail),
+                                number, password, wsOk, prefillSms = sms)
                         }
-                        else -> {}
                     }
+                    // submitMfa 不会返回 MfaRequired——占位保证穷尽
+                    else -> {}
                 }
             }
+        }
+
+        // v1.8.11：手动接管「完成登录」按钮——短信码为空时【不关对话框】，
+        // 在框内提示（旧版按钮一点就自动关闭，空码即白填一遍，流程作废重来）
+        val dlg = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.mfa_title)
+            .setView(view)
+            .setPositiveButton(R.string.mfa_submit, null)
             .setNegativeButton(android.R.string.cancel) { _, _ ->
                 if (wsOk) {
                     // 微哨通道已成功：仍可走 H5 捕获页兜底
@@ -473,7 +549,21 @@ class ApiFragment : Fragment() {
                         "未完成短信二次认证（学校新要求，网页/客户端登录均需短信验证）")
                 }
             }
-            .show()
+            .create()
+        dlg.setOnShowListener {
+            dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener {
+                    val sms = etSms.text.toString().trim()
+                    if (sms.isBlank()) {
+                        showErr(R.string.mfa_need_sms)
+                        return@setOnClickListener
+                    }
+                    dlg.dismiss()
+                    doSubmit(sms, mfa.execution, attemptRescue = true)
+                }
+        }
+        dialog = dlg
+        dlg.show()
     }
 
     private fun openH5Catcher(password: String) {
@@ -565,9 +655,10 @@ class ApiFragment : Fragment() {
         b.etToken.setText(prefs.apiToken)
         renderWsStatus()
         renderAccounts()
-        Toast.makeText(requireContext(), getString(
+        // v1.8.11：Toast 改需手动确认对话框（长文案可完整阅读）
+        Notice.show(this, getString(
             if (acc.captured) R.string.acct_switched else R.string.acct_switch_need_capture,
-            acctLabel(acc)), Toast.LENGTH_LONG).show()
+            acctLabel(acc)))
     }
 
     private fun confirmDeleteAccount(acc: WsAccount) {
@@ -601,8 +692,7 @@ class ApiFragment : Fragment() {
             renderWsStatus()
         }
         renderAccounts()
-        Toast.makeText(requireContext(), getString(R.string.acct_deleted, acctLabel(acc)),
-            Toast.LENGTH_SHORT).show()
+        Notice.show(this, getString(R.string.acct_deleted, acctLabel(acc)))
     }
 
     /** 清空活跃账号的全部本机信息（不动作账号列表） */
@@ -628,7 +718,7 @@ class ApiFragment : Fragment() {
         }
         val accounts = Accounts.load(prefs, store)
         if (accounts.isEmpty()) {
-            Toast.makeText(requireContext(), R.string.acct_query_none, Toast.LENGTH_LONG).show()
+            Notice.show(this, R.string.acct_query_none)
             return
         }
         queryingAll = true
@@ -675,8 +765,7 @@ class ApiFragment : Fragment() {
                         val cm = requireActivity().getSystemService(
                             android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                         cm.setPrimaryClip(android.content.ClipData.newPlainText("runmate", result))
-                        Toast.makeText(requireContext(), R.string.pref_crash_copied,
-                            Toast.LENGTH_SHORT).show()
+                        Notice.show(this@ApiFragment, R.string.pref_crash_copied)
                     }
                 }
                 .show()
@@ -716,7 +805,7 @@ class ApiFragment : Fragment() {
 
     private fun test(p: ApiProfile) {
         if (p.url.isBlank()) {
-            Toast.makeText(requireContext(), "URL 为空，请先编辑", Toast.LENGTH_SHORT).show()
+            Notice.show(this, "URL 为空，请先编辑")
             return
         }
         if (testingId != null) return                  // v1.6.0：防重复点击

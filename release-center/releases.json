@@ -1,64 +1,17 @@
 {
   "repo": "43aquarius/DUT-RunMate",
   "latest": {
-    "versionName": "1.8.10",
-    "versionCode": 23,
+    "versionName": "1.8.11",
+    "versionCode": 24,
     "date": "2026-10-12",
-    "apkFile": "DUT-RunMate_v1.8.10.apk",
-    "sha256": "dd700b86ba48a42e96ecd097d8fb565b7bd83f20511a51b28fc0547347093ceb",
-    "sizeBytes": 6300896,
-    "notes": "【修复】登录「会话已过期」专项 + 设置页闪退修复\n\n- 修复设置页闪退（用户实报）：点「测试提醒」后 4.5 秒内离开设置页，Fragment 已脱离上下文仍调用 getString()/requireContext() 抛 IllegalStateException；现在延迟回调先无条件释放播放器，已脱离则安静放弃弹窗\n- 登录实测结论（本轮用真实账号全链路探针验证）：账号密码与协议格式均无误，学校服务端二次认证状态机健壮（75 秒等待、多次错码重试、发送后刷新图形码均存活）；「会话已过期」是学校服务波动重置会话所致，v1.8.10 从四个维度加固对波动的免疫\n- CasAuth.login 重构：①登录页→提交之间加 2.5 秒人节奏（对齐真实用户填表耗时）②请求头补 Origin / Accept-Language / Accept / Upgrade-Insecure-Requests（逐字节对齐 Chrome 抓包）③表单字段序改为网页端实际提交序（rsa 在前）④响应为「无错误文案的登录页」（服务端重置会话）时自动换新会话重试，最多 3 轮\n- 短信码提交（PM1）同样补齐浏览器同构头\n- 「会话已过期」提示语重写：向用户说明这是学校服务重置（不是密码/验证码错误）、已自动重新登录、重发短信受一分钟限频，避免用户连续重试烧掉当日短信配额",
-    "githubTag": "v1.8.10",
-    "githubReleaseUrl": "https://github.com/43aquarius/dut-runmate/releases/tag/v1.8.10",
-    "githubApkUrl": "https://github.com/43aquarius/dut-runmate/releases/download/v1.8.10/DUT-RunMate_v1.8.10.apk",
+    "apkFile": "DUT-RunMate_v1.8.11.apk",
+    "sha256": "1812ac1f9afccf220cfe588416e41ab49db44cb473b6b4aae9d79e24dbee55ce",
+    "sizeBytes": 6308892,
     "minSdk": 24,
-    "targetSdk": 34
+    "targetSdk": 34,
+    "notes": "【更新】登录「会话被重置」根治性重构 + 全部临时弹窗改手动确认\n\n1. 登录二次认证失败分流（实测根治方向）\n   - 用你的账号在沙箱全链路复刻 App 的 OkHttp 客户端逐步实测：学校 CAS 的验证会话其实非常稳定（错码/刷新验证码/等待 6 分钟都不会失效）——手机上「会话被学校服务重置」大多是网络瞬断/超时，会话并没有失效\n   - 网络失败不再强制重登：短信码自动保留在输入框，直接再点「完成登录」重试即可（不再浪费短信配额）\n   - 会话真失效时自动「重登+同一短信码重提」一次——若短信码绑定在账号上，直接救回，无感\n   - 每次失败自动记录 HTTP 状态与页面指纹到崩溃日志，反馈时可复制（设置→查看崩溃日志）\n2. 二次认证对话框：短信码为空点「完成登录」不再关闭对话框（旧版按钮一点就关，白填一遍）\n3. 全部临时弹窗改为需手动点「确定」才能关闭的对话框——长文案完整可读（设置/接口/地图/标定/跑步/H5 捕获/更新检查全部覆盖）；跑步页下拉刷新成功时静默（数字已就地更新），仅失败时弹完整原因\n4. 后台跑步服务启动失败的提示改高优先级通知（可展开全文，点按进入 App）"
   },
   "history": [
-    {
-      "versionName": "1.8.9",
-      "versionCode": 22,
-      "date": "2026-10-12",
-      "apkFile": "DUT-RunMate_v1.8.9.apk",
-      "sha256": "32bf2d8814bcf25f3f1b575973d244bb0406c6e1633928e2a6c6d71b65d4fe37",
-      "sizeBytes": 6299856,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "【修复】短信二次认证三连问题：验证码总过期 / 二次发送失败 / H5 捕获页自动刷新\n\n- 二次认证「验证码过期或无效」根治：实测发现短信发送成功后服务端进入「待提交短信码」状态，此时再请求图形验证码会重置认证流程——旧版在发送成功后自动刷新图形码图片，恰好在此时破坏流程导致提交必失败。现在发送成功后不再自动刷新（对齐学校网页端行为），需要重发时点图片手动刷新\n- 「第二次发送验证码 get_session_error」修复：同上根因（流程被重置后发送通道作废）。现在遇到 get_session_error 会自动重启登录流程，重新弹出对话框继续验证，不再卡死\n- 短信码输错重试修复：实测短信码提交后服务端会推进会话状态（旧状态立即作废），旧版用旧状态重试永远报「验证码过期」。现在自动采用服务端返回的新状态重试，输错短信码可直接再输\n- H5 捕获页「一直在自动刷新」根治：自动流程把统一认证的登录页误判为「已登录」，反复导航离开再弹回形成死循环，还会作废正在输入的验证码。现在认证页绝不自动导航；检测到短信/图形验证时暂停全部自动化并提示操作步骤，手动完成验证后自动继续捕获；自动重试最多两轮后停止，交还手动控制\n- 无已保存会话也可打开 H5 捕获页（自动填表 + 页面内完成验证），首次登录遇二次认证不再被挡在门外"
-    },
-    {
-      "versionName": "1.8.8",
-      "versionCode": 21,
-      "date": "2026-10-12",
-      "apkFile": "DUT-RunMate_v1.8.8.apk",
-      "sha256": "9f511a06998b522b008d262495a167af36ae8ced27f74d47c9aa8e5f9750be66",
-      "sizeBytes": 6289496,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "【修复】登录失败根因修复 + 语音提醒重构 + 移除操场环线\n\n- 登录失败已定位并修复：学校统一认证近期新启用「短信二次认证」，旧版遇到该页面误报「用户名或密码错误」（实测账号密码无误）。现在登录会弹出二次认证对话框：输入图形验证码 → 发送短信 → 输入短信验证码，完成后自动继续原生一键配置；短信码输错可直接重试\n- 语音提醒彻底重构：弃用系统 TTS 引擎（各品牌 ROM 引擎缺失/无中文语音数据，连续多轮不可靠），改为 9 条预录语音随 App 打包——「注意，未确认打卡，请减速返回或留意手机」等提醒全设备一致播放，跟随媒体音量；测试提醒改为即点即播\n- 移除地图页「操场环线」开关：仅参考显示、不参与检测计算，按用户要求删除（点位检测只看打卡点列表）"
-    },
-    {
-      "versionName": "1.8.7",
-      "versionCode": 20,
-      "date": "2026-10-11",
-      "apkFile": "DUT-RunMate_v1.8.7.apk",
-      "sha256": "24733a241d6fa685e1aaa6e531bf8f9b2d998e9e8ab833bce76128d4d6c885b8",
-      "sizeBytes": 6134145,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "【修复】TTS 引擎不可用 + 震动无实效 + 锁屏卡片透明背景\n\n- 语音引擎多链兜底：旧版只试系统默认引擎，国产 ROM 默认引擎缺失/损坏/无中文语音数据时语音直接判死（用户实报「TTS 引擎不可用」）。现改为引擎链逐个尝试：系统默认 → Google → 小爱 → 讯飞 → 百度 → 三星 → 扫描出的其余引擎，初始化失败或缺中文语音数据自动换下一个；自检结果展示当前引擎名，不可用时提供「去系统语音设置」直达入口\n- 震动补通知属性：旧调用不带属性（系统归为 UNKNOWN 用法），部分 ROM 在静音/勿扰/触感策略下静默吞掉——「显示触发、手上无感」。现按 Android 8.0/11 分级挂「通知震动」属性，归入系统通知震动通道；自检改为真实结果（旧版「✓ 震动已触发」是写死的静态文案），失败附排查指引；三档波形再加长，测试演示用专用强波形\n- 锁屏卡片实底色（用户实报「背景透明」）：通知 setColor+setColorized 实心品牌蓝；媒体会话挂 512 渐变实底专辑图——Android 11+ 锁屏系统媒体卡背景取专辑图，无图时部分 ROM 直接透出壁纸\n- 提示音保留 v1.8.6 双通道逻辑（本轮用户确认已正常）"
-    },
-    {
-      "versionName": "1.8.6",
-      "versionCode": 19,
-      "date": "2026-10-11",
-      "apkFile": "DUT-RunMate_v1.8.6.apk",
-      "sha256": "0d4e3476ba4ec8be1c83bcef963a0910f2b40dc0be6e35c24f9dd69d448020c7",
-      "sizeBytes": 6131321,
-      "minSdk": 24,
-      "targetSdk": 34,
-      "notes": "## v1.8.6\n\n【修复】提醒三通道 + 锁屏卡片 + 下拉刷新 + 1m 精度\n\n### 1. 语音播报 / 提示音 / 震动彻底重修（用户实报三通道全部无效）\n\n- **语音**：TTS 音频通道由「导航」改为「媒体」——旧版走系统导航音量通道，绝大多数设备默认极小甚至为 0，表现为永远听不到语音；现在跟随媒体音量（跑步听歌的用户必然开着）\n- **语音**：中文语音包缺失（LANG_MISSING_DATA）时如实降级为提示音+震动，旧版谎报就绪导致 speak 入队无声\n- **提示音**：媒体音量为 0 时自动切「通知」通道（通知通道几乎总开着，不受媒体音量影响）；相对音量 80→100\n- **震动**：三档波形加长（旧版 35/60ms 在口袋臂包里几乎无感）；修复 Android 7.x 上调 VibrationEffect 重载触发 NoSuchMethodError（Error 捕不住）导致整次震动丢失的兼容缺陷\n- **新增**：设置页「测试提醒」按钮——当场播报语音+提示音+震动，数秒后弹出三通道自检结果（含 TTS 引擎诊断）\n\n### 2. 锁屏显示改为音乐软件样式（用户澄清：不是显示整个主页面）\n\n- 跑步前台通知升级为 **MediaSession + MediaStyle 媒体卡片**：锁屏上一个框框，只显示关键信息\n  - 标题 = 官方打卡距离（如「官方打卡 826 m」）\n  - 副标题 = 漏卡警示 / 检测区待确认 / 已确认进度 + GPS 里程\n  - 按钮 =「立即核对」「结束」\n- Android 11+ 锁屏与快捷设置顶部媒体区渲染；Android 5~10 锁屏白底媒体卡\n- v1.8.4 的 setShowWhenLocked（整页显示在锁屏上）按用户澄清移除\n\n### 3. 跑步页下拉刷新\n\n- 主页面「跑步」向下划屏幕即触发服务端距离查询/核对：成功静默更新右上角数字，失败 Toast 给出原因；完整响应详情弹窗仍走点按「服务端距离」入口\n\n### 4. 检测参数最小可调精度 1m\n\n- 默认半径（原 5m 步长）、预告距离（原 10m 步长）、单点编辑半径（原 5m 步长）全部改为 1m 步进；确认阈值原本即 1m\n\n---\n\n**升级提示**：签名与历史版本一致，可直接覆盖安装；versionCode 19 > 18，v1.8.5 用户打开 App 即收到升级提醒。\n"
-    },
     {
       "versionName": "1.8.5",
       "versionCode": 18,
@@ -152,6 +105,48 @@
       "githubTag": "v1.6.1",
       "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.6.1",
       "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.6.1.apk"
+    },
+    {
+      "versionName": "1.6.0",
+      "versionCode": 9,
+      "date": "2026-10-10",
+      "apkFile": "DUT-RunMate_v1.6.0.apk",
+      "sha256": "abaa10ea5285c26aa684e649fec4c813ab6bd4ee0c634c173f250bc267ddbe00",
+      "sizeBytes": 5940713,
+      "minSdk": 24,
+      "targetSdk": 34,
+      "notes": "【修复 + 精简】WebVPN 登录 · 开始跑步闪退 · 测试反馈\n\n- 修复校外 WebVPN 无法登录：学校 WebVPN 页面已改为「仅统一身份认证登录」（无账号密码表单），本版自动点击统一认证入口 → CAS 自动填表 → 登录后自动重进健康长跑 H5，校外配置一步到位\n- 修复「开始跑步」1~2 秒后闪退：跑步启动后的定位/轮询/通知/语音回调逐段隔离，任何异常只记录不崩溃；如仍异常，到 设置 → 查看崩溃日志 复制反馈\n- 「发送测试」与连通性测试即时反馈：点击立即弹出结果卡片（已移到列表上方）+ 按钮变「测试中…」，结果明确显示 ✓ 通过 / ✗ 失败 · HTTP 状态码 · 耗时\n- 更新界面精简：只保留一个「检查更新」按钮（服务器已内置，失败自动转 GitHub）\n- 设置页新增 GitHub 开源仓库入口（源码 / Issue / 版本发布）",
+      "githubTag": "v1.6.0",
+      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases/tag/v1.6.0",
+      "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.6.0.apk"
+    },
+    {
+      "versionName": "1.5.1",
+      "versionCode": 8,
+      "date": "2026-10-09",
+      "apkFile": "DUT-RunMate_v1.5.1.apk",
+      "sha256": "f6e6c9603dca1614debd8eff36d29244ae175ae232c7030f211caa936631706e",
+      "sizeBytes": 5930349,
+      "minSdk": 24,
+      "targetSdk": 34,
+      "notes": "【修复】登录改用学校统一身份认证（CAS）协议\n\n- 登录失败根因确认：学校网关已下线旧版微哨登录通道（携带 app_version 的请求被 401 拒绝），无该参数的真实凭据校验同样不可靠\n- v1.5.1 登录改为与网页端 sso.dlut.edu.cn 完全一致的 CAS 协议（内置同款加密算法，已实测验证），正确学号密码即可登录\n- 双通道设计：CAS 统一认证（主）+ 微哨（辅，成功可多得 userId/whistlekey），任一成功即可完成 H5 自动配置\n- H5 捕获页：注入 CAS 会话 Cookie；遇到统一身份认证页自动填表提交；不再强制要求微哨会话\n- 「发送测试」再加双保险：任何异常进结果卡片显示，绝不闪退\n- 设置页新增「查看崩溃日志」：闪退时打开即可复制完整堆栈反馈\n- ⚠ v1.4.0 及以前版本用户：旧更新通道（GitHub）在国内基本不可用，请手动下载本 APK 覆盖安装一次，之后即可正常收到后续更新",
+      "githubTag": "v1.5.1",
+      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases",
+      "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.5.1.apk"
+    },
+    {
+      "versionName": "1.5.0",
+      "versionCode": 7,
+      "date": "2026-10-09",
+      "apkFile": "DUT-RunMate_v1.5.0.apk",
+      "sha256": "af35c6e33c051b030c79ec16948d04383e65beaeeab65291b15c8639a8c76b8a",
+      "sizeBytes": 5917805,
+      "minSdk": 24,
+      "targetSdk": 34,
+      "notes": "【修复 + 新功能】登录、闪退与锁屏打卡距离\n\n- 修复登录 i大工「a is empty」：实测定位为网关拒绝 app_version 参数，登录参数集已对齐官方 App（equipment_type/os_version/phone_type），学号密码直接可登\n- 修复「发送测试」偶发闪退：请求在途时切换页面不再崩溃（协程安全终止）；新增崩溃日志自动落盘，问题可自助反馈\n- 登录信息本机保存：下次打开自动回填学号密码，会话过期一键重新登录（长按密码框可清除）\n- 锁屏打卡距离：跑步常驻通知在锁屏完整显示官方打卡距离 + GPS 里程，RFID 命中即刻刷新\n- 更新服务器内置固定为 https://dut-runmate.space-z.ai（不可用时自动改走 GitHub），移除自定义地址设置",
+      "githubTag": "v1.5.0",
+      "githubReleaseUrl": "https://github.com/43aquarius/DUT-RunMate/releases",
+      "githubApkUrl": "https://dut-runmate.space-z.ai/apk/DUT-RunMate_v1.5.0.apk"
     }
   ]
 }

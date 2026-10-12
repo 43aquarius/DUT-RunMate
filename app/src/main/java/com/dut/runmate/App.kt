@@ -29,6 +29,8 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         installCrashLogger()
+        // v1.8.11：CasAuth 诊断日志目录（PM1 提交失败时把页面指纹写入 crash_log）
+        com.dut.runmate.auth.CasAuth.logDir = filesDir
         // v1.8.1：恢复 WebVPN 隧道真实前缀（Http.call 请求时替换 URL 中 0 占位段用）
         try {
             val prefs = com.dut.runmate.data.Prefs.get(this)

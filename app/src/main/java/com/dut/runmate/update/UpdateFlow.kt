@@ -74,7 +74,7 @@ object UpdateFlow {
             when (val r = Updater.check(activity)) {
                 is Updater.CheckResult.HasUpdate -> showUpdateDialog(activity, r.info)
                 is Updater.CheckResult.UpToDate -> if (!silent)
-                    Toast.makeText(activity, R.string.upd_uptodate, Toast.LENGTH_SHORT).show()
+                    com.dut.runmate.ui.Notice.show(activity, R.string.upd_uptodate)
                 is Updater.CheckResult.Failed -> if (!silent)
                     showCheckFailedDialog(activity, r.reason)
             }
@@ -170,7 +170,7 @@ object UpdateFlow {
         try {
             val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("runmate", text))
-            Toast.makeText(activity, R.string.pref_crash_copied, Toast.LENGTH_SHORT).show()
+            com.dut.runmate.ui.Notice.show(activity, R.string.pref_crash_copied)
         } catch (_: Exception) {
         }
     }
@@ -189,7 +189,7 @@ object UpdateFlow {
                             Uri.parse("package:${activity.packageName}"))
                     )
                 } catch (_: Exception) {
-                    Toast.makeText(activity, R.string.upd_perm_manual, Toast.LENGTH_LONG).show()
+                    com.dut.runmate.ui.Notice.show(activity, R.string.upd_perm_manual)
                 }
             }
             .setNegativeButton(android.R.string.cancel, null)

@@ -92,7 +92,8 @@ class SettingsFragment : Fragment() {
         b.btnTestAlert.setOnClickListener {
             val am = com.dut.runmate.alert.AlertManager(requireContext(), prefs)
             try {
-                Toast.makeText(requireContext(), R.string.alert_test_playing, Toast.LENGTH_SHORT).show()
+                // v1.8.11：Toast 改需手动确认对话框
+                Notice.show(this, R.string.alert_test_playing)
             } catch (_: Throwable) { }
             // 立即触发三通道（预录语音无初始化延迟）
             try { am.testAlert() } catch (_: Throwable) { }
@@ -158,9 +159,7 @@ class SettingsFragment : Fragment() {
                 startActivity(Intent(Intent.ACTION_VIEW,
                     Uri.parse("https://github.com/" + com.dut.runmate.update.Updater.GITHUB_REPO)))
             } catch (_: Exception) {
-                Toast.makeText(requireContext(),
-                    "https://github.com/" + com.dut.runmate.update.Updater.GITHUB_REPO,
-                    Toast.LENGTH_LONG).show()
+                Notice.show(this, "https://github.com/" + com.dut.runmate.update.Updater.GITHUB_REPO)
             }
         }
 
@@ -172,7 +171,7 @@ class SettingsFragment : Fragment() {
                         Uri.parse("package:${requireContext().packageName}"))
                 )
             } catch (_: Exception) {
-                Toast.makeText(requireContext(), "请手动在系统设置中允许后台运行", Toast.LENGTH_LONG).show()
+                Notice.show(this, "请手动在系统设置中允许后台运行")
             }
         }
         // v1.8.3：系统通知设置直达（锁屏显示修复链路的一环——Android 13+ 通知
@@ -185,13 +184,13 @@ class SettingsFragment : Fragment() {
                         .putExtra(Settings.EXTRA_APP_PACKAGE, requireContext().packageName)
                 )
             } catch (_: Exception) {
-                Toast.makeText(requireContext(), R.string.notif_settings_fallback, Toast.LENGTH_LONG).show()
+                Notice.show(this, R.string.notif_settings_fallback)
             }
         }
         b.btnExport.setOnClickListener {
             val cm = requireActivity().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("runmate", store.exportJson()))
-            Toast.makeText(requireContext(), getString(R.string.pref_export_done, store.count), Toast.LENGTH_SHORT).show()
+            Notice.show(this, getString(R.string.pref_export_done, store.count))
         }
 
         // v1.5.1：崩溃日志查看（filesDir/crash_log.txt，App.kt 全局捕获落盘）。
@@ -202,7 +201,7 @@ class SettingsFragment : Fragment() {
                     .takeIf { it.exists() }?.readText() ?: ""
             } catch (_: Exception) { "" }
             if (text.isBlank()) {
-                Toast.makeText(requireContext(), R.string.pref_crash_none, Toast.LENGTH_SHORT).show()
+                Notice.show(this, R.string.pref_crash_none)
             } else {
                 val cm = requireActivity().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                 cm.setPrimaryClip(ClipData.newPlainText("crash", text))
@@ -210,7 +209,7 @@ class SettingsFragment : Fragment() {
                     .setTitle(R.string.pref_crash_title)
                     .setMessage(text.take(6000))
                     .setPositiveButton(R.string.pref_crash_copy) { d, _ ->
-                        Toast.makeText(requireContext(), R.string.pref_crash_copied, Toast.LENGTH_SHORT).show()
+                        Notice.show(this, R.string.pref_crash_copied)
                         d.dismiss()
                     }
                     .setNegativeButton(android.R.string.cancel, null)

@@ -308,6 +308,20 @@
          该情形源于学校服务波动重置会话；自动重登后需重发短信（受 1 分钟/次限频）。 -->
     <string name="mfa_session_lost">本次验证会话被学校服务重置（服务波动，不是密码或验证码错误）。已自动重新登录，请在弹出的新对话框里重新获取短信验证码（一分钟内请勿重复发送）。</string>
 
+    <!-- v1.8.11：PM1 提交失败细分（实测探针：会话极稳，手机端失败多为网络层；
+         旧版一切失败都报「会话被重置」并强制重登，误导排查方向） -->
+    <string name="mfa_net_retry">提交时网络出问题了：%1$s\n\n验证会话没有受影响，短信码已为你保留在下方输入框里，直接再点「完成登录」重试即可（不用重新发短信）。</string>
+    <string name="mfa_rescuing">验证会话已失效，正在自动重新登录并重试（无需操作）…</string>
+    <string name="mfa_session_lost_resend">本次验证会话已失效（网络波动或学校服务重置，不是密码或验证码错误）。已自动重新登录——短信验证码需要重新获取一次（一分钟内请勿重复发送）。</string>
+
+    <!-- v1.8.11：统一「需手动确认」弹窗（Notice）——用户实报临时弹窗显示不全 -->
+    <string name="notice_title">提示</string>
+    <string name="ws_native_fail_title">一键配置未完成</string>
+
+    <!-- v1.8.11：服务启动失败通知（后台无法弹对话框，改高优先级通知可展开全文） -->
+    <string name="ch_err_name">跑步服务异常</string>
+    <string name="ch_err_title">跑步服务启动失败</string>
+
     <!-- 更新 -->
     <string name="pref_update">更新</string>
     <string name="pref_upd_auto">自动检查更新</string>

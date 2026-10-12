@@ -224,8 +224,18 @@ class H5CatcherActivity : AppCompatActivity() {
         val hasCredential = prefs.wsSkey.isNotBlank() || prefs.casTgt.isNotBlank()
         val hasFormCredential = number.isNotBlank() && password.isNotBlank()
         if (!hasCredential && !hasFormCredential) {
-            Toast.makeText(this, R.string.h5_no_session, Toast.LENGTH_LONG).show()
-            finish()
+            // v1.8.11：Toast 改需手动确认对话框；用户点「确定」后才 finish()
+            //（旧版 Toast 一闪而过 + 立即退出，用户根本来不及看原因）
+            try {
+                com.google.android.material.dialog.MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.notice_title)
+                    .setMessage(R.string.h5_no_session)
+                    .setCancelable(false)
+                    .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
+                    .show()
+            } catch (_: Throwable) {
+                finish()
+            }
             return
         }
 
@@ -1074,8 +1084,9 @@ class H5CatcherActivity : AppCompatActivity() {
         b.scrollLog.post { b.scrollLog.fullScroll(View.FOCUS_DOWN) }
     }
 
-    private fun toast(resId: Int) = Toast.makeText(this, resId, Toast.LENGTH_LONG).show()
-    private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()
+    // v1.8.11：Toast 改需手动确认对话框（用户实报临时弹窗显示不全，要求全部手动确认关闭）
+    private fun toast(resId: Int) = Notice.show(this, resId)
+    private fun toast(s: String) = Notice.show(this, s)
 
     override fun onDestroy() {
         try { b.web.destroy() } catch (_: Exception) {}

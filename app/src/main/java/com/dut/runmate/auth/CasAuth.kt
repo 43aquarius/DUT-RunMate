@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -66,7 +67,17 @@ object CasAuth {
             val phoneTail: String
         ) : Result()
 
-        data class Err(val msg: String) : Result()
+        /**
+         * v1.8.11：失败细分。旧版把一切失败（网络超时 / 服务端 5xx / 会话失效）
+         * 都笼统当成「会话被重置」，误导用户排查方向（实测沙箱全链路复现：
+         * 学校 CAS 的 PM1 会话极稳，手机上失败多为网络层问题）。
+         * NETWORK=本机网络异常（会话大概率还活着，可直接重试提交）；
+         * SESSION_LOST=回到密码登录页（会话确实没了）；
+         * SERVER_ERROR=学校服务报「请求出错」异常页（如 execution 无效）。
+         */
+        enum class ErrKind { NETWORK, SESSION_LOST, SERVER_ERROR, OTHER }
+
+        data class Err(val msg: String, val kind: ErrKind = ErrKind.OTHER) : Result()
     }
 
     private val cookieStore = mutableListOf<Cookie>()
@@ -273,11 +284,19 @@ object CasAuth {
     /**
      * 提交二次认证短信码（PM1）。成功返回 CASTGC；仍停在二次认证页时返回
      * MfaRetry（携带响应页的新 execution——实测 PM1 提交后 execution 推进
-     * e1s2→e1s3，重试必须用新值，旧值作废）；会话丢失（回到密码登录页等）
-     * 返回 Err，调用方需重新 login()。
+     * e1s2→e1s3，重试必须用新值，旧值作废）。
+     *
+     * v1.8.11：其余失败按 ErrKind 细分（旧版一律当「会话过期」，实测误导）：
+     *  - NETWORK：本机网络异常（超时/断连）——CAS 会话大概率还活着，直接重试提交即可；
+     *  - SESSION_LOST：响应为密码登录页——会话确实没了，需重新 login()；
+     *  - SERVER_ERROR：学校服务「请求出错」异常页（实测 execution 为空/非法时出现）。
+     * 每次失败都把 HTTP 状态/终态 URL/页面指纹写入 crash_log（SoftLog），
+     * 用户反馈时可复制，远程定位不再靠猜。
      */
     suspend fun submitMfa(smsCode: String, execution: String): Result =
         withContext(Dispatchers.IO) {
+            var lastCode = 0
+            var lastUrl = ""
             try {
                 val form = FormBody.Builder()
                     .add("PM1", smsCode.trim())
@@ -297,6 +316,8 @@ object CasAuth {
                         .post(form)
                         .build()
                 ).execute().use { r ->
+                    lastCode = r.code
+                    lastUrl = r.request.url.toString()
                     val body = r.body?.string() ?: ""
                     val castgc = synchronized(cookieStore) {
                         cookieStore.firstOrNull {
@@ -304,12 +325,19 @@ object CasAuth {
                         }?.value
                     }
                     if (!castgc.isNullOrBlank()) return@withContext Result.Ok(castgc)
+
+                    // v1.8.11：页面指纹分类（实测样本：MFA 页含 PM1+二次认证；
+                    // 密码登录页含 name="rsa"；服务异常页含「请求出错」）
+                    val isMfa = body.contains("PM1") && body.contains("二次认证")
+                    val isLoginPage = body.contains("<form id=\"loginForm\"") &&
+                        body.contains("name=\"rsa\"")
+                    val isServerError = body.contains("请求出错") || body.contains("系统提示")
                     val err = Regex(
                         """id="errormsghide"[^>]*>\s*([^<]*)"""
                     ).find(body)?.groupValues?.get(1)?.trim()
                         ?.replace("<br/>", "")?.replace("<br>", "")
                     // v1.8.9：仍是二次认证页 → 流程还活着，提取新 execution 供重试
-                    if (body.contains("PM1") && body.contains("二次认证")) {
+                    if (isMfa) {
                         val newEx = Regex("""name="execution"\s+value="([^"]+)"""")
                             .find(body)?.groupValues?.get(1) ?: execution
                         val tail = Regex("""尾号(\d+)""")
@@ -319,13 +347,46 @@ object CasAuth {
                             newEx, tail
                         )
                     }
-                    // 回到密码登录页 / 其他页面 → 会话丢失，需重新 login()
-                    Result.Err(err?.takeIf { it.isNotBlank() } ?: "会话已过期，请重新登录")
+                    // v1.8.11：诊断落盘（无凭据、无 Cookie 值，只有页面指纹）
+                    diag(lastCode, lastUrl, isLoginPage, isServerError,
+                        body.length, err ?: "")
+                    when {
+                        isServerError -> Result.Err(
+                            "学校认证服务返回「请求出错」（服务端异常，可稍后重试）",
+                            Result.ErrKind.SERVER_ERROR)
+                        isLoginPage -> Result.Err(
+                            err?.takeIf { it.isNotBlank() } ?: "会话已过期，请重新登录",
+                            Result.ErrKind.SESSION_LOST)
+                        else -> Result.Err(
+                            err?.takeIf { it.isNotBlank() }
+                                ?: "响应异常（HTTP $lastCode），请重试",
+                            Result.ErrKind.OTHER)
+                    }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                Result.Err("网络错误：${e.message ?: "无法连接学校认证服务"}")
+                diag(lastCode, lastUrl, false, false, -1,
+                    "EXC ${e.javaClass.simpleName}: ${e.message ?: ""}")
+                Result.Err(
+                    "网络错误：${e.message ?: "无法连接学校认证服务"}（会话未受影响，可直接重试）",
+                    Result.ErrKind.NETWORK)
             }
         }
+
+    /** v1.8.11：诊断日志目录（App.onCreate 注入 filesDir；CasAuth 无 Context） */
+    @Volatile var logDir: File? = null
+
+    /** v1.8.11：PM1 提交诊断落盘（crash_log.txt [SOFT] 段，无敏感信息） */
+    private fun diag(code: Int, url: String, loginPage: Boolean, serverErr: Boolean,
+                     bodyLen: Int, err: String) {
+        try {
+            val msg = "PM1 submit fail: HTTP=$code url=${url.take(80)} " +
+                "loginPage=$loginPage serverErr=$serverErr bodyLen=$bodyLen err=${err.take(80)}"
+            com.dut.runmate.util.SoftLog.write(logDir ?: return, "CasAuth", msg)
+        } catch (_: Throwable) {
+        }
+    }
 }
 
 /**

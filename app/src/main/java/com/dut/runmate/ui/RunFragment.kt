@@ -70,12 +70,9 @@ class RunFragment : Fragment() {
         }
     }
 
-    /** v1.6.1：Toast 隔离——个别 ROM 的 Toast 渲染异常不再可能闪退整个 App */
+    /** v1.6.1 隔离 + v1.8.11 改需手动确认对话框（原 Toast 显示不全，用户实报） */
     private fun safeToast(resId: Int) {
-        try {
-            Toast.makeText(requireContext(), resId, Toast.LENGTH_SHORT).show()
-        } catch (_: Throwable) {
-        }
+        Notice.show(this, resId)
     }
 
     override fun onCreateView(i: LayoutInflater, c: ViewGroup?, s: Bundle?): View {
@@ -184,12 +181,9 @@ class RunFragment : Fragment() {
         super.onPause()
     }
 
-    /** v1.8.6：安全显示文本 Toast（中文消息用），与 safeToast 同样隔离 ROM 异常 */
+    /** v1.8.6 中文消息版 + v1.8.11 改需手动确认对话框 */
     private fun safeToastText(msg: String) {
-        try {
-            Toast.makeText(requireContext(), msg, Toast.LENGTH_SHORT).show()
-        } catch (_: Throwable) {
-        }
+        Notice.show(this, msg)
     }
 
     // ---------- 服务端距离：点按核对 / 下拉刷新 ----------
@@ -230,6 +224,9 @@ class RunFragment : Fragment() {
             }
             viewLifecycleOwner.lifecycleScope.launch {
                 var resultToast: String? = null
+                // v1.8.11：下拉刷新成功时静默（右上角数字已更新，弹窗反而打扰），
+                // 仅失败/异常才弹需手动确认的完整提示（用户要求长文案可完整阅读）
+                var resultIsFailure = false
                 runCatching {
                     val resp = Http.call(prof, prefs.apiToken, prefs.apiCookie)
                     if (_b == null) return@launch      // 页面已销毁：放弃 UI 更新
@@ -268,6 +265,7 @@ class RunFragment : Fragment() {
                         ok && dv != null -> getString(R.string.pull_refresh_done, String.format("%.1f", dv))
                         else -> headline
                     }
+                    resultIsFailure = !ok || webvpnExpired || dv == null
                     if (showDialog) showQueryResult(headline, ok && !webvpnExpired, resp, prof)
                 }.onFailure { e ->
                     // v1.6.1：页面仍在才展示/记录；已分离则静默丢弃（requireContext 会抛异常）
@@ -275,11 +273,13 @@ class RunFragment : Fragment() {
                     SoftLog.write(requireContext().filesDir, "run=refresh", e)
                     val err = getString(R.string.api_test_error, "${e.javaClass.simpleName}: ${e.message ?: ""}")
                     resultToast = err
+                    resultIsFailure = true
                     if (showDialog) showQueryResult(err, false, null, prof)
                 }
                 querying = false
-                // 下拉刷新：结果 Toast 简报（成功=已刷新+距离；失败=原因）
-                if (!showDialog && _b != null) resultToast?.let { safeToastText(it) }
+                // 下拉刷新：仅失败/异常弹完整提示（成功静默，数字已就地更新）
+                if (!showDialog && _b != null && resultIsFailure)
+                    resultToast?.let { safeToastText(it) }
                 // 恢复右上角标签（render 也会在下次状态变化时重设）
                 if (_b != null && !RunBus.state.value.running) {
                     b.tvApiDist.text = getString(R.string.api_dist_query)
