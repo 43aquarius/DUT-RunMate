@@ -1,0 +1,73 @@
+name: Android Release
+
+# 打 v* 标签自动触发；也支持手动触发（Actions 页面 → Run workflow）
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle (with cache)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Determine version & tag
+        id: ver
+        run: |
+          VER="$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)"
+          TAG="v${VER}"
+          echo "ver=${VER}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "版本: ${VER}  标签: ${TAG}"
+
+      - name: Rename APK & generate SHA256
+        env:
+          VER: ${{ steps.ver.outputs.ver }}
+        run: |
+          SRC="app/build/outputs/apk/release/app-release.apk"
+          DST="DUT-RunMate_v${VER}.apk"
+          cp "${SRC}" "${DST}"
+          sha256sum "${DST}" | awk '{print $1}' > "${DST}.sha256"
+          echo "—— 产物 ——"
+          ls -la DUT-RunMate_v*
+          echo "SHA256: $(cat ${DST}.sha256)"
+
+      - name: Create GitHub Release & upload APK
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VER: ${{ steps.ver.outputs.ver }}
+        run: |
+          # Release 已存在则复用，不存在则创建（notes 取 .github/release-notes/<tag>.md）
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "DUT-RunMate $TAG" \
+              --notes-file ".github/release-notes/$TAG.md"
+          fi
+          gh release upload "$TAG" \
+            "DUT-RunMate_v${VER}.apk" \
+            "DUT-RunMate_v${VER}.apk.sha256" \
+            --clobber --repo "$GITHUB_REPOSITORY"
+          echo "—— Release 资产 ——"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name'

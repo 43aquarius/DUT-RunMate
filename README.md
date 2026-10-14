@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.11-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.12-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.11.apk`（约 6.3 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.12.apk`（约 6.3 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,11 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.12（2026-10-14）** —— 登录「输入正确短信验证码也报错」实测根治 + GitHub Actions 自动构建发布
+  - 根因（真实账号全链路实测）：学校 CAS 二次认证实为三步——密码 → 短信码 → **「信任设备」确认**。短信码验证通过后服务端不发 CASTGC，而是返回「信任设备」确认页（execution 推进 e1s2→e1s3，含 check_user_device 隐藏域）；旧版不认识此页，落入兜底分支报「响应异常（HTTP 200），请重试」——看起来就像验证码错了，其实验证码早已通过
+  - 修复：`submitMfa` 识别信任设备页指纹后自动以 `check_user_device=true` + 新 execution 提交（等价网页端替用户点「确认」），实测全链路 CASTGC 到手、成功跳转校园门户；信任确认后仍失败则回落原有分流重试路径，兼容旧行为
+  - 选「信任」而非「不信任」：设备被服务端标记信任后，App 进程存活期间重登可跳过短信验证，减少发码次数
+  - 新增 `.github/workflows/android-release.yml`：打 `v*` 标签自动构建签名 APK 并发布 Release（附 SHA256 校验文件）
 - **v1.8.11（2026-10-12）** —— 登录二次认证失败分流（网络/会话/服务端细分 + 同码自动找回，实测推翻「会话被重置」旧结论）+ 全部临时弹窗改为需手动确认的对话框 + 服务启动失败改通知
 - **v1.8.10（2026-10-12）** —— 登录「会话已过期」实测根治 + 设置页闪退修复
   - 修复设置页「测试提醒」4.5 秒延迟回调在 Fragment 脱离后崩溃（IllegalStateException: not attached to a context）；

@@ -11,8 +11,8 @@ android {
         applicationId = "com.dut.runmate"
         minSdk = 24
         targetSdk = 34
-        versionCode = 24
-        versionName = "1.8.11"
+        versionCode = 25
+        versionName = "1.8.12"
     }
 
     signingConfigs {

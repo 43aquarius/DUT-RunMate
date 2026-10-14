@@ -281,10 +281,23 @@ object CasAuth {
         }
     }
 
+    /** v1.8.12：从共享 Cookie jar 取 CASTGC（submitMfa 两段式复用） */
+    private fun castgcFromJar(): String? = synchronized(cookieStore) {
+        cookieStore.firstOrNull { it.name == "CASTGC" && it.value.isNotBlank() }?.value
+    }
+
     /**
      * 提交二次认证短信码（PM1）。成功返回 CASTGC；仍停在二次认证页时返回
      * MfaRetry（携带响应页的新 execution——实测 PM1 提交后 execution 推进
      * e1s2→e1s3，重试必须用新值，旧值作废）。
+     *
+     * v1.8.12 根因修复（实测 2026-10-14）：短信码【正确】时服务端并不直接发
+     * CASTGC，而是先返回「信任设备」确认页（execution 推进到 e1s3，页面指纹 =
+     * 含 check_user_device 隐藏域，无 PM1 / 无 rsa / 无错误文案）。旧版不认识
+     * 此页，落入 OTHER 分支报「响应异常（HTTP 200），请重试」——即用户实报
+     * 「输入正确验证码也显示错误」的根因。网页端用户点「确认」= 把
+     * check_user_device 置 true 再提交同一表单；此处自动代点，提交后 CASTGC
+     * 到手，全链路（含 WebVPN 后续配置）不变。
      *
      * v1.8.11：其余失败按 ErrKind 细分（旧版一律当「会话过期」，实测误导）：
      *  - NETWORK：本机网络异常（超时/断连）——CAS 会话大概率还活着，直接重试提交即可；
@@ -318,13 +331,43 @@ object CasAuth {
                 ).execute().use { r ->
                     lastCode = r.code
                     lastUrl = r.request.url.toString()
-                    val body = r.body?.string() ?: ""
-                    val castgc = synchronized(cookieStore) {
-                        cookieStore.firstOrNull {
-                            it.name == "CASTGC" && it.value.isNotBlank()
-                        }?.value
+                    var body = r.body?.string() ?: ""
+                    castgcFromJar()?.let { return@withContext Result.Ok(it) }
+
+                    // v1.8.12 根因修复：上面若没拿到 CASTGC 且响应是「信任设备」确认页
+                    // （指纹=含 check_user_device 隐藏域），说明短信码已验对，只差最后
+                    // 一步设备确认。网页端「确认」按钮 = check_user_device=true 提交同一
+                    // 表单（实测提交后 CASTGC 到手，并 302 跳转校园门户）。
+                    // 取 false 可完成登录但下次仍要短信；true 则本设备（devInfo Cookie）
+                    // 在服务端标记为信任——App 进程存活期间重登可免短信，选 true。
+                    if (body.contains("check_user_device")) {
+                        val trustEx = Regex("""name="execution"\s+value="([^"]+)"""")
+                            .find(body)?.groupValues?.get(1)
+                        if (!trustEx.isNullOrBlank()) {
+                            val trustForm = FormBody.Builder()
+                                .add("check_user_device", "true")
+                                .add("RelayState", trustEx)
+                                .add("execution", trustEx)
+                                .add("_eventId", "submit")
+                                .build()
+                            client.newCall(
+                                Request.Builder().url(LOGIN_PAGE)
+                                    .header("User-Agent", UA)
+                                    .header("Referer", LOGIN_PAGE)
+                                    .header("Origin", "https://$HOST")
+                                    .header("Accept-Language", "zh-CN,zh;q=0.9")
+                                    .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                                    .header("Upgrade-Insecure-Requests", "1")
+                                    .post(trustForm)
+                                    .build()
+                            ).execute().use { tr ->
+                                lastCode = tr.code
+                                lastUrl = tr.request.url.toString()
+                                body = tr.body?.string() ?: ""
+                                castgcFromJar()?.let { return@withContext Result.Ok(it) }
+                            }
+                        }
                     }
-                    if (!castgc.isNullOrBlank()) return@withContext Result.Ok(castgc)
 
                     // v1.8.11：页面指纹分类（实测样本：MFA 页含 PM1+二次认证；
                     // 密码登录页含 name="rsa"；服务异常页含「请求出错」）
