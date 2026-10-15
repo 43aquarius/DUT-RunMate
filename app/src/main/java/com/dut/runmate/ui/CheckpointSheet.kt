@@ -34,7 +34,7 @@ object CheckpointSheet {
 
         b.etCpName.setText(cp.name.ifEmpty { store.defaultName() })
         b.etCpNote.setText(cp.note)
-        b.sliderSheetRadius.value = cp.radius.toFloat().coerceIn(10f, 100f)
+        b.sliderSheetRadius.value = cp.radius.toFloat().coerceIn(1f, 100f)   // v1.8.13：最小 1m
         b.tvSheetRadius.text = "${cp.radius} m"
 
         if (lat != null && lon != null) {

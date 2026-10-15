@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.12-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.13-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.12.apk`（约 6.3 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.13.apk`（约 6.3 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -128,6 +128,12 @@ app/src/main/java/com/dut/runmate/
 
 ## 更新日志
 
+- **v1.8.13（2026-10-15）** —— 跑步中途提醒失效根治 + 分场景提醒开关 + 更新/接口页精简
+  - 🐛 **根治「跑到一半多语音震动全没了，距离还能刷新」**：根因是健康长跑为多圈跑，旧版对已确认（CONFIRMED）的点位永不重新武装——第一圈跑完全部点位确认后检测引擎彻底沉默（无预告/无进区/无确认/无漏卡，核对失败强提醒也停），而距离轮询独立所以照常刷新。现在离开预告圈后自动重新武装，下一圈照常预告→进区→基线→确认（确认数按圈累计）；宽限期到期/漏卡判定改为独立心跳驱动，GPS 定位停顿（精度变差被过滤/楼宇遮挡）时漏卡告警也照常触发
+  - 🔔 **分场景提醒开关**：设置页新增「分场景开关（语音/震动）」——开跑/预告/进区/打卡成功/区内未确认周期提醒/漏卡警告/通过点位/核对链路异常/跑步结束，9 种场景的语音与震动可逐一独立开关（与总开关叠加，默认全开）
+  - 📏 检测半径与预告距离的最小值放宽到 1m（原 15m/30m 起步；点位编辑弹层同步）
+  - 🌐 更新只走 GitHub Release：移除发布中心服务器通道（dut-runmate.space-z.ai），单一发布源；检查失败时弹窗引导 GitHub Releases 页浏览器直下
+  - 🧹 移除「自定义接口调试」功能（接口模板列表/手动编辑/发送测试/令牌手填/结果卡片）：账号登录一键配置已覆盖全部场景，普通用户无需手工调试；接口页只留账号登录、多账号、批量查距离与 API 判定开关
 - **v1.8.12（2026-10-14）** —— 登录「输入正确短信验证码也报错」实测根治 + GitHub Actions 自动构建发布
   - 根因（真实账号全链路实测）：学校 CAS 二次认证实为三步——密码 → 短信码 → **「信任设备」确认**。短信码验证通过后服务端不发 CASTGC，而是返回「信任设备」确认页（execution 推进 e1s2→e1s3，含 check_user_device 隐藏域）；旧版不认识此页，落入兜底分支报「响应异常（HTTP 200），请重试」——看起来就像验证码错了，其实验证码早已通过
   - 修复：`submitMfa` 识别信任设备页指纹后自动以 `check_user_device=true` + 新 execution 提交（等价网页端替用户点「确认」），实测全链路 CASTGC 到手、成功跳转校园门户；信任确认后仍失败则回落原有分流重试路径，兼容旧行为

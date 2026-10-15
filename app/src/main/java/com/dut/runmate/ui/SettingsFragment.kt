@@ -10,7 +10,6 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import com.dut.runmate.BuildConfig
@@ -19,6 +18,7 @@ import com.dut.runmate.data.CheckpointStore
 import com.dut.runmate.data.Prefs
 import com.dut.runmate.databinding.FragmentSettingsBinding
 import com.dut.runmate.update.UpdateFlow
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
  * 设置页（v1.3.0 起为底部导航第 5 个 Tab，替代原独立 SettingsActivity）。
@@ -85,6 +85,10 @@ class SettingsFragment : Fragment() {
         b.swVibrate.isChecked = prefs.vibrateEnabled
         b.swVibrate.setOnCheckedChangeListener { _, c -> prefs.vibrateEnabled = c }
 
+        // v1.8.13：分场景提醒开关（每种提醒的语音/震动独立开关，默认全开，
+        // 与上方总开关叠加——两层都开才触发）
+        b.btnAlertScn.setOnClickListener { showScnMatrixDialog() }
+
         // v1.8.6：测试提醒——当场播报语音+提示音+震动，4.5s 后弹出三通道自检结果。
         // v1.8.8：语音改预录音（res/raw/voice_*.ogg 随 App 打包）——彻底不依赖
         // 系统 TTS 引擎（连续两轮修「引擎不可用」的终结方案）：即点即播、
@@ -147,8 +151,8 @@ class SettingsFragment : Fragment() {
             prefs.coordGcj = id == R.id.rbCoordGcj
         }
 
-        // 更新（v1.6.0：界面精简——服务器地址与自动检查开关不再展示，只留「检查更新」；
-        // 服务器已内置固定，自动检查默认开启，升级提醒不受影响）
+        // 更新（v1.6.0：界面精简——只留「检查更新」；v1.8.13：更新只走 GitHub
+        // Release，发布中心服务器通道已随 Updater 一并移除）
         b.btnUpdCheck.setOnClickListener {
             (requireActivity() as? AppCompatActivity)?.let { UpdateFlow.manualCheck(it) }
         }
@@ -219,6 +223,72 @@ class SettingsFragment : Fragment() {
 
         // 关于（动态版本号）
         b.tvAbout.text = getString(R.string.pref_about_body, BuildConfig.VERSION_NAME)
+    }
+
+    /**
+     * v1.8.13：分场景提醒开关矩阵——9 种提醒场景 ×「语音」「震动」两个可勾选
+     * Chip，即点即存（SharedPreferences）。与总开关（语音/震动）叠加：两层都
+     * 开才触发。提示音保持全局开关不分场景（提醒主通道是语音+震动）。
+     */
+    private fun showScnMatrixDialog() {
+        val act = activity as? AppCompatActivity ?: return
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val rows = listOf(
+            com.dut.runmate.alert.AlertManager.Voice.START to getString(R.string.scn_start),
+            com.dut.runmate.alert.AlertManager.Voice.APPROACH to getString(R.string.scn_approach),
+            com.dut.runmate.alert.AlertManager.Voice.ENTER to getString(R.string.scn_enter),
+            com.dut.runmate.alert.AlertManager.Voice.OK to getString(R.string.scn_ok),
+            com.dut.runmate.alert.AlertManager.Voice.UNCONFIRMED to getString(R.string.scn_unconfirmed),
+            com.dut.runmate.alert.AlertManager.Voice.MISSED to getString(R.string.scn_missed),
+            com.dut.runmate.alert.AlertManager.Voice.PASS_GPS to getString(R.string.scn_pass_gps),
+            com.dut.runmate.alert.AlertManager.Voice.API_ERR to getString(R.string.scn_api_err),
+            com.dut.runmate.alert.AlertManager.Voice.END to getString(R.string.scn_end)
+        )
+        val root = android.widget.LinearLayout(act).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
+        }
+        for ((v, label) in rows) {
+            val row = android.widget.LinearLayout(act).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(0, pad / 4, 0, pad / 4)
+            }
+            row.addView(android.widget.TextView(act).apply {
+                text = label
+                setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Body1)
+                layoutParams = android.widget.LinearLayout.LayoutParams(0,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            val chipV = com.google.android.material.chip.Chip(act).apply {
+                text = getString(R.string.scn_voice)
+                isCheckable = true
+                isChecked = prefs.scnVoiceOn(v.scn)
+                setOnCheckedChangeListener { _, c -> prefs.setScnVoiceOn(v.scn, c) }
+            }
+            val chipB = com.google.android.material.chip.Chip(act).apply {
+                text = getString(R.string.scn_vib)
+                isCheckable = true
+                isChecked = prefs.scnVibOn(v.scn)
+                setOnCheckedChangeListener { _, c -> prefs.setScnVibOn(v.scn, c) }
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { marginStart = pad / 2 }
+            }
+            row.addView(chipV)
+            row.addView(chipB)
+            root.addView(row)
+        }
+        val scroll = android.widget.ScrollView(act).apply { addView(root) }
+        try {
+            MaterialAlertDialogBuilder(act)
+                .setTitle(R.string.scn_matrix_title)
+                .setView(scroll)
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        } catch (_: Throwable) {
+        }
     }
 
     override fun onPause() {

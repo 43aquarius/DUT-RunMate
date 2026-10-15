@@ -242,7 +242,7 @@ class RunTrackerService : Service() {
         // v1.8.3：开跑即时反馈（旧 TTS 引擎初始化需 1~3 秒，引擎
         // 没就绪时开场提示完全丢失；补提示音+震动，不依赖语音就绪）
         alert?.chime(AlertManager.Kind.OK)
-        alert?.vibrate(AlertManager.Kind.OK)
+        alert?.vibrate(AlertManager.Kind.OK, AlertManager.Voice.START.scn)
         RunBus.update {
             it.copy(running = true, fix = null, snaps = engine?.snapshot() ?: emptyList(),
                 stats = RunBus.Stats(), summary = null, apiErr = null, apiDistance = null)
@@ -256,7 +256,7 @@ class RunTrackerService : Service() {
                 prefs.apiToken.isBlank()) {
                 alert?.voice(AlertManager.Voice.API_ERR)
                 alert?.chime(AlertManager.Kind.WARN)
-                alert?.vibrate(AlertManager.Kind.WARN)
+                alert?.vibrate(AlertManager.Kind.WARN, AlertManager.Voice.API_ERR.scn)
                 RunBus.update { it.copy(apiErr = getString(R.string.api_unconfigured_run)) }
             }
         }
@@ -276,6 +276,9 @@ class RunTrackerService : Service() {
                 delay(500)
                 // v1.6.1：单轮全部隔离——任何一段异常只跳过本轮，循环继续
                 try {
+                    // v1.8.13：时间驱动心跳——宽限期到期/漏卡判定不再依赖 GPS
+                    // 回调（定位停顿时漏卡提醒也能照常触发）
+                    engine?.tick(SystemClock.elapsedRealtime())
                     checkZoneNags()          // v1.8.3：区内长时间未确认打卡的周期性强提醒
                     pollOnce()
                 } catch (ce: CancellationException) {
@@ -306,7 +309,7 @@ class RunTrackerService : Service() {
             try {
                 a.voice(AlertManager.Voice.UNCONFIRMED)
                 a.chime(AlertManager.Kind.WARN)
-                a.vibrate(AlertManager.Kind.WARN)
+                a.vibrate(AlertManager.Kind.WARN, AlertManager.Voice.UNCONFIRMED.scn)
             } catch (e: Throwable) {
                 logSoft("zoneNag", e)
             }
@@ -396,7 +399,7 @@ class RunTrackerService : Service() {
         try {
             a.voice(AlertManager.Voice.API_ERR)
             a.chime(AlertManager.Kind.WARN)
-            a.vibrate(AlertManager.Kind.WARN)
+            a.vibrate(AlertManager.Kind.WARN, AlertManager.Voice.API_ERR.scn)
         } catch (e: Throwable) {
             logSoft("alertApiFailure", e)
         }
@@ -499,24 +502,27 @@ class RunTrackerService : Service() {
                     a.chime(AlertManager.Kind.INFO)
                     // v1.8.3：接近提醒补轻震动（旧版只响音不震动，手机在口袋/嘌杂
                     // 环境易错过；震动是唯一可靠通道）
-                    a.vibrate(AlertManager.Kind.INFO)
+                    a.vibrate(AlertManager.Kind.INFO, AlertManager.Voice.APPROACH.scn)
                 }
                 is DetectEngine.Ev.EnterZone -> {
                     // v1.8.3：进区提醒从「仅语音」升为「语音+提示音+震动」——
                     // TTS 未就绪/被系统杀掉时旧版完全无声，进区是核对流程的起点
                     a.voice(AlertManager.Voice.ENTER)
                     a.chime(AlertManager.Kind.OK)
-                    a.vibrate(AlertManager.Kind.OK)
+                    a.vibrate(AlertManager.Kind.OK, AlertManager.Voice.ENTER.scn)
                 }
                 is DetectEngine.Ev.Confirmed -> {
                     a.voice(AlertManager.Voice.OK)
-                    a.chime(AlertManager.Kind.OK); a.vibrate(AlertManager.Kind.OK)
+                    a.chime(AlertManager.Kind.OK); a.vibrate(AlertManager.Kind.OK, AlertManager.Voice.OK.scn)
                 }
                 is DetectEngine.Ev.Missed -> {
                     a.voice(AlertManager.Voice.MISSED)
-                    a.chime(AlertManager.Kind.WARN); a.vibrate(AlertManager.Kind.WARN)
+                    a.chime(AlertManager.Kind.WARN); a.vibrate(AlertManager.Kind.WARN, AlertManager.Voice.MISSED.scn)
                 }
-                is DetectEngine.Ev.PassedGps -> a.voice(AlertManager.Voice.PASS_GPS)
+                is DetectEngine.Ev.PassedGps -> {
+                    a.voice(AlertManager.Voice.PASS_GPS)
+                    a.vibrate(AlertManager.Kind.INFO, AlertManager.Voice.PASS_GPS.scn)
+                }
             }
         } catch (e: Throwable) {
             logSoft("onEvent", e)   // v1.6.0：语音/提醒失败不影响跟踪
@@ -661,7 +667,7 @@ class RunTrackerService : Service() {
 
     /** v1.5.0：通知文本 = 官方打卡距离 + 自测 GPS 里程 + 点位状态（锁屏可见） */
     private fun updateNotificationText(nearest: RunBus.CpSnap?, snaps: List<RunBus.CpSnap>) {
-        val ok = snaps.count { it.state == RunBus.CpState.CONFIRMED }
+        val ok = snaps.count { it.confirmedCount > 0 }   // v1.8.13：累计口径（多圈重武装后不随圈次归零）
         val st = RunBus.state.value
         val apiTxt = st.apiDistance
             ?.let { "官方打卡 %d m".format(it.roundToInt()) }
@@ -729,9 +735,9 @@ class RunTrackerService : Service() {
         val now = SystemClock.elapsedRealtime()
         val stats = RunBus.Stats(now - startAt, sessionMeters, fixCount)
         val snaps = eng?.snapshot() ?: emptyList()
-        val confirmed = snaps.filter { it.state == RunBus.CpState.CONFIRMED }.map { it.cp.name }
-        val missed = snaps.filter { it.state == RunBus.CpState.MISSED }.map { it.cp.name }
-        val passedGps = snaps.filter { it.state == RunBus.CpState.PENDING && it.missedCount == 0 && it.distM >= 0 }
+        val confirmed = snaps.filter { it.confirmedCount > 0 }.map { it.cp.name }
+        val missed = snaps.filter { it.missedCount > 0 }.map { it.cp.name }
+        val passedGps = snaps.filter { it.confirmedCount == 0 && it.missedCount == 0 && it.distM >= 0 }
             .map { it.cp.name }
 
         alert?.voice(AlertManager.Voice.END)

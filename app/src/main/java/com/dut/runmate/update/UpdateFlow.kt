@@ -83,21 +83,23 @@ object UpdateFlow {
 
     /** v1.6.1：检查失败 → 持久对话框（完整错误 + 打开发布中心 + 复制） */
     private fun showCheckFailedDialog(activity: AppCompatActivity, reason: String) {
-        val msg = activity.getString(R.string.upd_check_fail_body, reason, Updater.SERVER_BASE)
+        val msg = activity.getString(
+            R.string.upd_check_fail_body, reason, Updater.GITHUB_RELEASES_PAGE)
         MaterialAlertDialogBuilder(activity)
             .setTitle(R.string.upd_check_fail_title)
             .setMessage(msg)
-            .setPositiveButton(R.string.upd_open_site) { _, _ -> openBrowser(activity, Updater.SERVER_BASE) }
+            .setPositiveButton(R.string.upd_open_site) { _, _ ->
+                openBrowser(activity, Updater.GITHUB_RELEASES_PAGE)
+            }
             .setNeutralButton(R.string.pref_crash_copy) { _, _ -> copyText(activity, msg) }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
     private fun showUpdateDialog(activity: AppCompatActivity, info: Updater.UpdateInfo) {
-        val src = activity.getString(if (info.source == "server") R.string.upd_src_server else R.string.upd_src_github)
         MaterialAlertDialogBuilder(activity)
             .setTitle(activity.getString(R.string.upd_found_title, info.versionName))
-            .setMessage(activity.getString(R.string.upd_found_msg, src, info.notes.ifBlank { "-" }))
+            .setMessage(activity.getString(R.string.upd_found_msg, info.notes.ifBlank { "-" }))
             .setPositiveButton(R.string.upd_now) { _, _ -> startDownload(activity, info) }
             .setNegativeButton(R.string.upd_later, null)
             .show()

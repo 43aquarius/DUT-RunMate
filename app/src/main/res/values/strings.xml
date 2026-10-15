@@ -108,7 +108,7 @@
     <string name="delete_confirm">确定删除该打卡点？</string>
 
     <!-- 接口页 -->
-    <string name="api_title">接口调试</string>
+    <string name="api_title">接口配置</string>
     <string name="api_token_label">令牌 Token（从抓包获取，支持 {token} 占位）</string>
     <string name="api_token_hint">findExtExercise 填「userId:accessToken」整串</string>
     <string name="api_test">发送测试</string>
@@ -132,7 +132,7 @@
     <string name="api_hint_offcampus">⚠ 该地址（202.118.65.138:8081）是校内服务器，校园网外无法访问。v1.8.0 起所有连接默认走 WebVPN 隧道（webvpn.dlut.edu.cn，校内外通用）：请用下方「账号登录」重新登录一次，自动捕获隧道地址即可。</string>
     <!-- v1.8.0：隧道请求被重定向到登录页（会话 Cookie 缺失/过期）的根因提示 -->
     <string name="api_hint_webvpn_expired">⚠ WebVPN 会话未建立或已过期（请求被重定向到登录页）。请在上方「账号登录」重新登录一次，自动捕获最新隧道令牌后重试。</string>
-    <string name="api_usage_hint">「健康长跑距离」模板已预填 WebVPN 隧道接口（v1.8.0 起默认，校内校外通用）：用下方「账号登录 · 一键配置」自动完成全部填写即可；手工抓包则把 userId/amId/pmId/sign 填进请求体、Authorization 令牌粘到上方令牌栏，发送测试能提取距离即配置成功，开启 API 判定后跑步自动核对打卡。</string>
+    <string name="api_usage_hint">输入学号密码点「登录并自动配置」即可：自动完成 CAS/微哨登录、打开健康长跑并捕获接口参数（令牌/请求体自动填好），无需任何手工配置。多账号保存切换、批量查距离见下方账号列表。</string>
 
     <!-- v1.4.0 账号登录 · 一键配置 -->
     <string name="ws_card_title">账号登录 · 一键配置</string>
@@ -225,7 +225,7 @@
     <string name="h5_log_test_ok">自动测试通过：服务端距离 %1$s m</string>
     <string name="h5_log_test_fail">自动测试未通过：%1$s（可在接口页手动测试排查）</string>
     <string name="h5_test_ok">配置成功！当前服务端距离 %1$s m</string>
-    <string name="h5_test_fail">已写入配置，但测试请求未通过；请检查网络后到「接口」页重试</string>
+    <string name="h5_test_fail">已写入配置，但测试请求未通过；请检查网络后重新登录捕获一次</string>
     <string name="api_enabled_title">API 判定（进区后轮询距离增量）</string>
     <string name="api_enabled_off">关闭：出区即提示（无法判定漏卡）</string>
 
@@ -240,6 +240,20 @@
     <string name="pref_tts">语音提醒（预录语音，跟媒体音量）</string>
     <string name="pref_chime">提示音</string>
     <string name="pref_vibrate">震动</string>
+    <!-- v1.8.13：分场景提醒开关（每种提醒的语音/震动独立开关） -->
+    <string name="pref_alert_scn">分场景开关（语音 / 震动）</string>
+    <string name="scn_matrix_title">每种提醒的语音与震动</string>
+    <string name="scn_voice">语音</string>
+    <string name="scn_vib">震动</string>
+    <string name="scn_start">开跑提示</string>
+    <string name="scn_approach">前方点位预告</string>
+    <string name="scn_enter">进入检测区</string>
+    <string name="scn_ok">打卡成功</string>
+    <string name="scn_unconfirmed">区内未确认·周期提醒</string>
+    <string name="scn_missed">漏卡警告</string>
+    <string name="scn_pass_gps">通过点位（纯GPS）</string>
+    <string name="scn_api_err">核对链路异常</string>
+    <string name="scn_end">跑步结束</string>
     <string name="pref_api">API 判定</string>
     <string name="pref_api_enabled">启用 API 判定</string>
     <string name="pref_map">地图与坐标</string>
@@ -336,15 +350,15 @@
     <string name="upd_failed">检查更新失败：%1$s</string>
     <!-- v1.6.1：更新失败改持久对话框 + 浏览器兑底 -->
     <string name="upd_check_fail_title">检查更新失败</string>
-    <string name="upd_check_fail_body">两个更新通道均未成功：\n\n%1$s\n\n可打开发布中心用浏览器直接下载：\n%2$s</string>
-    <string name="upd_open_site">打开发布中心</string>
+    <string name="upd_check_fail_body">GitHub Release 通道未成功：\n\n%1$s\n\n可用浏览器打开 GitHub Releases 直接下载：\n%2$s</string>
+    <string name="upd_open_site">打开 GitHub Releases</string>
     <string name="upd_browser_dl">浏览器下载</string>
     <string name="upd_copy_link">复制下载链接</string>
     <string name="upd_retry">重试</string>
     <string name="upd_dl_err_title">下载失败</string>
     <string name="upd_dl_url_label">下载地址：</string>
     <string name="upd_found_title">发现新版本 v%1$s</string>
-    <string name="upd_found_msg">来源：%1$s\n\n%2$s</string>
+    <string name="upd_found_msg">更新内容：\n\n%1$s</string>
     <string name="upd_src_server">本站服务器</string>
     <string name="upd_src_github">GitHub Release</string>
     <string name="upd_now">立即更新</string>
@@ -366,5 +380,5 @@
 
     <!-- v1.6.1：接口页/H5页使用说明（用户问：令牌/自定义接口/三个入口是干什么的） -->
     <string name="api_help_title">接口页使用说明</string>
-    <string name="api_help_body">【令牌 Token】\nfindExtExercise 接口的鉴权凭据（Authorization 请求头，格式「userId:accessToken」）。用「账号登录·一键配置」或 H5 捕获成功后会自动填好，通常无需手动填写；只有自己抓包时才需要手工粘贴。下方模板里所有 {token} 占位符都会替换成它。\n\n【多账号（v1.7.0 新增）】\n登录并完成一次 H5 捕获，该账号就自动进入下方账号列表（✓ 为当前账号）。点击账号即切换整套配置（令牌/请求体/会话），长按删除；「＋添加」录入新同学账号；「查询全部账号距离」一次查完所有人的距离——给室友/同学代查打卡进度用这个。\n\n【三个接口模板】\n· 健康长跑距离 findExtExercise —— 核心接口：跑步中轮询它，服务端距离出现 +100m 级增量即判定打卡成功。v1.8.0 起模板默认就是 WebVPN 隧道地址（webvpn.dlut.edu.cn，校内校外通用，不依赖校园网）；旧版本捕获的校内直连地址在校园网外会连接失败，重新登录捕获一次即换成隧道地址\n· 连通性测试 —— 探测服务 service.m.dlut.edu.cn 是否可达（公网域名，校内外均可访问）\n· 自定义接口 —— 空白模板：任意填 URL/方法/请求头/请求体/距离字段路径，调试任意 HTTP 接口用，只保存在本机\n\n【登录后 H5 捕获页的快捷入口】\n· WebVPN 隧道（默认）—— v1.8.0 起默认入口：经 webvpn.dlut.edu.cn 隧道进入（公网可达，校内校外通用，不依赖校园网），自动完成统一身份认证登录\n· 校内直连（仅校园网）—— 手动入口：直连校内服务器 202.118.65.138:8081，速度最快但仅校园网内可用\n· 重新注入嗅探器 —— 页面跳转后监听脚本可能失效，点它重新挂上；一直捕获不到参数时先点这个试试\n\n【API 判定开关】\n开启后，跑步进入打卡检测圈时自动轮询服务端距离判定打卡；关闭则为纯 GPS 模式（出区即提示，无法判定漏卡）。</string>
+    <string name="api_help_body">【账号登录 · 一键配置】\n输入 i大工（校园统一身份）学号与密码，点「登录并自动配置」：App 自动完成统一认证登录（学校开启短信二次认证时弹窗引导）→ 打开健康长跑 → 捕获接口参数并自动填好，API 判定同步开启。登录信息只存本机。\n\n【多账号】\n登录并完成一次配置后，该账号自动进入下方账号列表（✓ 为当前账号）。点击账号即切换整套配置；长按删除；「＋添加」录入新同学账号；「查询全部账号距离」一次查完所有人的距离——给室友/同学代查打卡进度用这个。\n\n【重新捕获 H5 参数】\n换学期/令牌失效/会话过期时点它重走一遍自动配置。\n\n【API 判定开关】\n开启后，跑步进入打卡检测圈时自动轮询服务端距离判定打卡；关闭则为纯 GPS 模式（出区即提示，无法判定漏卡）。</string>
 </resources>

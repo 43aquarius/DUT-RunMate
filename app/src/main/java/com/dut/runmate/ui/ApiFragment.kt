@@ -9,11 +9,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.dut.runmate.R
 import com.dut.runmate.data.Accounts
 import com.dut.runmate.data.Prefs
@@ -21,10 +18,7 @@ import com.dut.runmate.data.WsAccount
 import com.dut.runmate.data.api.ApiProfile
 import com.dut.runmate.data.api.ApiStore
 import com.dut.runmate.databinding.FragmentApiBinding
-import com.dut.runmate.databinding.ItemApiProfileBinding
-import com.dut.runmate.databinding.SheetApiBinding
 import com.dut.runmate.net.Http
-import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CancellationException
@@ -39,16 +33,6 @@ class ApiFragment : Fragment() {
     private val prefs by lazy { Prefs.get(requireContext()) }
     private val store by lazy { ApiStore.get(requireContext().filesDir) }
 
-    private lateinit var adapter: ProfileAdapter
-
-    /** v1.6.0：正在测试的接口 id（同步给 Adapter 显示「测试中…」防重复点击） */
-    private var testingId: String?
-        get() = adapter.testingId
-        set(v) { adapter.testingId = v }
-
-    /** v1.6.1：最近一次测试的完整结果（供一键复制） */
-    private var lastResultText = ""
-
     /** v1.7.0：批量查询全部账号距离进行中（防重复点击） */
     private var queryingAll = false
 
@@ -62,16 +46,7 @@ class ApiFragment : Fragment() {
         // v1.8.2：复位批量查询在逓标记（旧版取消路径不复位——切页中断后 queryingAll
         // 永久卡 true，「查询全部账号距离」从此点击无反应，只能杀进程恢复）
         queryingAll = false
-        adapter = ProfileAdapter(store.profiles, { p -> test(p) }, { p -> edit(p) })
-        b.rvProfiles.adapter = adapter
-        b.rvProfiles.layoutManager = LinearLayoutManager(requireContext())
 
-        b.etToken.setText(prefs.apiToken)
-        b.btnTokenSave.setOnClickListener {
-            prefs.apiToken = b.etToken.text.toString().trim()
-            // v1.8.11：临时弹窗改需手动确认的对话框（用户实报 Toast 显示不全）
-            Notice.show(this, "令牌已保存")
-        }
         b.swApiMode.isChecked = prefs.apiEnabled
         b.swApiMode.setOnCheckedChangeListener { _, c -> prefs.apiEnabled = c }
 
@@ -99,42 +74,8 @@ class ApiFragment : Fragment() {
         renderAccounts()
         b.btnQueryAll.setOnClickListener { runCatching { queryAll() } }
 
-        // v1.6.1：页面说明（令牌/三个模板/H5 三个入口都是干什么的）
+        // v1.6.1：页面说明（多账号/重新捕获/API 判定都是干什么的）
         b.btnHelpApi.setOnClickListener { HelpDialog.show(requireContext()) }
-        // v1.6.1：一键复制完整测试结果（旧版底部 Toast 一闪而过无法查看复制）
-        b.btnCopyResult.setOnClickListener {
-            if (lastResultText.isBlank()) {
-                Notice.show(this, R.string.api_result_none)
-            } else {
-                runCatching {
-                    val cm = requireActivity().getSystemService(
-                        android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    cm.setPrimaryClip(android.content.ClipData.newPlainText("runmate", lastResultText))
-                    Notice.show(this, R.string.pref_crash_copied)
-                }
-            }
-        }
-
-        // v1.8.1：修复响应体区域无法内部滚动的问题。
-        // 根因：整页 ScrollView(scrollApi，外层) 与结果卡片内 240dp ScrollView(svApiBody，
-        // 内层) 同向嵌套，外层 onInterceptTouchEvent 在 MOVE 超阈值后抢走手势（Android
-        // 经典嵌套滚动冲突），tvApiBody 的 textIsSelectable 又会先消费 DOWN——内层
-        // 永远滚不动，用户实报「结果很长显示不全，上下滑动时外部窗口在动」。
-        // 修法：按下时按内容是否可滚动态禁止外层拦截（能滚→内层独享手势；
-        // 不能滚→交还外层正常滚动整页），抬起/取消时恢复。
-        b.svApiBody.setOnTouchListener { v, ev ->
-            when (ev.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN,
-                android.view.MotionEvent.ACTION_POINTER_DOWN -> {
-                    val canScroll = v.canScrollVertically(1) || v.canScrollVertically(-1)
-                    v.parent.requestDisallowInterceptTouchEvent(canScroll)
-                }
-                android.view.MotionEvent.ACTION_UP,
-                android.view.MotionEvent.ACTION_CANCEL ->
-                    v.parent.requestDisallowInterceptTouchEvent(false)
-            }
-            false
-        }
     }
 
     private fun renderWsStatus() {
@@ -289,7 +230,6 @@ class ApiFragment : Fragment() {
             when (sr) {
                 is com.dut.runmate.auth.SportAuth.Result.Ok -> {
                     com.dut.runmate.auth.SportAuth.applySession(prefs, store, sr.s)
-                    b.etToken.setText(prefs.apiToken)
                     b.swApiMode.isChecked = prefs.apiEnabled
                     renderWsStatus()
                     renderAccounts()
@@ -652,7 +592,6 @@ class ApiFragment : Fragment() {
         if (!changed) return
         b.etWsNumber.setText(acc.number)
         b.etWsPwd.setText(prefs.wsPwdDecoded())
-        b.etToken.setText(prefs.apiToken)
         renderWsStatus()
         renderAccounts()
         // v1.8.11：Toast 改需手动确认对话框（长文案可完整阅读）
@@ -688,7 +627,7 @@ class ApiFragment : Fragment() {
                 switchAccount(remaining.first().number)
                 return
             }
-            b.etWsNumber.setText(""); b.etWsPwd.setText(""); b.etToken.setText("")
+            b.etWsNumber.setText(""); b.etWsPwd.setText("")
             renderWsStatus()
         }
         renderAccounts()
@@ -803,129 +742,12 @@ class ApiFragment : Fragment() {
         }
     }
 
-    private fun test(p: ApiProfile) {
-        if (p.url.isBlank()) {
-            Notice.show(this, "URL 为空，请先编辑")
-            return
-        }
-        if (testingId != null) return                  // v1.6.0：防重复点击
-        testingId = p.id
-        adapter.notifyItemChanged(store.profiles.indexOfFirst { it.id == p.id })
-        // v1.6.0：点击立即反馈（旧版卡片在页面底部且无任何提示，用户以为没反应）
-        b.cardResult.visibility = View.VISIBLE
-        b.tvApiStatus.text = getString(R.string.api_testing)
-        b.tvApiExtract.text = p.title
-        b.tvApiBody.text = "→ ${p.method} ${p.url.take(120)}"
-        b.scrollApi.post { b.scrollApi.smoothScrollTo(0, b.cardResult.top) }
-        // v1.6.1：反馈只走卡片（旧版底部 Toast 显示不全且一闪而过，无法查看复制）
-        lastResultText = "${p.title}\n${p.method} ${p.url}"
-        viewLifecycleOwner.lifecycleScope.launch {
-            // v1.5.1：整段 runCatching 双保险——任何异常都进结果卡片，绝不崩溃白屏
-            runCatching {
-                val resp = Http.call(p, prefs.apiToken, prefs.apiCookie)
-                if (_b == null) return@launch          // 页面已销毁（v1.5.0 闪退修复）
-                val ok = resp.error == null && resp.code in 200..299
-                val statusLine = when {
-                    resp.error != null -> getString(R.string.api_test_error, resp.error)
-                    ok -> getString(R.string.api_test_ok, resp.code, resp.ms)
-                    else -> getString(R.string.api_test_fail, resp.code, resp.ms)
-                }
-                b.tvApiStatus.text = statusLine
-                // v1.8.0：根因提示（校外直连不可达 / WebVPN 会话失效重定向到登录页）
-                var statusText = statusLine
-                if (resp.error != null && resp.error.contains("connect", true) &&
-                    p.url.contains("202.118.65.138") && !p.url.contains("webvpn")) {
-                    statusText = statusLine + "\n" + getString(R.string.api_hint_offcampus)
-                    b.tvApiStatus.text = statusText
-                } else if (resp.error == null && Http.isWebvpnLoginRedirect(
-                        resp.finalUrl, resp.body, resp.url)) {
-                    statusText = statusLine + "\n" + getString(R.string.api_hint_webvpn_expired)
-                    b.tvApiStatus.text = statusText
-                }
-                b.tvApiStatus.setTextColor(ContextCompat.getColor(requireContext(),
-                    if (ok) R.color.md_success_bright else R.color.md_error))
-                b.tvApiBody.text = Http.pretty(resp.body)
-                var extractLine = p.title
-                if (p.distPath.isNotBlank()) {
-                    val dv = Http.extractDouble(resp.body, p.distPath)
-                    extractLine = when {
-                        dv != null -> getString(R.string.api_extracted, String.format("%.2f m", dv))
-                        // v1.8.3：「无」= 今日尚未开跑（正常基线，不是配置错误）
-                        Http.extractRaw(resp.body, p.distPath) == "无" ->
-                            getString(R.string.api_test_no_record)
-                        else -> getString(R.string.api_extract_fail)
-                    }
-                }
-                b.tvApiExtract.text = extractLine
-                // v1.6.1：完整结果落内存，供「复制完整结果」一键取用
-                lastResultText = buildString {
-                    append(p.title).append('\n')
-                    append(p.method).append(' ').append(resp.url).append("\n\n")
-                    append(statusText).append('\n')
-                    append(extractLine).append("\n\n")
-                    append(Http.pretty(resp.body))
-                }
-            }.onFailure { e ->
-                // 兜底：把异常写进结果卡片而不是闪退
-                if (_b != null) {
-                    b.cardResult.visibility = View.VISIBLE
-                    val errLine = getString(R.string.api_test_error,
-                        "${e.javaClass.simpleName}: ${e.message ?: ""}")
-                    b.tvApiStatus.text = errLine
-                    b.tvApiBody.text = android.util.Log.getStackTraceString(e).take(3000)
-                    lastResultText = "${p.title}\n${p.method} ${p.url}\n\n$errLine\n\n${b.tvApiBody.text}"
-                }
-            }
-            // v1.6.0：恢复按钮状态（页面已销毁时无需理会）
-            if (_b != null) {
-                val idx = store.profiles.indexOfFirst { it.id == testingId }
-                testingId = null
-                if (idx >= 0) adapter.notifyItemChanged(idx)
-            }
-        }
-    }
-
-    private fun edit(p: ApiProfile) {
-        val dialog = BottomSheetDialog(requireContext(), com.dut.runmate.R.style.Theme_RunMate_BottomSheet)
-        val sb = SheetApiBinding.inflate(layoutInflater, null, false)
-        dialog.setContentView(sb.root)
-
-        sb.etApiTitle.setText(p.title)
-        sb.etApiUrl.setText(p.url)
-        sb.etApiHeaders.setText(p.headers)
-        sb.etApiBody.setText(p.body)
-        sb.etApiPath.setText(p.distPath)
-        when (p.method.uppercase()) {
-            "POST" -> sb.chipPost.isChecked = true
-            "PUT" -> sb.chipPut.isChecked = true
-            else -> sb.chipGet.isChecked = true
-        }
-
-        sb.btnSheetApiSave.setOnClickListener {
-            p.title = sb.etApiTitle.text.toString().ifBlank { "未命名" }
-            p.url = sb.etApiUrl.text.toString().trim()
-            p.headers = sb.etApiHeaders.text.toString().ifBlank { "{}" }
-            p.body = sb.etApiBody.text.toString()
-            p.distPath = sb.etApiPath.text.toString().trim()
-            p.method = when {
-                sb.chipPost.isChecked -> "POST"
-                sb.chipPut.isChecked -> "PUT"
-                else -> "GET"
-            }
-            store.update(p)
-            adapter.notifyItemChanged(store.profiles.indexOfFirst { it.id == p.id })
-            dialog.dismiss()
-        }
-        dialog.show()
-    }
-
     override fun onResume() {
         super.onResume()
         // v1.6.2：从 H5 捕获页返回后刷新令牌/开关/登录状态。
         // MainActivity 用 replace() 管理 Fragment、捕获页是覆盖其上的独立 Activity，
         // 返回时 View 不重建——旧版令牌框不刷新，即使捕获成功用户也以为「没自动填充」。
         if (_b != null) {
-            b.etToken.setText(prefs.apiToken)
             b.swApiMode.isChecked = prefs.apiEnabled
             renderWsStatus()
             // v1.7.0：从 H5 捕获页返回后刷新账号 chips（新捕获的账号会自动入库）
@@ -934,33 +756,4 @@ class ApiFragment : Fragment() {
     }
 
     override fun onDestroyView() { _b = null; super.onDestroyView() }
-}
-
-class ProfileAdapter(
-    private val profiles: List<ApiProfile>,
-    private val onTest: (ApiProfile) -> Unit,
-    private val onEdit: (ApiProfile) -> Unit
-) : androidx.recyclerview.widget.RecyclerView.Adapter<ProfileAdapter.VH>() {
-
-    /** v1.6.0：正在测试中的接口 id（由外部持有/更新后 notifyDataSetChanged） */
-    var testingId: String? = null
-
-    class VH(val b: ItemApiProfileBinding) : androidx.recyclerview.widget.RecyclerView.ViewHolder(b.root)
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
-        VH(ItemApiProfileBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-
-    override fun getItemCount() = profiles.size
-
-    override fun onBindViewHolder(holder: VH, pos: Int) {
-        val p = profiles[pos]
-        holder.b.tvTitle.text = p.title
-        holder.b.tvUrl.text = p.url.ifBlank { "（待抓包后填写）" }
-        holder.b.chipMethod.text = p.method
-        val busy = testingId == p.id
-        holder.b.btnTest.isEnabled = !busy
-        holder.b.btnTest.text = if (busy) "测试中…" else "发送测试"
-        holder.b.btnTest.setOnClickListener { runCatching { onTest(p) } }
-        holder.b.btnEdit.setOnClickListener { runCatching { onEdit(p) } }
-    }
 }

@@ -36,7 +36,7 @@
                 <!-- v1.8.6：最小可调精度 1m（原步长 5m） -->
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderRadius" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:valueFrom="15" android:valueTo="80"
+                    android:layout_height="wrap_content" android:valueFrom="1" android:valueTo="80"
                     android:stepSize="1" />
             </LinearLayout>
 
@@ -54,7 +54,7 @@
                 <!-- v1.8.6：最小可调精度 1m（原步长 10m） -->
                 <com.google.android.material.slider.Slider
                     android:id="@+id/sliderApproach" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:valueFrom="30" android:valueTo="150"
+                    android:layout_height="wrap_content" android:valueFrom="1" android:valueTo="150"
                     android:stepSize="1" />
             </LinearLayout>
 
@@ -162,6 +162,13 @@
             </LinearLayout>
 
             <!-- v1.8.6：测试提醒——当场验证语音/提示音/震动三通道（用户实报三通道全无效后的自查入口） -->
+            <!-- v1.8.13：分场景提醒开关——每种提醒的语音/震动独立开关 -->
+            <com.google.android.material.button.MaterialButton
+                style="?attr/materialButtonOutlinedStyle"
+                android:id="@+id/btnAlertScn"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:text="@string/pref_alert_scn" />
+
             <com.google.android.material.button.MaterialButton
                 style="?attr/materialButtonOutlinedStyle"
                 android:id="@+id/btnTestAlert"

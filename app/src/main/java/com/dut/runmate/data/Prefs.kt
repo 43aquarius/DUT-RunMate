@@ -32,6 +32,21 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         get() = sp.getBoolean("vibrate", true)
         set(v) = sp.edit().putBoolean("vibrate", v).apply()
 
+    /**
+     * v1.8.13：分场景提醒开关（用户要求每种提醒的语音/震动可独立开关）。
+     * 键 = AlertManager.Voice.scn（start/approach/enter/ok/unconfirmed/
+     * missed/pass_gps/api_err/end）；默认全开，总开关（tts/vibrate）之上
+     * 再叠加一层场景粒度——两层都开才触发。
+     */
+    fun scnVoiceOn(scn: String): Boolean = sp.getBoolean("scnv_$scn", true)
+    fun setScnVoiceOn(scn: String, v: Boolean) {
+        sp.edit().putBoolean("scnv_$scn", v).apply()
+    }
+    fun scnVibOn(scn: String): Boolean = sp.getBoolean("scnvi_$scn", true)
+    fun setScnVibOn(scn: String, v: Boolean) {
+        sp.edit().putBoolean("scnvi_$scn", v).apply()
+    }
+
     var apiEnabled: Boolean
         get() = sp.getBoolean("apiEnabled", false)
         set(v) = sp.edit().putBoolean("apiEnabled", v).apply()
@@ -107,7 +122,7 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         get() = sp.getBoolean("mapHintShown", false)
         set(v) = sp.edit().putBoolean("mapHintShown", v).apply()
 
-    // 更新（v1.5.0：服务器地址改为内置常量，见 Updater.SERVER_BASE；不再可自定义）
+    // 更新（v1.8.13：只走 GitHub Release，见 Updater.GITHUB_RELEASES_PAGE）
     var updAutoCheck: Boolean
         get() = sp.getBoolean("updAutoCheck", true)
         set(v) = sp.edit().putBoolean("updAutoCheck", v).apply()

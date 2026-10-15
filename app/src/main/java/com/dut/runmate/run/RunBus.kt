@@ -13,7 +13,9 @@ object RunBus {
         val cp: Checkpoint,
         val state: CpState,
         val distM: Int,
-        val missedCount: Int
+        val missedCount: Int,
+        /** v1.8.13：累计确认次数（多圈跑每圈各计一次；0=从未确认） */
+        val confirmedCount: Int = 0
     )
 
     data class Stats(

@@ -17,7 +17,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-            <!-- v1.6.1：标题 + 说明按钮（令牌/模板/H5入口都是干什么的） -->
+            <!-- v1.6.1：标题 + 说明按钮；v1.8.13：自定义接口调试 UI 已移除，仅保留账号登录配置 -->
             <LinearLayout android:orientation="horizontal" android:gravity="center_vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content">
                 <TextView style="@style/TextAppearance.RunMate.Label"
@@ -62,8 +62,8 @@
                     </com.google.android.material.textfield.TextInputLayout>
                     <com.google.android.material.textfield.TextInputLayout
                         style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
-                        android:layout_width="0dp" android:layout_weight="1"
-                        android:layout_height="wrap_content" android:layout_marginStart="8dp"
+                        android:layout_width="0dp" android:layout_weight="1" android:layout_marginStart="8dp"
+                        android:layout_height="wrap_content"
                         android:hint="@string/ws_pwd_hint" app:endIconMode="password_toggle">
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/etWsPwd" android:layout_width="match_parent"
@@ -105,22 +105,6 @@
                     android:text="@string/acct_btn_query_all" />
             </LinearLayout>
 
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/tilToken" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginTop="12dp"
-                android:hint="@string/api_token_label"
-                app:endIconMode="password_toggle">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etToken" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:inputType="textPassword"
-                    android:textAppearance="?attr/textAppearanceBodySmall" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnTokenSave" style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="8dp" android:text="@string/save" />
-
             <LinearLayout android:orientation="horizontal" android:gravity="center_vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="12dp" android:background="?attr/colorSurfaceVariant"
@@ -137,49 +121,6 @@
                     android:id="@+id/swApiMode" android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
             </LinearLayout>
-
-            <!-- v1.6.0：结果卡片提前到接口列表上方 —— 点击「发送测试」立即可见反馈，
-                 不再需要等响应后滚动到底部（旧版反馈不可见问题修复） -->
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/cardResult" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginTop="12dp"
-                android:visibility="gone" app:cardBackgroundColor="?attr/colorSurfaceVariant"
-                app:cardCornerRadius="24dp" app:strokeWidth="0dp">
-                <LinearLayout android:orientation="vertical" android:padding="20dp"
-                    android:layout_width="match_parent" android:layout_height="wrap_content">
-                    <!-- v1.6.1：文本可长按选中复制（旧版只能看不能复制） -->
-                    <TextView android:id="@+id/tvApiStatus" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceTitleMedium"
-                        android:textIsSelectable="true"
-                        android:text="@string/api_result_none" />
-                    <TextView android:id="@+id/tvApiExtract" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:layout_marginTop="4dp"
-                        android:textAppearance="?attr/textAppearanceBodyMedium"
-                        android:textIsSelectable="true"
-                        android:textColor="?attr/colorOnSurfaceVariant" android:text="" />
-                    <!-- v1.8.1：加 id —— 同向嵌套 ScrollView（外层 scrollApi 会抢手势），
-                         在 ApiFragment 里按内容可滚性动态禁止外层拦截，修复「结果很长
-                         却无法上下滑动、一动就是外部窗口滚」的问题 -->
-                    <ScrollView android:id="@+id/svApiBody" android:layout_width="match_parent" android:layout_height="240dp"
-                        android:layout_marginTop="8dp" android:background="?attr/colorSurface"
-                        android:padding="8dp">
-                        <TextView android:id="@+id/tvApiBody" android:layout_width="match_parent"
-                            android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
-                            android:fontFamily="monospace" android:textIsSelectable="true" android:text="" />
-                    </ScrollView>
-                    <!-- v1.6.1：一键复制完整结果（标题/URL/状态/响应体） -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnCopyResult" style="?attr/materialButtonOutlinedStyle"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp" android:layout_gravity="end"
-                        android:text="@string/api_result_copy" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvProfiles" android:layout_width="match_parent"
-                android:layout_height="wrap_content" android:layout_marginTop="12dp"
-                android:nestedScrollingEnabled="false" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

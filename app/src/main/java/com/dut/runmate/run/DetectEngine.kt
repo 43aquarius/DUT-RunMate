@@ -37,6 +37,8 @@ class DetectEngine(
         var enteredAtMs = 0L
         /** v1.8.3：上次「打卡未确认」提醒时刻（限频） */
         var lastNagAt = 0L
+        /** v1.8.13：累计确认次数（多圈跑每圈各计一次）——用于结束汇总/通知稳定显示 */
+        var confirmedCount = 0
     }
 
     private val snaps = mutableListOf<Snap>()
@@ -62,7 +64,6 @@ class DetectEngine(
     /** 每次 GPS 更新调用 */
     fun onLocation(lat: Double, lon: Double, nowMs: Long) {
         for (s in snaps) {
-            if (s.state == RunBus.CpState.CONFIRMED) { s.lastDistM = -1; continue }
             val d = com.dut.runmate.geo.GeoKit.dist(lat, lon, s.cp.lat, s.cp.lon)
             s.lastDistM = Math.round(d).toInt()
             val zone = s.cp.radius.toDouble()
@@ -94,6 +95,22 @@ class DetectEngine(
                     if (d <= zone) { s.state = RunBus.CpState.IN_ZONE; s.baseline = null } // 补打卡重试
                     else if (d > prefs.approachDist + 60) { s.state = RunBus.CpState.PENDING; s.nearSaid = false }
                 }
+                // v1.8.13 根因修复（用户实报「跑到一半多语音震动全没了，距离还能刷新」）：
+                // 健康长跑是多圈跑（每圈经过全部 8 个打卡点），旧版对 CONFIRMED 点位
+                // 直接 continue 跳过且永不重新武装——第一圈跑完全部点位确认后，引擎
+                // 彻底沉默：无预告/无进区/无确认/无漏卡，needsPoll() 也变 false 连
+                // 核对失败强提醒都停（距离轮询独立所以还在刷新——症状完全吻合）。
+                // 修法：离开预告圈（+60m 滞回，与 NEAR 回退一致）后重新武装为 PENDING，
+                // 下一圈照常预告→进区→基线→确认（confirmedCount 累计计次）。
+                RunBus.CpState.CONFIRMED -> {
+                    if (d > prefs.approachDist + 60) {
+                        s.state = RunBus.CpState.PENDING
+                        s.nearSaid = false
+                        s.baseline = null
+                        s.enteredAtMs = 0L
+                        s.lastNagAt = 0L
+                    }
+                }
                 else -> {}
             }
         }
@@ -110,11 +127,28 @@ class DetectEngine(
                     if (b == null) s.baseline = v
                     else if (v >= b + prefs.confirmDelta) {
                         s.state = RunBus.CpState.CONFIRMED
+                        s.confirmedCount++      // v1.8.13：多圈累计（重武装后每圈各计一次）
                         onEvent(Ev.Confirmed(s))
                     }
                 }
                 else -> {}
             }
+        }
+    }
+
+    /**
+     * v1.8.13：时间驱动心跳（服务 500ms 轮询循环调用，不依赖 GPS 定位回调）。
+     * 旧版 GRACE→MISSED（漏卡判定）只在 onLocation 里推进——GPS 精度变差
+     * （>60m 被过滤）/楼宇遮挡导致定位回调停顿时，漏卡提醒永远不触发。
+     * 现在宽限期到期由心跳独立判定，定位停顿也能照常漏卡告警。
+     */
+    fun tick(nowMs: Long) {
+        for (s in snaps) {
+            if (s.state != RunBus.CpState.GRACE) continue
+            if (nowMs < s.graceLeftAt) continue
+            s.state = RunBus.CpState.MISSED
+            s.missedCount++
+            onEvent(Ev.Missed(s))
         }
     }
 
@@ -142,6 +176,6 @@ class DetectEngine(
     }
 
     fun snapshot(): List<RunBus.CpSnap> = snaps.map {
-        RunBus.CpSnap(it.cp, it.state, it.lastDistM, it.missedCount)
+        RunBus.CpSnap(it.cp, it.state, it.lastDistM, it.missedCount, it.confirmedCount)
     }
 }

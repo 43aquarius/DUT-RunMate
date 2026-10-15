@@ -43,17 +43,18 @@ class AlertManager(private val ctx: Context, private val prefs: Prefs) {
     /**
      * v1.8.8：预录语音片段。res/raw 打包、随装随用，无任何系统依赖。
      * 文案即 gen_voice_clips.sh 的 CLIPS 表（改动语音 = 重新生成 ogg）。
+     * v1.8.13：scn = 分场景开关的偏好键（设置页「分场景开关」矩阵行）。
      */
-    enum class Voice(val res: Int) {
-        START(R.raw.voice_start),               // 跑步已开始
-        APPROACH(R.raw.voice_approach),         // 前方打卡点，请准备
-        ENTER(R.raw.voice_enter),               // 已进入打卡检测区
-        OK(R.raw.voice_ok),                     // 打卡成功
-        UNCONFIRMED(R.raw.voice_unconfirmed),   // 提醒，打卡尚未确认
-        MISSED(R.raw.voice_missed),             // 注意，未确认打卡，请减速返回或留意手机
-        PASS_GPS(R.raw.voice_pass_gps),         // 已通过打卡点，请自行确认打卡
-        API_ERR(R.raw.voice_api_err),           // 注意，暂时无法核对打卡
-        END(R.raw.voice_end)                    // 本次跑步结束
+    enum class Voice(val res: Int, val scn: String) {
+        START(R.raw.voice_start, "start"),               // 跑步已开始
+        APPROACH(R.raw.voice_approach, "approach"),     // 前方打卡点，请准备
+        ENTER(R.raw.voice_enter, "enter"),               // 已进入打卡检测区
+        OK(R.raw.voice_ok, "ok"),                         // 打卡成功
+        UNCONFIRMED(R.raw.voice_unconfirmed, "unconfirmed"), // 提醒，打卡尚未确认
+        MISSED(R.raw.voice_missed, "missed"),             // 注意，未确认打卡，请减速返回或留意手机
+        PASS_GPS(R.raw.voice_pass_gps, "pass_gps"),     // 已通过打卡点，请自行确认打卡
+        API_ERR(R.raw.voice_api_err, "api_err"),         // 注意，暂时无法核对打卡
+        END(R.raw.voice_end, "end")                       // 本次跑步结束
     }
 
     /**
@@ -90,12 +91,20 @@ class AlertManager(private val ctx: Context, private val prefs: Prefs) {
 
     /**
      * 播放一条预录语音（USAGE_MEDIA 属性，跟媒体音量）。
-     * 资源以 Ogg Vorbis 打包（aapt 对 .ogg 默认 STORED，openRawResourceFd
-     * 可直接拿 fd）；万一资源被压缩打包拿不到 fd，退资源 Uri 再试。
-     * 失败如实记 voiceState 并降级提示音——跑步场景宁可多响一声别漏提醒。
+     * v1.8.13：双层开关——总开关（tts）× 分场景开关（scnv_<scn>，默认全开）；
+     * 两层都开才播。资源以 Ogg Vorbis 打包（aapt 对 .ogg 默认 STORED，
+     * openRawResourceFd 可直接拿 fd）；万一资源被压缩打包拿不到 fd，退资源
+     * Uri 再试。失败如实记 voiceState 并降级提示音——跑步场景宁可多响一声别漏提醒。
      */
     fun voice(v: Voice) {
-        if (!prefs.ttsEnabled) { voiceState = "开关未开启"; return }
+        if (!prefs.ttsEnabled) { voiceState = "总开关未开启"; return }
+        if (!prefs.scnVoiceOn(v.scn)) { voiceState = "该场景语音已关闭"; return }
+        playRaw(v)
+    }
+
+    /** v1.8.13：直通播放（跳过总开关/场景开关）——仅自检 testAlert 用，
+     * 保证「测试提醒」不受用户关掉某场景开关影响，三通道诊断结果始终可信 */
+    private fun playRaw(v: Voice) {
         try {
             player?.release()
             player = null
@@ -173,8 +182,13 @@ class AlertManager(private val ctx: Context, private val prefs: Prefs) {
         }
     }
 
-    fun vibrate(kind: Kind): Boolean {
-        if (!prefs.vibrateEnabled) { vibState = "开关未开启"; return false }
+    /**
+     * v1.8.13：vibrate 增加场景开关（scn = Voice.scn；null = 不分场景的通用
+     * 调用，如演示波形）。双层开关：总开关（vibrate）× 分场景开关（scnvi_<scn>）。
+     */
+    fun vibrate(kind: Kind, scn: String? = null): Boolean {
+        if (!prefs.vibrateEnabled) { vibState = "总开关未开启"; return false }
+        if (scn != null && !prefs.scnVibOn(scn)) { vibState = "该场景震动已关闭"; return false }
         val v = vib ?: run { vibState = "未获取震动服务"; return false }
         val has = try { v.hasVibrator() } catch (_: Throwable) { true }
         if (!has) { vibState = "设备无震动模块"; return false }
@@ -234,9 +248,11 @@ class AlertManager(private val ctx: Context, private val prefs: Prefs) {
         }
     }
 
-    /** v1.8.8：三通道演示——预录语音（打卡成功）+ 提示音 + 强震动 */
+    /** v1.8.8：三通道演示——预录语音（打卡成功）+ 提示音 + 强震动。
+     *  v1.8.13：语音改走 playRaw 直通（不检查场景开关，只看真实通道健康度），
+     *  避免用户关掉某场景语音后自检误报「开关未开启」误导排查。 */
     fun testAlert() {
-        voice(Voice.OK)
+        playRaw(Voice.OK)
         chime(Kind.OK)
         vibrateDemo()
     }
