@@ -150,7 +150,7 @@ object SportAuth {
 
     /**
      * 原生一键配置。freshCas=true 时内部先做 CAS 登录（自动续期场景）；
-     * ApiFragment 场景 CASTGC 刚拿到可传 false 省一步。
+     * SettingsFragment（一键配置）场景 CASTGC 刚拿到可传 false 省一步。
      */
     suspend fun login(
         number: String, password: String,
@@ -385,7 +385,7 @@ object SportAuth {
 
     /**
      * 把原生登录结果写入「接口」页全部配置 + 多账号快照。
-     * ApiFragment（一键配置）与 RunTrackerService（会话自动续期）共用。
+     * SettingsFragment（一键配置）与 RunTrackerService（会话自动续期）共用。
      */
     fun applySession(prefs: Prefs, store: ApiStore, s: Session) {
         // 令牌 + 隧道 Cookie

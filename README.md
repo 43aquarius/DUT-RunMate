@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.13-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.14-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -30,13 +30,13 @@
 - 🏃 **实测打卡机制**（v1.2.0 抓包确认）：健康长跑为操场 RFID 读卡器计圈，官方距离每次经过读卡器 +100m 阶跃，`findExtExercise` 接口一次返回全部状态（详见 API 文档 §3）；
 - 👁 **随时定位预览**（v1.3.0）：不开跑步也能在首页/地图实时查看位置、定位源与精度（GPS 蓝/网络橙徽章）、最近点位距离与方向；
 - 🔒 **数据全部留在本机**：不联网上传、不读取 i大工 其他数据、不需要 root。
-- 🔄 **应用内自更新**（v1.1.0 起）：GitHub Release 优先 + 发布中心服务器兜底（v1.8.5 起每次进入 App 自动检查），下载带 SHA256 校验；
+- 🔄 **应用内自更新**（v1.1.0 起）：仅从 GitHub Release 拉取（v1.8.13 起移除服务器兜底；v1.8.5 起每次进入 App 自动检查），下载带 SHA256 校验；
 
 > 判定逻辑说明：官方成绩以服务端记录的距离为准，因此「距离接口的增量」比单纯 GPS 进出圈更可靠 —— 这正是本 App 的核心判定依据。
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.13.apk`（约 6.3 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.14.apk`（约 6.3 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -80,7 +80,7 @@
         出圈后 12s 宽限仍无增量 ⇒ 漏卡！强提醒 ⚠（语音 + 急震 + 警示音）
 ```
 
-配置步骤（约 2 分钟，一次性）：「接口」页输入学号密码 → **「登录并自动配置」**（自动完成 CAS 登录、打开健康长跑 H5、捕获令牌/请求体全部参数，校外自动走 WebVPN 隧道）→ 发送测试能提取距离即成功 → 设置页打开「API 判定」。跑步中也可随时点按首页「服务端距离」**立即核对**。手工抓包配置法仍保留作兜底（详见 [docs/i大工-健康长跑_API接口文档.md](docs/i大工-健康长跑_API接口文档.md) §3.5/§6）。
+配置步骤（约 2 分钟，一次性）：「设置」页顶部「账号」分区输入学号密码 → **「登录并自动配置」**（自动完成 CAS 登录、打开健康长跑 H5、捕获令牌/请求体全部参数，校外自动走 WebVPN 隧道）→ 配置成功弹窗显示姓名/学号/距离即完成（API 判定自动开启）。跑步中也可随时点按首页「服务端距离」**立即核对**。手工抓包配置法仍保留作兜底（详见 [docs/i大工-健康长跑_API接口文档.md](docs/i大工-健康长跑_API接口文档.md) §3.5/§6）。
 
 ## 从源码构建
 
@@ -99,21 +99,20 @@ cd DUT-RunMate
 
 ```
 app/src/main/java/com/dut/runmate/
-├── App.kt / MainActivity.kt                            # 入口（底部导航 5 Tab：跑步/地图/标定/接口/设置）
+├── App.kt / MainActivity.kt                            # 入口（底部导航 4 Tab：跑步/地图/标定/设置）
 ├── service/RunTrackerService.kt                        # 前台定位服务（息屏持续运行 + 距离轮询核对）
 ├── run/DetectEngine.kt · RunBus.kt                     # 检测引擎：进出圈判定 + 距离增量核对
 ├── geo/GeoKit.kt · LocGate.kt                          # WGS-84 ↔ GCJ-02 转换 + 定位源归一
 ├── auth/WhistleAuth.kt · CasAuth.kt                    # 微哨/CAS 统一认证登录（协议复刻）
 ├── data/CheckpointStore.kt · Prefs.kt · Accounts.kt · api/ApiStore.kt   # 点位/设置/多账号/接口模板本机存储
 ├── alert/AlertManager.kt                               # 预录语音（res/raw）+ 提示音 + 震动
-├── update/Updater.kt · UpdateFlow.kt                   # 应用内更新（服务器 + GitHub 双通道）
+├── update/Updater.kt · UpdateFlow.kt                   # 应用内更新（仅 GitHub Release 通道）
 └── ui/
     ├── RunFragment.kt · RadarView.kt                   # 跑步页：定位预览、状态、雷达、小结
     ├── MapFragment.kt                                  # 地图选点（osmdroid，缩放至 20 级）
     ├── CalibrateFragment.kt                            # 现场标定（精度加权平均）
-    ├── ApiFragment.kt                                  # 接口调试 + 账号登录 + 多账号切换/批量查询
     ├── H5CatcherActivity.kt                            # H5 捕获（嗅探器预注入，自动配置全参数）
-    ├── SettingsFragment.kt                             # 设置（检测参数/提醒/更新/系统）
+    ├── SettingsFragment.kt                             # 设置（账号登录/多账号/批量查询 + 检测参数/提醒/联系作者/更新/系统）
     └── CheckpointSheet.kt · PointAdapters.kt           # 点位编辑面板与列表
 ```
 
@@ -127,6 +126,11 @@ app/src/main/java/com/dut/runmate/
 - 网络定位（基站/Wi-Fi，国产 ROM 返回 GCJ-02）会被自动归一后再参与显示与检测（v1.2.0），地图上灰点即网络定位，蓝点为 GPS。
 
 ## 更新日志
+
+- **v1.8.14（2026-10-15）** —— 登录并入设置页 + 联系作者邮箱入口
+  - 🔀 **登录功能合并进「设置」页**：账号登录·一键配置（学号/密码、CAS+短信二次认证引导、多账号切换、批量查距离）整体成为设置页顶部「账号」分区；底部导航移除「接口」Tab（5 Tab → 4 Tab：跑步/地图/标定/设置）——入口更少更直白，登录与检测/提醒等设置项同页可见；
+  - ✉️ **新增「联系作者」入口**（设置页，GitHub 仓库行下方）：aquars@mail.dlut.edu.cn —— 一键发送邮件（无邮件应用时自动复制邮箱地址）或直接复制邮箱，使用问题/功能建议直达作者；
+  - 🧹 同步清理历史遗留文案与死资源（「接口」页引导改指向设置页、移除 v1.8.13 已删功能的 4 条失效字符串），登录/多账号/批量查询逻辑自 ApiFragment 原样平移（行为零变化）；
 
 - **v1.8.13（2026-10-15）** —— 跑步中途提醒失效根治 + 分场景提醒开关 + 更新/接口页精简
   - 🐛 **根治「跑到一半多语音震动全没了，距离还能刷新」**：根因是健康长跑为多圈跑，旧版对已确认（CONFIRMED）的点位永不重新武装——第一圈跑完全部点位确认后检测引擎彻底沉默（无预告/无进区/无确认/无漏卡，核对失败强提醒也停），而距离轮询独立所以照常刷新。现在离开预告圈后自动重新武装，下一圈照常预告→进区→基线→确认（确认数按圈累计）；宽限期到期/漏卡判定改为独立心跳驱动，GPS 定位停顿（精度变差被过滤/楼宇遮挡）时漏卡告警也照常触发

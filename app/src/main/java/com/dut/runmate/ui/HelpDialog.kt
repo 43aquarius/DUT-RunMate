@@ -5,10 +5,12 @@ import com.dut.runmate.R
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
- * v1.6.1：接口页 / H5 捕获页共用的「说明」对话框。
+ * v1.6.1：账号登录 / H5 捕获页共用的「说明」对话框。
  * 背景：用户反馈不清楚「令牌 Token」「自定义接口」以及登录后 H5 页
  * 三个快捷入口（健康长跑校内直连 / WebVPN 登录 / 重新注入嗅探器）的用途，
  * 把说明直接放进 App，随装随查。
+ * v1.8.14：账号登录已并入设置页（原「接口」Tab 移除），本对话框随之在
+ * 设置页账号卡片「说明」按钮处弹出。
  */
 object HelpDialog {
     fun show(ctx: Context) {

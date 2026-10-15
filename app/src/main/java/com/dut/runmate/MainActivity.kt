@@ -10,7 +10,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.dut.runmate.databinding.ActivityMainBinding
-import com.dut.runmate.ui.ApiFragment
 import com.dut.runmate.ui.CalibrateFragment
 import com.dut.runmate.ui.MapFragment
 import com.dut.runmate.ui.RunFragment
@@ -24,7 +23,6 @@ class MainActivity : AppCompatActivity() {
     private val runFrag by lazy { RunFragment() }
     private val mapFrag by lazy { MapFragment() }
     private val calibFrag by lazy { CalibrateFragment() }
-    private val apiFrag by lazy { ApiFragment() }
     private val settingsFrag by lazy { SettingsFragment() }
 
     private var cur: Fragment? = null
@@ -43,7 +41,6 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_run -> swap(runFrag)
                 R.id.nav_map -> swap(mapFrag)
                 R.id.nav_calib -> swap(calibFrag)
-                R.id.nav_api -> swap(apiFrag)
                 R.id.nav_settings -> swap(settingsFrag)
             }
             true

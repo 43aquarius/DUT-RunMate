@@ -7,7 +7,6 @@
     <string name="tab_run">跑步</string>
     <string name="tab_map">地图</string>
     <string name="tab_calib">标定</string>
-    <string name="tab_api">接口</string>
     <string name="title_settings">设置</string>
 
     <!-- 跑步页 -->
@@ -47,7 +46,7 @@
     <string name="api_query_profile_line">接口：%1$s</string>
     <string name="api_query_req_line">状态：HTTP %1$d · %2$d ms</string>
     <string name="api_query_body_title">响应内容：</string>
-    <string name="api_not_configured">距离接口未配置，请到「接口」页填写抓包参数</string>
+    <string name="api_not_configured">距离接口未配置：到「设置」页顶部账号登录即可自动配置</string>
     <string name="api_need_enable">请先在「设置」页开启 API 判定</string>
 
     <!-- v1.8.6：跑步页下拉刷新 -->
@@ -107,8 +106,7 @@
     <string name="coord_gcj">GCJ-02（高德/火星）</string>
     <string name="delete_confirm">确定删除该打卡点？</string>
 
-    <!-- 接口页 -->
-    <string name="api_title">接口配置</string>
+    <!-- 账号登录（v1.8.14：由原「接口」Tab 并入设置页） -->
     <string name="api_token_label">令牌 Token（从抓包获取，支持 {token} 占位）</string>
     <string name="api_token_hint">findExtExercise 填「userId:accessToken」整串</string>
     <string name="api_test">发送测试</string>
@@ -132,11 +130,11 @@
     <string name="api_hint_offcampus">⚠ 该地址（202.118.65.138:8081）是校内服务器，校园网外无法访问。v1.8.0 起所有连接默认走 WebVPN 隧道（webvpn.dlut.edu.cn，校内外通用）：请用下方「账号登录」重新登录一次，自动捕获隧道地址即可。</string>
     <!-- v1.8.0：隧道请求被重定向到登录页（会话 Cookie 缺失/过期）的根因提示 -->
     <string name="api_hint_webvpn_expired">⚠ WebVPN 会话未建立或已过期（请求被重定向到登录页）。请在上方「账号登录」重新登录一次，自动捕获最新隧道令牌后重试。</string>
-    <string name="api_usage_hint">输入学号密码点「登录并自动配置」即可：自动完成 CAS/微哨登录、打开健康长跑并捕获接口参数（令牌/请求体自动填好），无需任何手工配置。多账号保存切换、批量查距离见下方账号列表。</string>
+    <string name="api_usage_hint">输入学号密码点「登录并自动配置」即可：自动完成统一认证登录（需短信二次认证时自动引导）、打开健康长跑并捕获接口参数，无需任何手工配置。多账号保存切换、批量查距离见下方账号列表。</string>
 
     <!-- v1.4.0 账号登录 · 一键配置 -->
     <string name="ws_card_title">账号登录 · 一键配置</string>
-    <string name="ws_card_hint">输入 i大工（校园统一身份）学号与密码：登录后自动打开健康长跑页面并捕获接口参数，自动填好下方全部配置。登录信息保存在本机；多人使用时每个账号一套配置（下方账号列表点击切换），长按密码框清除当前账号信息。</string>
+    <string name="ws_card_hint">输入 i大工（校园统一身份）学号与密码：登录后自动打开健康长跑页面并捕获接口参数（令牌/请求体自动配好）。登录信息保存在本机；多人使用时每个账号一套配置（账号列表点击切换），长按密码框清除当前账号信息。</string>
     <string name="ws_number_hint">学号</string>
     <string name="ws_pwd_hint">密码（统一身份）</string>
     <string name="ws_btn_login">登录并自动配置</string>
@@ -190,7 +188,7 @@
     <string name="h5_test_copy">复制详情</string>
     <string name="h5_go">前往</string>
     <string name="h5_done">完成，返回</string>
-    <string name="h5_no_session">请先在「接口」页登录账号</string>
+    <string name="h5_no_session">请先在「设置」页顶部账号登录</string>
     <string name="h5_sniff_reinjected">嗅探器已重新注入</string>
     <string name="h5_log_start">捕获页启动</string>
     <string name="h5_log_cookie">已注入 whistlekey 会话 Cookie</string>
@@ -223,7 +221,7 @@
     <string name="h5_log_captured">捕获成功 userId=%1$s… amId=%2$s… pmId=%3$s… sign=%4$s…</string>
     <string name="h5_log_cookie_saved">已保存 WebVPN 隧道 Cookie（后台轮询用）</string>
     <string name="h5_log_test_ok">自动测试通过：服务端距离 %1$s m</string>
-    <string name="h5_log_test_fail">自动测试未通过：%1$s（可在接口页手动测试排查）</string>
+    <string name="h5_log_test_fail">自动测试未通过：%1$s（可稍后重试，或更换网络环境再试）</string>
     <string name="h5_test_ok">配置成功！当前服务端距离 %1$s m</string>
     <string name="h5_test_fail">已写入配置，但测试请求未通过；请检查网络后重新登录捕获一次</string>
     <string name="api_enabled_title">API 判定（进区后轮询距离增量）</string>
@@ -289,10 +287,10 @@
 
     <!-- v1.8.8：TTS 动态文案已随 TTS 引擎一并移除（语音改 res/raw 预录音，
          文案见 gen_voice_clips.sh 的 CLIPS 表）；保留非语音文案 -->
-    <string name="api_unconfigured_run">接口未配置：打卡核对不可用（到「接口」页登录后自动配置）</string>
+    <string name="api_unconfigured_run">接口未配置：打卡核对不可用（到「设置」页顶部登录后自动配置）</string>
     <string name="api_webvpn_renewing">WebVPN 会话已过期，正在自动重连…</string>
-    <string name="api_webvpn_expired_manual">WebVPN 会话已过期且本机未保存登录信息，请到「接口」页重新登录</string>
-    <string name="api_webvpn_renew_fail">会话自动重连失败（%1$s：%2$s），请到「接口」页重新登录</string>
+    <string name="api_webvpn_expired_manual">WebVPN 会话已过期且本机未保存登录信息，请到「设置」页重新登录</string>
+    <string name="api_webvpn_renew_fail">会话自动重连失败（%1$s：%2$s），请到「设置」页重新登录</string>
 
     <!-- v1.8.8：CAS 短信二次认证（MFA）——学校统一认证新启用的登录第二道验证。
          凭据验对后需：图形验证码 → 发短信 → 输入短信码，才发 CASTGC。 -->
@@ -338,14 +336,22 @@
 
     <!-- 更新 -->
     <string name="pref_update">更新</string>
-    <string name="pref_upd_auto">自动检查更新</string>
-    <string name="pref_upd_auto_sub">每次启动时静默检查（GitHub 优先，仍是最新则不打扰）</string>
-    <string name="pref_upd_server">更新服务器</string>
-    <string name="pref_upd_server_fixed">GitHub Release 优先 + 本站服务器兜底（内置固定）\nhttps://dut-runmate.space-z.ai</string>
     <string name="pref_upd_check_now">检查更新</string>
     <!-- v1.6.0 GitHub 开源仓库入口 -->
     <string name="pref_github">GitHub 开源仓库</string>
     <string name="pref_github_sub">43aquarius/DUT-RunMate · 源码 / Issue 反馈 / 版本发布</string>
+
+    <!-- v1.8.14：账号登录分区（原「接口」Tab 并入）+ 联系作者（邮箱反馈） -->
+    <string name="pref_account">账号</string>
+    <string name="pref_contact">联系作者</string>
+    <string name="pref_contact_sub">aquars@mail.dlut.edu.cn · 使用问题 / 功能建议</string>
+    <string name="contact_dialog_msg">遇到使用问题或有好想法？
+欢迎邮件联系作者：
+
+aquars@mail.dlut.edu.cn</string>
+    <string name="contact_send">发送邮件</string>
+    <string name="contact_copy">复制邮箱地址</string>
+    <string name="contact_no_mail">未找到邮件应用，邮箱地址已复制到剪贴板</string>
     <string name="upd_uptodate">已是最新版本</string>
     <string name="upd_failed">检查更新失败：%1$s</string>
     <!-- v1.6.1：更新失败改持久对话框 + 浏览器兑底 -->
@@ -378,7 +384,7 @@
     <string name="pref_crash_copy">复制完整日志</string>
     <string name="pref_crash_copied">已复制到剪贴板</string>
 
-    <!-- v1.6.1：接口页/H5页使用说明（用户问：令牌/自定义接口/三个入口是干什么的） -->
-    <string name="api_help_title">接口页使用说明</string>
+    <!-- v1.6.1：账号登录 / H5 捕获页共用「说明」对话框（v1.8.14：原接口页已并入设置页） -->
+    <string name="api_help_title">账号登录说明</string>
     <string name="api_help_body">【账号登录 · 一键配置】\n输入 i大工（校园统一身份）学号与密码，点「登录并自动配置」：App 自动完成统一认证登录（学校开启短信二次认证时弹窗引导）→ 打开健康长跑 → 捕获接口参数并自动填好，API 判定同步开启。登录信息只存本机。\n\n【多账号】\n登录并完成一次配置后，该账号自动进入下方账号列表（✓ 为当前账号）。点击账号即切换整套配置；长按删除；「＋添加」录入新同学账号；「查询全部账号距离」一次查完所有人的距离——给室友/同学代查打卡进度用这个。\n\n【重新捕获 H5 参数】\n换学期/令牌失效/会话过期时点它重走一遍自动配置。\n\n【API 判定开关】\n开启后，跑步进入打卡检测圈时自动轮询服务端距离判定打卡；关闭则为纯 GPS 模式（出区即提示，无法判定漏卡）。</string>
 </resources>
