@@ -256,7 +256,9 @@ class SettingsFragment : Fragment() {
             }
             row.addView(android.widget.TextView(act).apply {
                 text = label
-                setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Body1)
+                // v1.8.13：不引用平台样式资源（TextAppearance_DeviceDefault_Body1
+                // 在编译期不可解析导致 CI 失败），直接设字号走默认前景色
+                textSize = 15f
                 layoutParams = android.widget.LinearLayout.LayoutParams(0,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             })
