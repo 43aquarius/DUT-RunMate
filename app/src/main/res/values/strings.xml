@@ -99,6 +99,14 @@
     <string name="cp_name">名称</string>
     <string name="cp_radius">检测半径（米）</string>
     <string name="cp_note">备注（可选）</string>
+    <!-- v1.8.15：点位分组 + 跑步页筛选 -->
+    <string name="cp_group">分组（如：中心田径场；留空不分组）</string>
+    <string name="run_filter_label">显示点位（自动 = 离最近的一组）</string>
+    <string name="filter_auto">自动</string>
+    <string name="filter_all">全部</string>
+    <string name="restore_cp_confirm">将删除当前全部 %1$d 个点位，恢复为 8 个默认点位（中心田径场 · 西山生活区 · 西部校区田径场，自带分组）。此操作不可撤销，继续？</string>
+    <string name="restore_cp_go">恢复默认</string>
+    <string name="restore_cp_done">已恢复 8 个默认打卡点（3 组）</string>
     <string name="save">保存</string>
     <string name="delete">删除</string>
     <string name="cancel">取消</string>
@@ -252,6 +260,10 @@
     <string name="scn_pass_gps">通过点位（纯GPS）</string>
     <string name="scn_api_err">核对链路异常</string>
     <string name="scn_end">跑步结束</string>
+    <string name="scn_done">打卡完成（达 3km）</string>
+    <!-- v1.8.15：文字开关（用户要求：不用颜色深浅表示开关状态） -->
+    <string name="scn_on">开</string>
+    <string name="scn_off">关</string>
     <string name="pref_api">API 判定</string>
     <string name="pref_api_enabled">启用 API 判定</string>
     <string name="pref_map">地图与坐标</string>
@@ -266,6 +278,7 @@
     <string name="pref_battery_sub">加入白名单，防止跑步中进程被杀</string>
     <string name="pref_export">导出打卡点 JSON 到剪贴板</string>
     <string name="pref_export_done">已复制 %1$d 个点位，可粘贴备档</string>
+    <string name="pref_restore_cp">恢复默认打卡点（8 个）</string>
     <!-- v1.8.3：系统通知设置直达（锁屏显示修复链路的一环） -->
     <string name="pref_notif_setting">打开系统通知设置（锁屏显示修复）</string>
     <string name="notif_settings_fallback">请到系统设置 → 应用 → 跑伴 → 通知，开启通知与锁屏显示</string>

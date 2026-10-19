@@ -12,7 +12,9 @@ data class Checkpoint(
     var lon: Double = 0.0,
     var radius: Int = 25,           // 检测半径（米）
     var note: String = "",
-    var source: String = "map"      // map | gps | manual
+    var source: String = "map",     // map | gps | manual
+    /** v1.8.15：点位分组（如「中心田径场」）——跑步页按组筛选显示，默认自动选中距离最近的组 */
+    var group: String = ""
 )
 
 /**
@@ -37,6 +39,16 @@ class CheckpointStore private constructor(private val file: File) {
         persist()
         return cp
     }
+
+    /** v1.8.15：清空并恢复为 8 个默认打卡点（设置页「恢复默认打卡点」入口） */
+    fun resetToDefaults() {
+        list.clear()
+        DEFAULTS.forEach { list.add(it.copy()) }
+        persist()
+    }
+
+    /** v1.8.15：现有全部分组名（去重，保留录入顺序；空分组名不计） */
+    fun groups(): List<String> = list.map { it.group }.filter { it.isNotBlank() }.distinct()
 
     fun delete(id: Long): Boolean {
         val ok = list.removeAll { it.id == id }
@@ -65,6 +77,7 @@ class CheckpointStore private constructor(private val file: File) {
         o.put("id", id); o.put("name", name)
         o.put("lat", lat); o.put("lon", lon)
         o.put("radius", radius); o.put("note", note); o.put("source", source)
+        o.put("group", group)
         return o
     }
 
@@ -76,6 +89,7 @@ class CheckpointStore private constructor(private val file: File) {
                     inst = s
                     s.load()
                     s.migrateGeoV2()
+                    s.seedDefaults()   // v1.8.15：首次安装预录 8 个官方打卡点（带分组）
                 }
             }
 
@@ -117,11 +131,43 @@ class CheckpointStore private constructor(private val file: File) {
                             lon = o.optDouble("lon"),
                             radius = o.optInt("radius", 25),
                             note = o.optString("note"),
-                            source = o.optString("source", "map")
+                            source = o.optString("source", "map"),
+                            group = o.optString("group")
                         )
                     )
                 }
             } catch (_: Exception) { }
         }
+
+        /**
+         * v1.8.15 一次性种子：点位库为空（首次安装）时预录 8 个官方打卡点并分组——
+         * 中心田径场（a/b）、西山生活区（c/d）、西部校区田径场（e/f/g/h），
+         * 坐标为用户现场 GPS 标定值（标定 ±3.8m，离散 ≤0.7m）。
+         * 已有点位的旧版本升级不覆盖（marker 防重入）；老用户想换回这套点位
+         * 走设置页「恢复默认打卡点」。
+         */
+        private fun CheckpointStore.seedDefaults() {
+            val marker = File(file.parentFile, "seed_defaults.done")
+            if (marker.exists()) return
+            try {
+                if (list.isEmpty()) {
+                    DEFAULTS.forEach { list.add(it.copy()) }
+                    persist()
+                }
+            } catch (_: Exception) { }
+            try { marker.createNewFile() } catch (_: Exception) { }
+        }
+
+        /** v1.8.15：默认打卡点（id 与用户标定数据一致；radius=20m，source=gps） */
+        private val DEFAULTS = listOf(
+            Checkpoint(1, "点位 h", 38.8835245, 121.5099830, 20, "标定 ±3.8m·离散0.3m", "gps", "西部校区田径场"),
+            Checkpoint(2, "点位 e", 38.8825987, 121.5102414, 20, "标定 ±3.8m·离散0.3m", "gps", "西部校区田径场"),
+            Checkpoint(3, "点位 f", 38.8831961, 121.5109119, 20, "标定 ±3.8m·离散0.2m", "gps", "西部校区田径场"),
+            Checkpoint(4, "点位 g", 38.8841217, 121.5106756, 20, "标定 ±3.8m·离散0.1m", "gps", "西部校区田径场"),
+            Checkpoint(5, "点位 a", 38.875885327499994, 121.52492782749997, 20, "标定 ±3.8m·离散0.1m", "gps", "中心田径场"),
+            Checkpoint(6, "点位 b", 38.876947427499985, 121.52573790899999, 20, "标定 ±3.8m·离散0.0m", "gps", "中心田径场"),
+            Checkpoint(7, "点位 c", 38.8793514, 121.5171089, 20, "标定 ±3.8m·离散0.7m", "gps", "西山生活区"),
+            Checkpoint(8, "点位 d", 38.88111223849999, 121.51680995949997, 20, "标定 ±3.8m·离散0.2m", "gps", "西山生活区")
+        )
     }
 }

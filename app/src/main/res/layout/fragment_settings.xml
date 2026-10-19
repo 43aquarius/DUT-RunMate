@@ -399,6 +399,12 @@
                 style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnExport"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" android:text="@string/pref_export" />
+
+            <!-- v1.8.15：恢复默认打卡点（8 个官方点位，带分组） -->
+            <com.google.android.material.button.MaterialButton
+                style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnRestoreCp"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:text="@string/pref_restore_cp" />
             <com.google.android.material.button.MaterialButton
                 style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnCrashLog"
                 android:layout_width="match_parent" android:layout_height="wrap_content"

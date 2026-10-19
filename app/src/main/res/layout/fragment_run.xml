@@ -157,6 +157,39 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:text="@string/run_idle_hint" />
 
+            <!-- v1.8.15：点位分组筛选（自动=离当前位置平均距离最近的一组，开跑时锁定；
+                 可手动切「全部」或指定分组；无分组数据时整行隐藏） -->
+            <LinearLayout
+                android:id="@+id/layoutFilter"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:text="@string/run_filter_label" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none"
+                    android:fillViewport="true">
+
+                    <com.google.android.material.chip.ChipGroup
+                        android:id="@+id/chipGroups"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        app:singleLine="true"
+                        app:singleSelection="true"
+                        app:selectionRequired="true" />
+                </HorizontalScrollView>
+            </LinearLayout>
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvPoints"
                 android:layout_width="match_parent"

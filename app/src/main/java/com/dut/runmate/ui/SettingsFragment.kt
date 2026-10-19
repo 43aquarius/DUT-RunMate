@@ -262,6 +262,9 @@ class SettingsFragment : Fragment() {
             Notice.show(this, getString(R.string.pref_export_done, store.count))
         }
 
+        // v1.8.15：恢复默认打卡点（8 个官方点位带分组；替换现有全部点位）
+        b.btnRestoreCp.setOnClickListener { confirmRestoreCheckpoints() }
+
         // v1.5.1：崩溃日志查看（filesDir/crash_log.txt，App.kt 全局捕获落盘）。
         // 用户遇到闪退时可打开复制给开发者，远程定位问题不再靠猜。
         b.btnCrashLog.setOnClickListener {
@@ -291,9 +294,11 @@ class SettingsFragment : Fragment() {
     }
 
     /**
-     * v1.8.13：分场景提醒开关矩阵——9 种提醒场景 ×「语音」「震动」两个可勾选
-     * Chip，即点即存（SharedPreferences）。与总开关（语音/震动）叠加：两层都
-     * 开才触发。提示音保持全局开关不分场景（提醒主通道是语音+震动）。
+     * v1.8.13：分场景提醒开关矩阵。v1.8.15 重设计（用户要求：开关状态不要用
+     * 颜色深浅表示，改用文字开关）——每行 = 场景名 + 「语音 开/关」「震动 开/关」
+     * 两个文字状态按钮：状态直接写在按钮文字与 ✓/✗ 图标里，点按即切换即存；
+     * 同时新增第 10 行「打卡完成（达 3km）」。与总开关（语音/震动）叠加：
+     * 两层都开才触发。提示音保持全局开关不分场景（提醒主通道是语音+震动）。
      */
     private fun showScnMatrixDialog() {
         val act = activity as? AppCompatActivity ?: return
@@ -307,7 +312,8 @@ class SettingsFragment : Fragment() {
             com.dut.runmate.alert.AlertManager.Voice.MISSED to getString(R.string.scn_missed),
             com.dut.runmate.alert.AlertManager.Voice.PASS_GPS to getString(R.string.scn_pass_gps),
             com.dut.runmate.alert.AlertManager.Voice.API_ERR to getString(R.string.scn_api_err),
-            com.dut.runmate.alert.AlertManager.Voice.END to getString(R.string.scn_end)
+            com.dut.runmate.alert.AlertManager.Voice.END to getString(R.string.scn_end),
+            com.dut.runmate.alert.AlertManager.Voice.DONE to getString(R.string.scn_done)
         )
         val root = android.widget.LinearLayout(act).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -321,30 +327,48 @@ class SettingsFragment : Fragment() {
             }
             row.addView(android.widget.TextView(act).apply {
                 text = label
-                // v1.8.13：不引用平台样式资源（TextAppearance_DeviceDefault_Body1
-                // 在编译期不可解析导致 CI 失败），直接设字号走默认前景色
+                // 不引用平台样式资源（TextAppearance_DeviceDefault_Body1 在编译期
+                // 不可解析导致 CI 失败），直接设字号走默认前景色
                 textSize = 15f
                 layoutParams = android.widget.LinearLayout.LayoutParams(0,
                     android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
             })
-            val chipV = com.google.android.material.chip.Chip(act).apply {
-                text = getString(R.string.scn_voice)
-                isCheckable = true
-                isChecked = prefs.scnVoiceOn(v.scn)
-                setOnCheckedChangeListener { _, c -> prefs.setScnVoiceOn(v.scn, c) }
+            /** 文字开关按钮：状态写在文字里（✓ 语音 开 / ✗ 语音 关），点按即切换 */
+            fun toggleBtn(isVoice: Boolean): com.google.android.material.button.MaterialButton {
+                val base = act.getString(if (isVoice) R.string.scn_voice else R.string.scn_vib)
+                val btn = com.google.android.material.button.MaterialButton(
+                    act, null, com.google.android.material.R.attr.materialButtonOutlinedStyle
+                ).apply {
+                    textSize = 12f
+                    setMinHeight(0)
+                    minimumHeight = 0
+                    insetTop = 0
+                    insetBottom = 0
+                    iconSize = (16 * resources.displayMetrics.density).toInt()
+                    iconPadding = pad / 4
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply { marginStart = pad / 2 }
+                }
+                fun applyState(on: Boolean) {
+                    text = "$base ${act.getString(if (on) R.string.scn_on else R.string.scn_off)}"
+                    setIconResource(if (on) R.drawable.ic_check else R.drawable.ic_close)
+                }
+                fun current() = if (isVoice) prefs.scnVoiceOn(v.scn) else prefs.scnVibOn(v.scn)
+                fun store(v2: Boolean) {
+                    if (isVoice) prefs.setScnVoiceOn(v.scn, v2) else prefs.setScnVibOn(v.scn, v2)
+                }
+                applyState(current())
+                setOnClickListener {
+                    val now = !current()
+                    store(now)
+                    applyState(now)
+                }
+                return btn
             }
-            val chipB = com.google.android.material.chip.Chip(act).apply {
-                text = getString(R.string.scn_vib)
-                isCheckable = true
-                isChecked = prefs.scnVibOn(v.scn)
-                setOnCheckedChangeListener { _, c -> prefs.setScnVibOn(v.scn, c) }
-                layoutParams = android.widget.LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { marginStart = pad / 2 }
-            }
-            row.addView(chipV)
-            row.addView(chipB)
+            row.addView(toggleBtn(isVoice = true))
+            row.addView(toggleBtn(isVoice = false))
             root.addView(row)
         }
         val scroll = android.widget.ScrollView(act).apply { addView(root) }
@@ -356,6 +380,26 @@ class SettingsFragment : Fragment() {
                 .show()
         } catch (_: Throwable) {
         }
+    }
+
+    /**
+     * v1.8.15：恢复默认打卡点——确认后清空现有点位，重建 8 个官方打卡点
+     *（中心田径场 a/b、西山生活区 c/d、西部校区田径场 e/f/g/h，坐标为
+     * 现场标定值，自带分组；首次安装自动预录，此入口供老用户/误删恢复）。
+     */
+    private fun confirmRestoreCheckpoints() {
+        val act = requireActivity()
+        try {
+            MaterialAlertDialogBuilder(act)
+                .setTitle(R.string.pref_restore_cp)
+                .setMessage(getString(R.string.restore_cp_confirm, store.count))
+                .setPositiveButton(R.string.restore_cp_go) { _, _ ->
+                    store.resetToDefaults()
+                    Notice.show(this, getString(R.string.restore_cp_done))
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        } catch (_: Throwable) { }
     }
 
     /**

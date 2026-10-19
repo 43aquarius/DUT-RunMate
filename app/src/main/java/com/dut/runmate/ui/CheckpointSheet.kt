@@ -34,6 +34,7 @@ object CheckpointSheet {
 
         b.etCpName.setText(cp.name.ifEmpty { store.defaultName() })
         b.etCpNote.setText(cp.note)
+        b.etCpGroup.setText(cp.group)   // v1.8.15：分组（留空 = 不分组）
         b.sliderSheetRadius.value = cp.radius.toFloat().coerceIn(1f, 100f)   // v1.8.13：最小 1m
         b.tvSheetRadius.text = "${cp.radius} m"
 
@@ -90,6 +91,7 @@ object CheckpointSheet {
             }
             cp.name = b.etCpName.text.toString().ifBlank { store.defaultName() }
             cp.note = b.etCpNote.text.toString()
+            cp.group = b.etCpGroup.text.toString().trim()   // v1.8.15：保存分组
             cp.radius = b.sliderSheetRadius.value.toInt()
             cp.lat = wLat; cp.lon = wLon
             if (!editing) cp.source = "manual"

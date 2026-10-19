@@ -44,6 +44,7 @@ class AlertManager(private val ctx: Context, private val prefs: Prefs) {
      * v1.8.8：预录语音片段。res/raw 打包、随装随用，无任何系统依赖。
      * 文案即 gen_voice_clips.sh 的 CLIPS 表（改动语音 = 重新生成 ogg）。
      * v1.8.13：scn = 分场景开关的偏好键（设置页「分场景开关」矩阵行）。
+     * v1.8.15：新增 DONE（打卡结束播报——官方打卡距离 ≥3km 达标时播报）。
      */
     enum class Voice(val res: Int, val scn: String) {
         START(R.raw.voice_start, "start"),               // 跑步已开始
@@ -54,7 +55,8 @@ class AlertManager(private val ctx: Context, private val prefs: Prefs) {
         MISSED(R.raw.voice_missed, "missed"),             // 注意，未确认打卡，请减速返回或留意手机
         PASS_GPS(R.raw.voice_pass_gps, "pass_gps"),     // 已通过打卡点，请自行确认打卡
         API_ERR(R.raw.voice_api_err, "api_err"),         // 注意，暂时无法核对打卡
-        END(R.raw.voice_end, "end")                       // 本次跑步结束
+        END(R.raw.voice_end, "end"),                       // 本次跑步结束
+        DONE(R.raw.voice_done, "done")                     // 打卡距离已达三公里，打卡完成
     }
 
     /**

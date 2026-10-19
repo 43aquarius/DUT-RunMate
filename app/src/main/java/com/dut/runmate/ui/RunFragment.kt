@@ -41,6 +41,13 @@ import kotlinx.coroutines.launch
  *
  * 服务端距离区（右上）：跑步中点按 = 立即核对（触发服务即时轮询一次）；
  * 未跑步点按 = 直接查询一次 findExtExercise 并显示官方距离。
+ *
+ * v1.8.15：
+ *  - 点位分组筛选：chips 选「自动（最近一组）/全部/指定分组」，默认自动 =
+ *    离当前位置平均距离最近的一组，开跑时锁定（今天去哪个场地就显示哪组）；
+ *  - 修复「有时不显示录入的点位」：冷启动/无定位时也立即列出全部点位（dist=--），
+ *    不再依赖首个定位回调才填充；
+ *  - 下拉刷新彻底免弹窗（用户要求：跑步中刷新距离还要点「确认」太麻烦）。
  */
 class RunFragment : Fragment() {
 
@@ -55,6 +62,14 @@ class RunFragment : Fragment() {
 
     /** v1.6.1：未跑步时的「查询服务端距离」在逓中标记（防重复点击） */
     private var querying = false
+
+    // ---- v1.8.15：分组筛选 ----
+
+    /** 筛选 chips（tag = "auto"/"all"/分组名） */
+    private val chipByTag = LinkedHashMap<String, com.google.android.material.chip.Chip>()
+
+    /** auto 模式下本次跑步锁定的分组（开跑时按当时位置定一次，跑步中不随移动切换） */
+    private var lockedGroup: String? = null
 
     // ---- 定位预览（v1.3.0） ----
     private var locMgr: LocationManager? = null
@@ -90,6 +105,10 @@ class RunFragment : Fragment() {
 
         b.radar.setTint(ContextCompat.getColor(requireContext(), R.color.md_primary))
         b.tvRunHint.visibility = if (store.count > 0) View.GONE else View.VISIBLE
+
+        // v1.8.15：分组筛选 chips + 无定位兜底快照（修复「有时不显示点位」）
+        rebuildGroupChips()
+        rebuildIdleSnaps()
 
         b.btnRun.setOnClickListener {
             if (RunBus.state.value.running) {
@@ -160,6 +179,9 @@ class RunFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        // v1.8.15：回到本页时同步地图/标定页的点位与分组改动，重建筛选 chips
+        rebuildGroupChips()
+        rebuildIdleSnaps()
         registerPreviewLocation()
     }
 
@@ -186,34 +208,49 @@ class RunFragment : Fragment() {
         Notice.show(this, msg)
     }
 
+    /** v1.8.15：下拉刷新路径专用——瞬时 Toast（自动消失、免点「确认」不打断跑步；
+     *  点按入口仍走 Notice 确认弹窗，长文案可完整阅读，v1.8.11 行为不变） */
+    private fun transientToast(msg: String) {
+        try {
+            android.widget.Toast.makeText(requireContext(), msg, android.widget.Toast.LENGTH_SHORT).show()
+        } catch (_: Throwable) { }
+    }
+
+    private fun transientToast(resId: Int) = transientToast(getString(resId))
+
     // ---------- 服务端距离：点按核对 / 下拉刷新 ----------
 
     /**
-     * v1.6.1 原逻辑，v1.8.6 重构为统一入口：
+     * v1.6.1 原逻辑，v1.8.6 重构为统一入口，v1.8.15 刷新路径免弹窗：
      *  - showDialog=true（点按）：结果弹持久详情弹窗（含响应体/复制），行为与旧版一致；
-     *  - showDialog=false（下拉刷新）：成功静默更新 RunBus（右上角数字自动刷新）+
-     *    Toast 简报；失败/异常 Toast 给出原因，不弹长弹窗。
-     *  跑步中两者等价：触发服务即时轮询一次（pollReq+1）。
+     *    提示性消息走 Notice 确认弹窗（长文案可完整阅读）。
+     *  - showDialog=false（下拉刷新）：成功静默（右上角数字就地更新）；失败/异常只弹
+     *    瞬时 Toast（自动消失，无需点「确认」——用户要求跑步中下拉刷新别再弹确认框）；
+     *    跑步中触发核对完全静默。
+     *  跑步中两者差异：点按会弹「已请求核对」，下拉完全无感。
      *  全链路 runCatching 隔离（v1.6.1 防闪退加固保留）。
      */
     private fun requestDistanceRefresh(showDialog: Boolean, onDone: (() -> Unit)? = null) {
         runCatching {
+            /** 点按 → Notice 确认弹窗；下拉 → 瞬时 Toast */
+            fun tell(resId: Int) { if (showDialog) safeToast(resId) else transientToast(resId) }
             if (!prefs.apiEnabled) {
-                safeToast(R.string.api_need_enable)
+                tell(R.string.api_need_enable)
                 onDone?.invoke(); return
             }
             if (RunBus.state.value.running) {
                 RunBus.update { it.copy(pollReq = it.pollReq + 1) }
-                safeToast(R.string.verify_requested)
+                // v1.8.15：下拉刷新静默触发核对（旧版弹确认框，用户要求去掉）
+                if (showDialog) safeToast(R.string.verify_requested)
                 onDone?.invoke(); return
             }
             if (querying) {
-                if (!showDialog) safeToast(R.string.pull_refresh_too_frequent)
+                tell(R.string.pull_refresh_too_frequent)
                 onDone?.invoke(); return                       // 防重复点击
             }
             val prof = apiStore.distanceProfile()
             if (prof == null || prof.url.isBlank()) {
-                safeToast(R.string.api_not_configured)
+                tell(R.string.api_not_configured)
                 onDone?.invoke(); return
             }
             querying = true
@@ -277,9 +314,9 @@ class RunFragment : Fragment() {
                     if (showDialog) showQueryResult(err, false, null, prof)
                 }
                 querying = false
-                // 下拉刷新：仅失败/异常弹完整提示（成功静默，数字已就地更新）
+                // v1.8.15：下拉刷新失败只弹瞬时 Toast（成功静默——数字已就地更新）
                 if (!showDialog && _b != null && resultIsFailure)
-                    resultToast?.let { safeToastText(it) }
+                    resultToast?.let { transientToast(it) }
                 // 恢复右上角标签（render 也会在下次状态变化时重设）
                 if (_b != null && !RunBus.state.value.running) {
                     b.tvApiDist.text = getString(R.string.api_dist_query)
@@ -380,11 +417,123 @@ class RunFragment : Fragment() {
 
     private fun startService() {
         val ctx = requireContext()
+        // v1.8.15：auto 分组筛选开跑锁定——按按下「开始」时的预览定位选最近组
+        //（无预览定位时由服务首个定位到达后再锁，见 filterSnaps）
+        lockedGroup = bestPreviewFix()?.let { fix ->
+            nearestGroupOf(
+                store.all().filter { it.group.isNotBlank() }
+                    .map { Triple(it.group, it.lat, it.lon) }, fix)
+        }
         RunBus.resetSession()
         summaryShown = false
         val i = Intent(ctx, RunTrackerService::class.java).setAction(RunTrackerService.ACT_START)
         if (android.os.Build.VERSION.SDK_INT >= 26) ContextCompat.startForegroundService(ctx, i)
         else ctx.startService(i)
+    }
+
+    // ---------- v1.8.15：分组筛选 ----------
+
+    /** 重建筛选 chips：自动 / 全部 / 各分组；无分组数据时整行隐藏 */
+    private fun rebuildGroupChips() {
+        val groups = store.groups()
+        // 保存的分组被删光时回退 auto（防空白筛选）
+        if (prefs.runFilter != "auto" && prefs.runFilter != "all" &&
+            groups.none { it == prefs.runFilter }) prefs.runFilter = "auto"
+        val cg = b.chipGroups
+        cg.removeAllViews()
+        chipByTag.clear()
+        val entries: List<Pair<String, String>> = listOf(
+            "auto" to getString(R.string.filter_auto),
+            "all" to getString(R.string.filter_all)
+        ) + groups.map { it to it }
+        for ((tag, label) in entries) {
+            val chip = com.google.android.material.chip.Chip(requireContext()).apply {
+                text = label
+                isCheckable = true
+                isClickable = true
+                id = android.view.View.generateViewId()
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) {
+                        prefs.runFilter = tag
+                        if (tag == "auto") lockedGroup = null   // 手动回自动：重新选组
+                        render(RunBus.state.value)
+                    }
+                }
+            }
+            chipByTag[tag] = chip
+            cg.addView(chip)
+        }
+        chipByTag[prefs.runFilter]?.isChecked = true
+        b.layoutFilter.visibility = if (groups.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * v1.8.15：未跑步时的兑底快照——冷启动/无定位时也把点位列出来（dist=--），
+     * 修复用户实报「主页跑步页有时不显示录入的点位」（旧版 snaps 要等首个
+     * 定位回调才填充，室内/GPS 慢/无网络定位时列表长时间空白）。回到本页
+     * （onResume）时同步地图/标定页的最新点位改动。
+     */
+    private fun rebuildIdleSnaps() {
+        val st = RunBus.state.value
+        if (st.running || st.summary != null) return
+        val fix = bestPreviewFix()
+        val snaps = store.all().map { cp ->
+            RunBus.CpSnap(
+                cp, RunBus.CpState.PENDING,
+                if (fix != null)
+                    Math.round(GeoKit.dist(fix.latitude, fix.longitude, cp.lat, cp.lon)).toInt()
+                else -1,
+                0, 0
+            )
+        }
+        val nearest = snaps.filter { it.distM >= 0 }.minByOrNull { it.distM }
+        RunBus.update {
+            it.copy(fix = fix ?: st.fix, gpsAcc = fix?.accuracy ?: st.gpsAcc,
+                snaps = snaps, nearest = nearest)
+        }
+    }
+
+    /** 组内点位到当前位置平均距离最小的组名（无分组数据返回 null） */
+    private fun nearestGroupOf(pts: List<Triple<String, Double, Double>>, fix: Location): String? {
+        if (pts.isEmpty()) return null
+        return pts.groupBy { it.first }
+            .mapValues { (_, g) ->
+                g.map { GeoKit.dist(fix.latitude, fix.longitude, it.second, it.third) }.average()
+            }
+            .entries.minByOrNull { it.value }?.key
+    }
+
+    /**
+     * 跑步页列表按分组筛选：
+     *  - all：全部；指定组名：只显示该组（组空时回退全部防白屏）；
+     *  - auto（默认）：未跑步按当前定位实时选「平均距离最近的组」；开始跑步时
+     *    锁定（用户需求：今天去哪个场地，开跑时离得最近的那组），跑步中不随
+     *    位置切换，结束自动解锁。
+     */
+    private fun filterSnaps(st: RunBus.UiState): List<RunBus.CpSnap> {
+        val all = st.snaps
+        if (all.isEmpty()) return all
+        val groups = all.map { it.cp.group }.filter { it.isNotBlank() }.distinct()
+        if (groups.isEmpty()) return all               // 无分组数据：不过滤
+        val mode = prefs.runFilter
+        if (mode == "all") return all
+        if (mode != "auto") {
+            return all.filter { s -> s.cp.group == mode }.ifEmpty { all }
+        }
+        // auto
+        if (st.running) {
+            val fix = st.fix
+            val g = lockedGroup
+                ?: fix?.let { nearestGroupOf(all.filter { it.cp.group.isNotBlank() }
+                    .map { Triple(it.cp.group, it.cp.lat, it.cp.lon) }, it) }
+                    ?.also { lockedGroup = it }
+            return if (g != null) all.filter { s -> s.cp.group == g } else all
+        }
+        lockedGroup = null                               // 结束跑步后解除锁定
+        val fix = st.fix ?: return all                   // 无定位时先全量显示
+        val g = nearestGroupOf(all.filter { it.cp.group.isNotBlank() }
+            .map { Triple(it.cp.group, it.cp.lat, it.cp.lon) }, fix) ?: return all
+        return all.filter { s -> s.cp.group == g }
     }
 
     // ---------- 渲染 ----------
@@ -423,16 +572,20 @@ class RunFragment : Fragment() {
         }
 
         b.tvRunHint.visibility = if (store.count > 0 || st.running) View.GONE else View.VISIBLE
-        adapter.submit(st.snaps)
+        // v1.8.15：列表按分组筛选（默认自动 = 最近一组；开跑锁定）
+        val visible = filterSnaps(st)
+        adapter.submit(visible)
 
         // 状态大字：跑步中 = 检测状态；未跑步 = 定位预览（有定位时显示源+精度）
-        val n = st.nearest
-        val inZone = st.snaps.firstOrNull { it.state == RunBus.CpState.IN_ZONE }
-        val missed = st.snaps.firstOrNull { it.state == RunBus.CpState.MISSED }
+        // v1.8.15：最近点位在「可见集合」内取（雷达/大字与列表同源，不跳到别组远点）
+        val n = visible.filter { it.state != RunBus.CpState.CONFIRMED && it.distM >= 0 }
+            .minByOrNull { it.distM }
+        val inZone = visible.firstOrNull { it.state == RunBus.CpState.IN_ZONE }
+        val missed = visible.firstOrNull { it.state == RunBus.CpState.MISSED }
         val head = when {
             st.running && missed != null -> getString(R.string.state_missed)
             st.running && inZone != null -> getString(R.string.state_inzone)
-            st.running && st.snaps.any { it.state == RunBus.CpState.GRACE } -> getString(R.string.state_grace)
+            st.running && visible.any { it.state == RunBus.CpState.GRACE } -> getString(R.string.state_grace)
             st.running && n != null -> "距 ${n.cp.name}"
             st.running -> getString(R.string.gps_waiting)
             st.fix != null -> getString(R.string.run_preview) + " · " + locLabel(st.fix, st.gpsAcc)

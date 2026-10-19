@@ -101,6 +101,16 @@
             android:layout_height="wrap_content" />
     </com.google.android.material.textfield.TextInputLayout>
 
+    <!-- v1.8.15：点位分组（留空 = 不分组；跑步页按组筛选显示） -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilCpGroup" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:hint="@string/cp_group">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etCpGroup" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:inputType="text" android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

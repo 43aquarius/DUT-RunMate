@@ -59,6 +59,9 @@ class RunTrackerService : Service() {
         const val MEDIA_ACT_STOP = "com.dut.runmate.media.STOP"
         const val CH_ID = "runmate_run"
 
+        /** v1.8.15：打卡结束播报阈值——官方打卡距离 ≥ 此值时播报「打卡完成」 */
+        const val GOAL_METERS = 3000.0
+
         /** v1.8.11：服务启动失败提醒渠道（高优先级，长文案可展开阅读） */
         const val CH_ERR_ID = "runmate_run_err"
         const val NID = 1001
@@ -96,6 +99,9 @@ class RunTrackerService : Service() {
     private var lastRenewAt = 0L
     // v1.8.3：接口异常强提醒限频（区内/宽限期 polling 失败时震动响音提醒用户）
     private var lastApiErrAlertAt = 0L
+
+    // v1.8.15：本次跑步是否已播报过「打卡完成」（≥3km 达标，每次跑步只报一次）
+    private var goalSaid = false
 
     private val locListener = LocationListener { loc ->
         // v1.6.0：定位回调全隔离——部分 ROM 的网络定位带异常元数据时仅跳过该次，不闪退
@@ -197,6 +203,7 @@ class RunTrackerService : Service() {
         startAt = SystemClock.elapsedRealtime()
         sessionMeters = 0.0; fixCount = 0; lastFix = null; lastGpsFix = null
         lastZonePoll = 0L; lastAnchor = 0L; pollReqSeen = RunBus.state.value.pollReq
+        goalSaid = false   // v1.8.15：打卡结束播报每跑重置
 
         // 前台服务 + 常驻通知
         // v1.8.6：锁屏媒体卡片会话先建（buildNotification 的 MediaStyle 需要其 token）
@@ -368,6 +375,7 @@ class RunTrackerService : Service() {
             } catch (e: Throwable) {
                 logSoft("onApiDistance", e)
             }
+            checkGoalAnnounce(v)   // v1.8.15：打卡结束播报（官方距离 ≥3km 达标）
             try {
                 refreshNotification()      // v1.5.0：打卡距离阶跃立即上锁屏通知
             } catch (e: Throwable) {
@@ -382,6 +390,25 @@ class RunTrackerService : Service() {
             } else {
                 RunBus.update { it.copy(apiErr = "未能提取: ${prof.distPath}") }
             }
+        }
+    }
+
+    /**
+     * v1.8.15：打卡结束播报（用户需求）——识别到当前官方打卡距离 ≥ 3000m
+     * （DUT 单次有效打卡达标线）时，语音「打卡距离已达三公里，打卡完成」+
+     * 提示音 + 震动一次，告知今日打卡任务已达成（可放心收工）。每次跑步
+     * 只播报一次（开跑时 goalSaid=false 重置）；纯 GPS 模式无官方距离不触发。
+     */
+    private fun checkGoalAnnounce(v: Double) {
+        if (goalSaid || v < GOAL_METERS) return
+        goalSaid = true
+        val a = alert ?: return
+        try {
+            a.voice(AlertManager.Voice.DONE)
+            a.chime(AlertManager.Kind.OK)
+            a.vibrate(AlertManager.Kind.OK, AlertManager.Voice.DONE.scn)
+        } catch (e: Throwable) {
+            logSoft("goalAnnounce", e)
         }
     }
 

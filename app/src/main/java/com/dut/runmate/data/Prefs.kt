@@ -35,17 +35,23 @@ class Prefs private constructor(private val sp: SharedPreferences) {
     /**
      * v1.8.13：分场景提醒开关（用户要求每种提醒的语音/震动可独立开关）。
      * 键 = AlertManager.Voice.scn（start/approach/enter/ok/unconfirmed/
-     * missed/pass_gps/api_err/end）；默认全开，总开关（tts/vibrate）之上
-     * 再叠加一层场景粒度——两层都开才触发。
+     * missed/pass_gps/api_err/end/done）；总开关（tts/vibrate）之上再叠加
+     * 一层场景粒度——两层都开才触发。
+     * v1.8.15 新默认（用户拍板）：语音全部默认开；震动仅「打卡成功（ok）/
+     * 区内未确认（unconfirmed）/漏卡警告（missed）」三场景默认开，其余默认关。
+     * 显式设置过的键不受影响（getBoolean 键存在即返回用户值）。
      */
     fun scnVoiceOn(scn: String): Boolean = sp.getBoolean("scnv_$scn", true)
     fun setScnVoiceOn(scn: String, v: Boolean) {
         sp.edit().putBoolean("scnv_$scn", v).apply()
     }
-    fun scnVibOn(scn: String): Boolean = sp.getBoolean("scnvi_$scn", true)
+    fun scnVibOn(scn: String): Boolean = sp.getBoolean("scnvi_$scn", scn in VIB_DEFAULT_ON)
     fun setScnVibOn(scn: String, v: Boolean) {
         sp.edit().putBoolean("scnvi_$scn", v).apply()
     }
+
+    /** v1.8.15：默认开启震动的场景（用户要求：只留打卡成功/区内未确认/漏卡警告） */
+    private val VIB_DEFAULT_ON = setOf("ok", "unconfirmed", "missed")
 
     var apiEnabled: Boolean
         get() = sp.getBoolean("apiEnabled", false)
@@ -121,6 +127,14 @@ class Prefs private constructor(private val sp: SharedPreferences) {
     var mapHintShown: Boolean
         get() = sp.getBoolean("mapHintShown", false)
         set(v) = sp.edit().putBoolean("mapHintShown", v).apply()
+
+    /**
+     * v1.8.15：跑步页点位分组筛选。"auto"（默认，自动选中离当前位置平均
+     * 距离最近的一组，开跑时锁定）/ "all"（全部）/ 其余值 = 分组名（锁定该组）。
+     */
+    var runFilter: String
+        get() = sp.getString("runFilter", "auto") ?: "auto"
+        set(v) = sp.edit().putString("runFilter", v).apply()
 
     // 更新（v1.8.13：只走 GitHub Release，见 Updater.GITHUB_RELEASES_PAGE）
     var updAutoCheck: Boolean

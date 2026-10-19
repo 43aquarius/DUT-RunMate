@@ -6,7 +6,7 @@
 
 戴上耳机就跑，漏卡立刻喊你 —— 不用再边跑边盯着手机看打卡点。
 
-[![Release](https://img.shields.io/badge/release-v1.8.14-blue.svg)](../../releases)
+[![Release](https://img.shields.io/badge/release-v1.8.15-blue.svg)](../../releases)
 [![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024)-green.svg)](https://developer.android.com/about/versions/nougat)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple.svg)](https://kotlinlang.org)
 [![Material](https://img.shields.io/badge/UI-Material%20Components-00897B.svg)](https://m3.material.io)
@@ -36,7 +36,7 @@
 
 ## 下载安装
 
-1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.14.apk`（约 6.3 MB）；
+1. 到 [Releases](../../releases) 页面下载 `DUT-RunMate_v1.8.15.apk`（约 6.3 MB）；
 2. 安装时允许「未知来源应用」；
 3. 首次打开按提示授予：**精确位置、通知、后台位置（建议「始终允许」）**；
 4. 进「设置」Tab → 系统 → **加入电池优化白名单**（防止跑步中被系统杀后台）。
@@ -108,7 +108,7 @@ app/src/main/java/com/dut/runmate/
 ├── alert/AlertManager.kt                               # 预录语音（res/raw）+ 提示音 + 震动
 ├── update/Updater.kt · UpdateFlow.kt                   # 应用内更新（仅 GitHub Release 通道）
 └── ui/
-    ├── RunFragment.kt · RadarView.kt                   # 跑步页：定位预览、状态、雷达、小结
+    ├── RunFragment.kt · RadarView.kt                   # 跑步页：定位预览、状态、雷达、分组筛选、小结
     ├── MapFragment.kt                                  # 地图选点（osmdroid，缩放至 20 级）
     ├── CalibrateFragment.kt                            # 现场标定（精度加权平均）
     ├── H5CatcherActivity.kt                            # H5 捕获（嗅探器预注入，自动配置全参数）
@@ -126,6 +126,14 @@ app/src/main/java/com/dut/runmate/
 - 网络定位（基站/Wi-Fi，国产 ROM 返回 GCJ-02）会被自动归一后再参与显示与检测（v1.2.0），地图上灰点即网络定位，蓝点为 GPS。
 
 ## 更新日志
+
+- **v1.8.15（2026-10-19）** —— 默认点位与分组 + 跑步页分组筛选 + 打卡结束播报
+  - 🗺️ **首次安装预录 8 个官方打卡点**（中心田径场 a/b、西山生活区 c/d、西部校区田径场 e/f/g/h，坐标为现场 GPS 标定值，半径 20m）；已有点位的老用户可在设置 →「恢复默认打卡点」一键换回；点位编辑面板新增「分组」字段，自定义点位也可参与分组
+  - 🎯 **跑步页按分组筛选点位**：新增筛选条（自动/全部/各分组）——默认「自动」= 离当前位置平均距离最近的组（今天去哪个场地就显示哪组），开跑时锁定本次选择；也可手动指定分组或看全部；修复「有时不显示录入的点位」：冷启动/无定位时立即列出全部点位，不再等首个定位回调
+  - 🏁 **打卡结束播报**：官方打卡距离 ≥ 3km（达标线）时语音播报「打卡距离已达三公里，打卡完成」+ 提示音 + 震动，每跑一次；分场景开关新增「打卡完成（达 3km）」行
+  - 🔔 **提醒默认值调整**：语音全部默认开；震动仅「打卡成功 / 区内未确认 / 漏卡警告」三场景默认开（其余默认关，可在分场景开关里自行打开）；已显式设置过的开关不受影响
+  - 🔘 **分场景开关改文字开关**：每行的语音/震动按钮直接显示「开/关」文字与 ✓/✗ 图标，不再用颜色深浅表示状态（更易辨认）
+  - 🔄 跑步中下拉刷新距离彻底免弹窗：不再弹「已请求核对」确认框（成功静默更新数字，失败只弹自动消失的短提示；点按右上角仍可看完整详情）
 
 - **v1.8.14（2026-10-15）** —— 登录并入设置页 + 联系作者邮箱入口
   - 🔀 **登录功能合并进「设置」页**：账号登录·一键配置（学号/密码、CAS+短信二次认证引导、多账号切换、批量查距离）整体成为设置页顶部「账号」分区；底部导航移除「接口」Tab（5 Tab → 4 Tab：跑步/地图/标定/设置）——入口更少更直白，登录与检测/提醒等设置项同页可见；
