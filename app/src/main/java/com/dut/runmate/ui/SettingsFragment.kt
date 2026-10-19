@@ -352,15 +352,15 @@ class SettingsFragment : Fragment() {
                     ).apply { marginStart = pad / 2 }
                 }
                 fun applyState(on: Boolean) {
-                    text = "$base ${act.getString(if (on) R.string.scn_on else R.string.scn_off)}"
-                    setIconResource(if (on) R.drawable.ic_check else R.drawable.ic_close)
+                    btn.text = "$base ${act.getString(if (on) R.string.scn_on else R.string.scn_off)}"
+                    btn.setIconResource(if (on) R.drawable.ic_check else R.drawable.ic_close)
                 }
                 fun current() = if (isVoice) prefs.scnVoiceOn(v.scn) else prefs.scnVibOn(v.scn)
                 fun store(v2: Boolean) {
                     if (isVoice) prefs.setScnVoiceOn(v.scn, v2) else prefs.setScnVibOn(v.scn, v2)
                 }
                 applyState(current())
-                setOnClickListener {
+                btn.setOnClickListener {
                     val now = !current()
                     store(now)
                     applyState(now)
