@@ -156,6 +156,17 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         set(v) = sp.edit().putBoolean("mapHintShown", v).apply()
 
     /**
+     * v1.9.3：后台定位权限「只主动问一次」标记（用户需求：第一次打开 App 就
+     * 申请全部权限）。配合 MainActivity.maybeAskBackgroundLocation 两段式申请：
+     * 后台定位必须在前台定位授权后单独发起（Android 11+ 会静默拒绝同批申请），
+     * 问过一次后不再重复弹窗（拒绝不影响跑步判定——前台服务定位仅需
+     * 「使用期间」权限）。属于流程状态而非配置，不参与 resetAllConfig。
+     */
+    var bgPermAsked: Boolean
+        get() = sp.getBoolean("bgPermAsked", false)
+        set(v) = sp.edit().putBoolean("bgPermAsked", v).apply()
+
+    /**
      * v1.9.0：跑步通知显示开关（用户需求：开始跑步后弹窗可自由选择是否出现在
      * 锁屏页面与状态栏）。锁屏关 = 通知渠道/通知 VISIBILITY_SECRET（锁屏不显示
      * 媒体卡片）；状态栏关 = 渠道 IMPORTANCE_MIN（不显示状态栏图标；Android

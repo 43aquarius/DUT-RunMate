@@ -728,8 +728,10 @@ class RunTrackerService : Service() {
                 st.apiErr != null -> "官方打卡：接口异常"
                 else -> "官方打卡：待接口"
             })
+        // v1.9.3：GPS 里程改米——与同行「官方打卡 %d m」及跑步页大数字统一口径
+        // （旧版「官方 2850 m · GPS 2.85 km」同一行两种单位，读着割裂）
         val gpsTxt = if (st.stats.meters >= 10)
-            "GPS %.2f km".format(st.stats.meters / 1000.0)
+            "GPS %d m".format(st.stats.meters.roundToInt())
         else "GPS 累积中"
         val zoneTxt = when {
             snaps.any { it.state == RunBus.CpState.MISSED } -> "⚠ 有点位未确认，请留意"

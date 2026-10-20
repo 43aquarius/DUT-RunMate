@@ -5,14 +5,19 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <!-- v1.8.6：下拉刷新距离查询（SwipeRefreshLayout 必须是可滚动内容的直接父级） -->
+    <!-- v1.8.6：下拉刷新距离查询（SwipeRefreshLayout 必须是可滚动内容的直接父级）。
+         v1.9.3：ScrollView → NestedScrollView——用户实报「点位列表区域滑不动、
+         最后一个点位被截断」：RecyclerView 关闭嵌套滚动后会吃掉列表区的手势，
+         而普通 ScrollView 不参与嵌套滚动协议拿不到分发；NestedScrollView 实现
+         NestedScrollingParent3，配合 RV 恢复默认嵌套滚动（见下方 rvPoints），
+         列表区拖动经嵌套滚动链直达整页滚动 -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fillViewport="true">
@@ -144,7 +149,7 @@
                         android:layout_width="wrap_content" android:layout_height="wrap_content"
                         android:text="@string/stat_dist" />
                     <TextView android:id="@+id/tvOdometer" style="@style/TextAppearance.RunMate.Metric"
-                        android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0.00 km" />
+                        android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 m" />
                 </LinearLayout>
 
                 <LinearLayout android:orientation="vertical" android:gravity="center"
@@ -199,14 +204,16 @@
                 </HorizontalScrollView>
             </LinearLayout>
 
+            <!-- v1.9.3：恢复嵌套滚动默认（删 nestedScrollingEnabled=false）——
+                 RV 全量展开（wrap_content）自身滚动范围为 0，关掉嵌套滚动后
+                 列表区手势被 RV 消费且无处分发，整页滚不动（见顶部 NSV 注释） -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvPoints"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:nestedScrollingEnabled="false" />
+                android:layout_marginTop="8dp" />
         </LinearLayout>
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <FrameLayout

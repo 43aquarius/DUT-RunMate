@@ -17,7 +17,7 @@
     <string name="stat_dist">自测距离</string>
     <string name="stat_pace">配速</string>
     <!-- v1.9.2：大数字改为当前跑步距离（用户需求：这才是最重要的数字） -->
-    <string name="run_big_label">已跑里程（km）</string>
+    <string name="run_big_label">已跑里程（m）</string>
     <string name="run_big_near_fmt">距 %1$s %2$d m</string>
     <string name="run_big_inzone_fmt">%1$s · 区内</string>
     <string name="state_pending">待经过</string>

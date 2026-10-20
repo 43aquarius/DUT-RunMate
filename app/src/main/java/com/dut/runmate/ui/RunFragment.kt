@@ -51,6 +51,8 @@ import kotlinx.coroutines.launch
  *
  * v1.9.2：状态卡大数字改为当前跑步距离（用户需求：这才是最重要的数字）；
  * 原「最近点位距离」移至大数字下方一行（含点位名），雷达与列表不变。
+ * v1.9.3：大数字/自测距离/小结单位 km → m（用户需求）；点位列表滚动修复
+ * （布局 ScrollView → NestedScrollView + RV 恢复嵌套滚动，详见 fragment_run.xml）。
  */
 class RunFragment : Fragment() {
 
@@ -561,10 +563,11 @@ class RunFragment : Fragment() {
         }
         b.tvHeadline.text = head
         // v1.9.2：大数字改为「当前跑步距离」（用户需求：这才是最重要的数字）。
-        // 跑步中/刚结束（summary 尚在）显示自测里程 km 两位小数；未跑步 "--"。
+        // v1.9.3：单位改米（用户需求：首页显示单位用 m）——每次打卡固定 +100/+200m、
+        // 目标 3000m，米与打卡增量/目标同口径，一眼可算「还差多少」。整数米显示。
         // 原「最近点位距离」下移到 tvTargetName 行（含点位名，预览/跑步中都可见）。
         b.tvBigDist.text = if (st.running || st.summary != null)
-            String.format("%.2f", st.stats.meters / 1000.0) else "--"
+            String.format("%d", Math.round(st.stats.meters)) else "--"
         b.tvTargetName.text = when {
             st.running && inZone != null -> getString(R.string.run_big_inzone_fmt, inZone.cp.name)
             st.running && n != null -> getString(R.string.run_big_near_fmt, n.cp.name, n.distM)
@@ -599,9 +602,9 @@ class RunFragment : Fragment() {
             else -> "--"
         }
 
-        // 统计
+        // 统计（v1.9.3：自测距离同改米，与状态卡大数字同口径）
         b.tvTime.text = st.stats.timeStr
-        b.tvOdometer.text = String.format("%.2f km", st.stats.meters / 1000.0)
+        b.tvOdometer.text = String.format("%d m", Math.round(st.stats.meters))
         b.tvPace.text = st.stats.pace
 
         // 总结弹窗
@@ -611,7 +614,7 @@ class RunFragment : Fragment() {
             try {
                 val ok = sum.confirmed.joinToString("、").ifEmpty { "无" }
                 val miss = sum.missed.joinToString("、").ifEmpty { "无" }
-                val body = "已确认：$ok\n未确认（漏卡）：$miss\n用时 ${sum.stats.timeStr} · 自测 ${String.format("%.2f km", sum.stats.meters / 1000.0)}"
+                val body = "已确认：$ok\n未确认（漏卡）：$miss\n用时 ${sum.stats.timeStr} · 自测 ${String.format("%d m", Math.round(sum.stats.meters))}"
                 MaterialAlertDialogBuilder(requireContext())
                     .setTitle("本次跑步小结")
                     .setMessage(body)
