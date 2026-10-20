@@ -66,7 +66,7 @@ class DetectEngine(
         for (s in snaps) {
             val d = com.dut.runmate.geo.GeoKit.dist(lat, lon, s.cp.lat, s.cp.lon)
             s.lastDistM = Math.round(d).toInt()
-            val zone = s.cp.radius.toDouble()
+            val zone = s.cp.radius   // v1.9.0：每点半径已是 Double（支持 1 位小数）
             when (s.state) {
                 RunBus.CpState.PENDING -> {
                     if (d <= zone) enterZone(s, nowMs)
@@ -172,7 +172,7 @@ class DetectEngine(
             return
         }
         s.state = RunBus.CpState.GRACE
-        s.graceLeftAt = nowMs + prefs.graceSec * 1000L
+        s.graceLeftAt = nowMs + (prefs.graceSec * 1000L).toLong()   // v1.9.0：graceSec 改 Float，显式转 Long
     }
 
     fun snapshot(): List<RunBus.CpSnap> = snaps.map {

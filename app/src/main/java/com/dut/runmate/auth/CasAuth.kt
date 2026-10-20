@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.FormBody
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -284,6 +285,97 @@ object CasAuth {
     /** v1.8.12：从共享 Cookie jar 取 CASTGC（submitMfa 两段式复用） */
     private fun castgcFromJar(): String? = synchronized(cookieStore) {
         cookieStore.firstOrNull { it.name == "CASTGC" && it.value.isNotBlank() }?.value
+    }
+
+    // ================= v1.9.0：微信扫码登录 =================
+
+    /** 扫码会话起点：uuid（App 侧生成）+ 二维码内容（微信扫开后是确认页） */
+    data class QrBegin(val uuid: String, val qrUrl: String)
+
+    /** 轮询结果 */
+    sealed class QrPoll {
+        /** 未扫码（服务器对未知/未扫 uuid 返回空体 200） */
+        object Wait : QrPoll()
+        /** 已扫码，等待用户在微信中确认 */
+        object WaitConfirm : QrPoll()
+        /** 用户在微信侧取消了本次登录 */
+        object Cancel : QrPoll()
+        /** 登录成功，CASTGC 已入共享 jar（后续与密码登录同链路） */
+        data class Ok(val castgc: String) : QrPoll()
+        data class Err(val msg: String) : QrPoll()
+    }
+
+    /**
+     * v1.9.0：微信扫码登录·第一步——初始化会话并生成二维码内容。
+     * 协议逆向自 sso.dlut.edu.cn 登录页 /cas/comm/js/login-qrcode.js + login12.js：
+     *  1) GET /cas/login → jar 取 JSESSIONIDCAS（对齐浏览器：轮询请求携带同一会话）
+     *  2) 客户端本地生成 UUID（网页端同款 v4 随机）
+     *  3) 二维码内容 = https://sso.dlut.edu.cn/cas/qrLogin?uuid=<uuid>&service=<service>
+     *     （登录页无 service 参数时为空串，与浏览器直接访问 sso 页一致）
+     * 之后由 UI 层每 3s 调 pollQrLogin(uuid)，状态机与网页端 20×3s=60s 超时一致。
+     * 返回 null = 网络失败（UI 提示重试）。
+     */
+    suspend fun beginQrLogin(): QrBegin? = withContext(Dispatchers.IO) {
+        try {
+            reset()
+            client.newCall(
+                Request.Builder().url(LOGIN_PAGE).header("User-Agent", UA).build()
+            ).execute().use { it.body?.string() }
+            val uuid = java.util.UUID.randomUUID().toString()
+            QrBegin(uuid, "https://$HOST/cas/qrLogin?uuid=$uuid&service=")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * v1.9.0：微信扫码登录·第二步——轮询扫码状态。
+     * GET /cas/checkQrCodeScan?random=<rand>&uuid=<uuid>（与网页端 jQuery.ajax 同参）；
+     * 未扫码时响应体为空（实测 200 + 空体）；扫码后返回 JSON：
+     *   scanStatus = wait_confirm（已扫待确认）/ cancel（用户取消）/ success
+     *   success 时响应带 redirect_url——网页端 window.location.href 跳转过去，
+     * 此处同样跟随（客户端 followRedirects=true），CASTGC 由本响应或跳转链的
+     * Set-Cookie 写入共享 jar，随后 castgcFromJar() 取出。
+     */
+    suspend fun pollQrLogin(uuid: String): QrPoll = withContext(Dispatchers.IO) {
+        try {
+            val body = client.newCall(
+                Request.Builder()
+                    .url("https://$HOST/cas/checkQrCodeScan?random=${Math.random()}&uuid=$uuid")
+                    .header("User-Agent", UA)
+                    .header("Referer", LOGIN_PAGE)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .build()
+            ).execute().use { it.body?.string() ?: "" }
+            if (body.isBlank()) return@withContext QrPoll.Wait
+            val o = JSONObject(body)
+            when (o.optString("scanStatus")) {
+                "wait_confirm" -> QrPoll.WaitConfirm
+                "cancel" -> QrPoll.Cancel
+                "success" -> {
+                    val redir = o.optString("redirect_url")
+                    if (redir.startsWith("http")) {
+                        try {
+                            client.newCall(
+                                Request.Builder().url(redir).header("User-Agent", UA).build()
+                            ).execute().use { it.body?.string() }
+                        } catch (_: Exception) {
+                        }
+                    }
+                    val t = castgcFromJar()
+                    if (t.isNullOrBlank())
+                        QrPoll.Err("扫码成功但未取得会话（CASTGC），请改用密码登录")
+                    else QrPoll.Ok(t)
+                }
+                else -> QrPoll.Wait
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            QrPoll.Err("网络错误：${e.message ?: "未知"}")
+        }
     }
 
     /**

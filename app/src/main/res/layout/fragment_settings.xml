@@ -77,6 +77,11 @@
                     android:id="@+id/btnWsLogin" style="@style/Widget.RunMate.PillButton"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="10dp" android:text="@string/ws_btn_login" />
+                <!-- v1.9.0：微信扫码登录（免输密码；需在微信中已绑定学校账号） -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnQrLogin" style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:text="@string/ws_btn_qr" />
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnOpenH5" style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
@@ -110,7 +115,8 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="24dp" android:text="@string/pref_detect" />
 
-            <!-- 默认半径 -->
+            <!-- v1.9.0：检测参数改手填（用户需求：直接手动填写，保留 1 位小数）。
+             旧滑杆步长 1m 只能整数——现在可自定义精确参数（如 12.5m） -->
             <LinearLayout android:orientation="vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
@@ -118,17 +124,19 @@
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:text="@string/pref_default_radius" />
-                <TextView android:id="@+id/tvRadius" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant" android:text="25 m" />
-                <!-- v1.8.6：最小可调精度 1m（原步长 5m） -->
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/sliderRadius" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:valueFrom="1" android:valueTo="80"
-                    android:stepSize="1" />
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" app:suffixText="m"
+                    android:hint="@string/pref_radius_range">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etRadius" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:inputType="numberDecimal"
+                        android:maxLength="6" android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
-            <!-- 预告距离 -->
+            <!-- 预告距离（v1.9.0：手填，保留 1 位小数） -->
             <LinearLayout android:orientation="vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
@@ -136,17 +144,19 @@
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:text="@string/pref_approach" />
-                <TextView android:id="@+id/tvApproach" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant" android:text="60 m" />
-                <!-- v1.8.6：最小可调精度 1m（原步长 10m） -->
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/sliderApproach" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:valueFrom="1" android:valueTo="150"
-                    android:stepSize="1" />
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" app:suffixText="m"
+                    android:hint="@string/pref_approach_range">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etApproach" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:inputType="numberDecimal"
+                        android:maxLength="6" android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
-            <!-- 确认阈值 -->
+            <!-- 确认阈值（v1.9.0：手填，保留 1 位小数） -->
             <LinearLayout android:orientation="vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
@@ -154,16 +164,19 @@
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:text="@string/pref_confirm_delta" />
-                <TextView android:id="@+id/tvDelta" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant" android:text="3 m" />
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/sliderDelta" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:valueFrom="1" android:valueTo="10"
-                    android:stepSize="1" />
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" app:suffixText="m"
+                    android:hint="@string/pref_delta_range">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etDelta" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:inputType="numberDecimal"
+                        android:maxLength="5" android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
-            <!-- 轮询间隔 -->
+            <!-- 轮询间隔（v1.9.0：手填，保留 1 位小数） -->
             <LinearLayout android:orientation="vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
@@ -171,16 +184,19 @@
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:text="@string/pref_poll_interval" />
-                <TextView android:id="@+id/tvPoll" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant" android:text="3 s" />
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/sliderPoll" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:valueFrom="2" android:valueTo="15"
-                    android:stepSize="1" />
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" app:suffixText="s"
+                    android:hint="@string/pref_poll_range">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPoll" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:inputType="numberDecimal"
+                        android:maxLength="5" android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
-            <!-- 宽限期 -->
+            <!-- 宽限期（v1.9.0：手填，保留 1 位小数） -->
             <LinearLayout android:orientation="vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
@@ -188,13 +204,53 @@
                 <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:textAppearance="?attr/textAppearanceTitleMedium"
                     android:text="@string/pref_grace" />
-                <TextView android:id="@+id/tvGrace" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant" android:text="12 s" />
-                <com.google.android.material.slider.Slider
-                    android:id="@+id/sliderGrace" android:layout_width="match_parent"
-                    android:layout_height="wrap_content" android:valueFrom="5" android:valueTo="40"
-                    android:stepSize="5" />
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp" app:suffixText="s"
+                    android:hint="@string/pref_grace_range">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etGrace" android:layout_width="match_parent"
+                        android:layout_height="wrap_content" android:inputType="numberDecimal"
+                        android:maxLength="5" android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <!-- v1.9.0：跑步通知显示（用户需求：开始跑步后弹窗可自由选择是否出现在锁屏页面与状态栏） -->
+            <TextView style="@style/TextAppearance.RunMate.Label"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" android:text="@string/pref_notif_section" />
+
+            <LinearLayout android:orientation="horizontal" android:gravity="center_vertical"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
+                android:paddingHorizontal="16dp" android:paddingVertical="8dp">
+                <LinearLayout android:orientation="vertical" android:layout_width="0dp"
+                    android:layout_weight="1" android:layout_height="wrap_content">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" android:text="@string/pref_notif_lock" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/pref_notif_lock_sub" />
+                </LinearLayout>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swNotifLock" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <LinearLayout android:orientation="horizontal" android:gravity="center_vertical"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:background="?attr/colorSurfaceVariant" android:layout_marginTop="8dp"
+                android:paddingHorizontal="16dp" android:paddingVertical="8dp">
+                <LinearLayout android:orientation="vertical" android:layout_width="0dp"
+                    android:layout_weight="1" android:layout_height="wrap_content">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" android:text="@string/pref_notif_bar" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/pref_notif_bar_sub" />
+                </LinearLayout>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swNotifBar" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             </LinearLayout>
 
             <TextView style="@style/TextAppearance.RunMate.Label"
@@ -400,11 +456,13 @@
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" android:text="@string/pref_export" />
 
-            <!-- v1.8.15：恢复默认打卡点（8 个官方点位，带分组） -->
+            <!-- v1.9.0：全部恢复默认（替代 v1.8.15「恢复默认打卡点」单一入口：
+                 检测参数/提醒开关/通知显示/API/地图坐标/筛选 + 8 个默认点位一并重置；
+                 账号登录信息不受影响） -->
             <com.google.android.material.button.MaterialButton
-                style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnRestoreCp"
+                style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnResetAll"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:layout_marginTop="8dp" android:text="@string/pref_restore_cp" />
+                android:layout_marginTop="8dp" android:text="@string/pref_reset_all" />
             <com.google.android.material.button.MaterialButton
                 style="?attr/materialButtonOutlinedStyle" android:id="@+id/btnCrashLog"
                 android:layout_width="match_parent" android:layout_height="wrap_content"

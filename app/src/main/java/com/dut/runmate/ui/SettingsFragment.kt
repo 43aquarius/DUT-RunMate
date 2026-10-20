@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
@@ -33,6 +34,8 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -94,6 +97,9 @@ class SettingsFragment : Fragment() {
         }
         renderWsStatus()
         b.btnWsLogin.setOnClickListener { doLogin() }
+        // v1.9.0：微信扫码登录（免输密码；协议复刻网页端 login-qrcode.js，见
+        // CasAuth.beginQrLogin / pollQrLogin）
+        b.btnQrLogin.setOnClickListener { showQrLoginDialog() }
         b.btnOpenH5.setOnClickListener { openH5Catcher(prefs.wsPwdDecoded()) }
 
         // v1.7.0 多账号：chips 列表（切换/长按删除/＋添加）+ 批量查询全部账号距离
@@ -103,49 +109,14 @@ class SettingsFragment : Fragment() {
         // v1.6.1：账号登录说明（多账号/重新捕获/API 判定都是干什么的）
         b.btnHelpApi.setOnClickListener { HelpDialog.show(requireContext()) }
 
-        // ==================== 检测参数 ====================
+        // ==================== 检测参数 / 提醒 / 通知显示 / API / 地图 ====================
         //
-        // v1.4.0 修复闪退：Material 1.12 的 Slider.setValue() 要求值必须落在
-        // [valueFrom, valueTo] 且与 stepSize 网格对齐，否则抛 IllegalArgumentException。
-        // 旧版默认 graceSec=12 不在 5/10/15… 网格上 → 一进设置页就崩。
-        // bindSlider 现在先夹取到滑杆范围、再吸附到最近网格点，并把吸附后的值
-        // 写回偏好（自愈），保证任何历史脏数据都能被安全渲染。
-        fun bindSlider(
-            slider: com.google.android.material.slider.Slider,
-            tv: android.widget.TextView, suffix: String,
-            get: () -> Int, set: (Int) -> Unit
-        ) {
-            val raw = get().toFloat()
-            val from = slider.valueFrom
-            val to = slider.valueTo
-            val step = slider.stepSize
-            val clamped = raw.coerceIn(from, to)
-            val v = if (step > 0f) {
-                val idx = Math.round((clamped - from) / step)
-                (from + idx * step).coerceIn(from, to)
-            } else clamped
-            if (v != raw) set(v.toInt())          // 自愈历史脏数据
-            slider.value = v
-            tv.text = "${v.toInt()} $suffix"
-            slider.addOnChangeListener { _, value, _ ->
-                val i = value.toInt()
-                set(i)
-                tv.text = "$i $suffix"
-            }
-        }
-        bindSlider(b.sliderRadius, b.tvRadius, "m", { prefs.defaultRadius }, { prefs.defaultRadius = it })
-        bindSlider(b.sliderApproach, b.tvApproach, "m", { prefs.approachDist }, { prefs.approachDist = it })
-        bindSlider(b.sliderDelta, b.tvDelta, "m", { prefs.confirmDelta }, { prefs.confirmDelta = it })
-        bindSlider(b.sliderPoll, b.tvPoll, "s", { prefs.pollInterval }, { prefs.pollInterval = it })
-        bindSlider(b.sliderGrace, b.tvGrace, "s", { prefs.graceSec }, { prefs.graceSec = it })
-
-        // 提醒
-        b.swTts.isChecked = prefs.ttsEnabled
-        b.swTts.setOnCheckedChangeListener { _, c -> prefs.ttsEnabled = c }
-        b.swChime.isChecked = prefs.chimeEnabled
-        b.swChime.setOnCheckedChangeListener { _, c -> prefs.chimeEnabled = c }
-        b.swVibrate.isChecked = prefs.vibrateEnabled
-        b.swVibrate.setOnCheckedChangeListener { _, c -> prefs.vibrateEnabled = c }
+        // v1.9.0：检测参数改手动输入（用户需求：直接手动填写、自动保留 1 位小数，
+        // 可自定义精确参数如 12.5m；旧滑杆步长 1m 只能整数）。可刷新绑定集中到
+        // bindConfigControls()——onViewCreated 首次调用，「全部恢复默认」后重调
+        // 一次即可整页回填默认值（v1.4.0 的「历史脏数据自愈」语义一并保留：
+        // 越界/非法输入夹取到合法范围后写回）。
+        bindConfigControls()
 
         // v1.8.13：分场景提醒开关（每种提醒的语音/震动独立开关，默认全开，
         // 与上方总开关叠加——两层都开才触发）
@@ -199,20 +170,6 @@ class SettingsFragment : Fragment() {
             }, 4500L)
         }
 
-        // API
-        b.swApi.isChecked = prefs.apiEnabled
-        b.swApi.setOnCheckedChangeListener { _, c -> prefs.apiEnabled = c }
-
-        // 地图
-        if (prefs.tileSat) b.rbTileSat.isChecked = true else b.rbTileStreet.isChecked = true
-        b.rgTile.setOnCheckedChangeListener { _, id ->
-            prefs.tileSat = id == R.id.rbTileSat
-        }
-        if (prefs.coordGcj) b.rbCoordGcj.isChecked = true else b.rbCoordWgs.isChecked = true
-        b.rgCoord.setOnCheckedChangeListener { _, id ->
-            prefs.coordGcj = id == R.id.rbCoordGcj
-        }
-
         // 更新（v1.6.0：界面精简——只留「检查更新」；v1.8.13：更新只走 GitHub
         // Release，发布中心服务器通道已随 Updater 一并移除）
         b.btnUpdCheck.setOnClickListener {
@@ -262,8 +219,9 @@ class SettingsFragment : Fragment() {
             Notice.show(this, getString(R.string.pref_export_done, store.count))
         }
 
-        // v1.8.15：恢复默认打卡点（8 个官方点位带分组；替换现有全部点位）
-        b.btnRestoreCp.setOnClickListener { confirmRestoreCheckpoints() }
+        // v1.9.0：全部恢复默认（替代 v1.8.15「恢复默认打卡点」单一入口：检测参数/
+        // 提醒开关/通知显示/API/地图坐标/点位一并重置；账号登录信息不受影响）
+        b.btnResetAll.setOnClickListener { confirmResetAll() }
 
         // v1.5.1：崩溃日志查看（filesDir/crash_log.txt，App.kt 全局捕获落盘）。
         // 用户遇到闪退时可打开复制给开发者，远程定位问题不再靠猜。
@@ -383,23 +341,215 @@ class SettingsFragment : Fragment() {
     }
 
     /**
-     * v1.8.15：恢复默认打卡点——确认后清空现有点位，重建 8 个官方打卡点
-     *（中心田径场 a/b、西山生活区 c/d、西部校区田径场 e/f/g/h，坐标为
-     * 现场标定值，自带分组；首次安装自动预录，此入口供老用户/误删恢复）。
+     * v1.9.0：检测参数手动输入绑定（替代旧滑杆——用户需求：直接手动填写、
+     * 自动保留 1 位小数，可自定义精确参数如 12.5m）。
+     * 失焦时生效：非法/空输入回退当前值；越界夹取到 [min,max]；四舍五入到
+     * 1 位小数后落盘并回显（沿用 v1.4.0 的历史脏数据自愈语义）。
      */
-    private fun confirmRestoreCheckpoints() {
-        val act = requireActivity()
+    private fun bindDecimalInput(
+        et: com.google.android.material.textfield.TextInputEditText,
+        min: Float, max: Float,
+        get: () -> Float, set: (Float) -> Unit
+    ) {
+        fun fmt(v: Float) = String.format("%.1f", v)
+        fun refresh() {
+            val cur = get().coerceIn(min, max)
+            if (cur != get()) set(cur)            // 自愈：越界/历史脏数据夹取后写回
+            et.setText(fmt(cur))
+        }
+        fun apply() {
+            val raw = et.text.toString().toFloatOrNull()
+            if (raw == null) { refresh(); return }
+            val v = Math.round(raw.coerceIn(min, max) * 10f) / 10f
+            set(v)
+            et.setText(fmt(v))
+            et.setSelection(et.text?.length ?: 0)
+        }
+        refresh()
+        et.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) apply() }
+        // 键盘「完成」→ 先收焦点（经焦点监听统一走 apply），保持单一落盘路径
+        et.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                et.clearFocus(); true
+            } else false
+        }
+    }
+
+    /**
+     * v1.9.0：可刷新的配置绑定（检测参数手填框/提醒总开关/跑步通知显示/API/地图）。
+     * onViewCreated 首次调用；「全部恢复默认」后重调一次，整页即时回填默认值
+     * （各监听器 attach 均为替换语义，重复绑定安全）。
+     */
+    private fun bindConfigControls() {
+        // 检测参数（手填，范围与旧滑杆一致；1 位小数）
+        bindDecimalInput(b.etRadius, 1f, 80f, { prefs.defaultRadius }, { prefs.defaultRadius = it })
+        bindDecimalInput(b.etApproach, 1f, 150f, { prefs.approachDist }, { prefs.approachDist = it })
+        bindDecimalInput(b.etDelta, 1f, 10f, { prefs.confirmDelta }, { prefs.confirmDelta = it })
+        bindDecimalInput(b.etPoll, 2f, 15f, { prefs.pollInterval }, { prefs.pollInterval = it })
+        bindDecimalInput(b.etGrace, 5f, 40f, { prefs.graceSec }, { prefs.graceSec = it })
+
+        // 提醒总开关
+        b.swTts.isChecked = prefs.ttsEnabled
+        b.swTts.setOnCheckedChangeListener { _, c -> prefs.ttsEnabled = c }
+        b.swChime.isChecked = prefs.chimeEnabled
+        b.swChime.setOnCheckedChangeListener { _, c -> prefs.chimeEnabled = c }
+        b.swVibrate.isChecked = prefs.vibrateEnabled
+        b.swVibrate.setOnCheckedChangeListener { _, c -> prefs.vibrateEnabled = c }
+
+        // v1.9.0：跑步通知显示（锁屏/状态栏；RunTrackerService 下次开跑时重建渠道生效）
+        b.swNotifLock.isChecked = prefs.notifLockscreen
+        b.swNotifLock.setOnCheckedChangeListener { _, c -> prefs.notifLockscreen = c }
+        b.swNotifBar.isChecked = prefs.notifStatusbar
+        b.swNotifBar.setOnCheckedChangeListener { _, c -> prefs.notifStatusbar = c }
+
+        // API
+        b.swApi.isChecked = prefs.apiEnabled
+        b.swApi.setOnCheckedChangeListener { _, c -> prefs.apiEnabled = c }
+
+        // 地图
+        if (prefs.tileSat) b.rbTileSat.isChecked = true else b.rbTileStreet.isChecked = true
+        b.rgTile.setOnCheckedChangeListener { _, id ->
+            prefs.tileSat = id == R.id.rbTileSat
+        }
+        if (prefs.coordGcj) b.rbCoordGcj.isChecked = true else b.rbCoordWgs.isChecked = true
+        b.rgCoord.setOnCheckedChangeListener { _, id ->
+            prefs.coordGcj = id == R.id.rbCoordGcj
+        }
+    }
+
+    /**
+     * v1.9.0：全部恢复默认（替代 v1.8.15「恢复默认打卡点」单一入口，用户需求：
+     * 删掉单一入口、加「将所有配置改为默认」，默认检测半径 10m / 预告距离 20m）。
+     * 重置范围见 Prefs.resetAllConfig（账号登录信息保留）；点位同步重建 8 个
+     * 官方默认点；随后重调 bindConfigControls 整页即时回填。
+     */
+    private fun confirmResetAll() {
+        val act = activity as? AppCompatActivity ?: return
         try {
             MaterialAlertDialogBuilder(act)
-                .setTitle(R.string.pref_restore_cp)
-                .setMessage(getString(R.string.restore_cp_confirm, store.count))
-                .setPositiveButton(R.string.restore_cp_go) { _, _ ->
+                .setTitle(R.string.pref_reset_all)
+                .setMessage(getString(R.string.reset_all_confirm, store.count))
+                .setPositiveButton(R.string.reset_all_go) { _, _ ->
+                    prefs.resetAllConfig()
                     store.resetToDefaults()
-                    Notice.show(this, getString(R.string.restore_cp_done))
+                    if (_b != null) bindConfigControls()
+                    Notice.show(this, getString(R.string.reset_all_done))
                 }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
         } catch (_: Throwable) { }
+    }
+
+    // ==================== v1.9.0：微信扫码登录 ====================
+
+    /**
+     * 扫码登录对话框（协议逆向自 sso 登录页 login-qrcode.js + login12.js）：
+     * beginQrLogin（GET /cas/login 播种会话 + 本地 UUID）→ 展示二维码 →
+     * 每 3s pollQrLogin（checkQrCodeScan：wait / wait_confirm / cancel / success）
+     * → success 后 CASTGC 入共享 jar → 与密码登录同路径 startNativeConfig（免密码）。
+     * 60s 未扫过期（对齐网页端 20×3s），点「刷新二维码」重新生成；
+     * 密码框留空时扫码成功后不落盘密码（会话自动续期不可用，属可接受降级）。
+     */
+    private fun showQrLoginDialog() {
+        if (_b == null) return
+        val number = b.etWsNumber.text.toString().trim()
+        if (number.isBlank()) {
+            b.tvWsStatus.text = getString(R.string.qr_need_number)
+            return
+        }
+        // 换账号扫码前先把当前活跃账号快照入库（与 doLogin 同策略）
+        if (prefs.wsNumber.isNotBlank() && number != prefs.wsNumber.trim()) {
+            try {
+                Accounts.snapshotCurrent(prefs, apiStore)?.let { Accounts.upsert(prefs, apiStore, it) }
+            } catch (_: Exception) {
+            }
+        }
+        val view = layoutInflater.inflate(R.layout.dialog_qr_login, null)
+        val imgQr = view.findViewById<ImageView>(R.id.imgQr)
+        val tvQrStatus = view.findViewById<TextView>(R.id.tvQrStatus)
+
+        var pollJob: kotlinx.coroutines.Job? = null
+        val dlg = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.qr_login_title)
+            .setView(view)
+            .setPositiveButton(R.string.qr_btn_refresh, null)   // 手动接管：点按=刷新
+            .setNegativeButton(android.R.string.cancel) { _, _ -> }
+            .setOnDismissListener { pollJob?.cancel() }
+            .create()
+
+        fun startQr() {
+            tvQrStatus.text = getString(R.string.qr_status_loading)
+            pollJob?.cancel()
+            pollJob = viewLifecycleOwner.lifecycleScope.launch {
+                val beg = com.dut.runmate.auth.CasAuth.beginQrLogin()
+                if (_b == null || !dlg.isShowing) return@launch
+                if (beg == null) {
+                    tvQrStatus.text = getString(R.string.qr_status_net_err)
+                    return@launch
+                }
+                val bmp = withContext(Dispatchers.IO) { qrBitmap(beg.qrUrl) }
+                if (_b == null || !dlg.isShowing) return@launch
+                if (bmp == null) {
+                    tvQrStatus.text = getString(R.string.qr_status_net_err)
+                    return@launch
+                }
+                imgQr.setImageBitmap(bmp)
+                tvQrStatus.text = getString(R.string.qr_status_wait)
+                var polls = 0
+                while (polls < 20 && isActive && dlg.isShowing) {   // 网页端同款 20×3s=60s 有效期
+                    delay(3000)
+                    polls++
+                    if (_b == null || !dlg.isShowing) return@launch
+                    when (val st = com.dut.runmate.auth.CasAuth.pollQrLogin(beg.uuid)) {
+                        com.dut.runmate.auth.CasAuth.QrPoll.WaitConfirm ->
+                            tvQrStatus.text = getString(R.string.qr_status_confirm)
+                        com.dut.runmate.auth.CasAuth.QrPoll.Cancel -> {
+                            tvQrStatus.text = getString(R.string.qr_status_cancel)
+                            return@launch
+                        }
+                        is com.dut.runmate.auth.CasAuth.QrPoll.Ok -> {
+                            tvQrStatus.text = getString(R.string.qr_status_ok)
+                            prefs.casTgt = st.castgc
+                            prefs.wsNumber = number
+                            val pwd = b.etWsPwd.text.toString()
+                            if (pwd.isNotBlank()) prefs.wsPwdSaved = android.util.Base64.encodeToString(
+                                pwd.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+                            dlg.dismiss()
+                            renderWsStatus()
+                            // 与密码登录同路径：CASTGC 就绪 → 原生一键配置
+                            //（SportAuth 免密调用，密码仅会话失效兜底时才需要）
+                            startNativeConfig(number, pwd)
+                            return@launch
+                        }
+                        is com.dut.runmate.auth.CasAuth.QrPoll.Err -> {
+                            tvQrStatus.text = st.msg
+                            return@launch
+                        }
+                        com.dut.runmate.auth.CasAuth.QrPoll.Wait -> { }
+                    }
+                }
+                if (polls >= 20 && dlg.isShowing)
+                    tvQrStatus.text = getString(R.string.qr_status_expired)
+            }
+        }
+        dlg.setOnShowListener {
+            dlg.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener { startQr() }
+        }
+        dlg.show()
+        startQr()
+    }
+
+    /** v1.9.0：二维码位图（zxing；IO 线程调用；内容 = qrLogin?uuid=<uuid>&service=） */
+    private fun qrBitmap(content: String, size: Int = 512): Bitmap? = try {
+        val m = com.google.zxing.qrcode.QRCodeWriter()
+            .encode(content, com.google.zxing.BarcodeFormat.QR_CODE, size, size)
+        val px = IntArray(size * size)
+        for (y in 0 until size) for (x in 0 until size)
+            px[y * size + x] = if (m.get(x, y)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+        Bitmap.createBitmap(px, size, size, Bitmap.Config.ARGB_8888)
+    } catch (_: Exception) {
+        null
     }
 
     /**

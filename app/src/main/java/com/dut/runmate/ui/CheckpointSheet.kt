@@ -27,7 +27,8 @@ object CheckpointSheet {
         dialog.setContentView(b.root)
 
         val editing = origin != null
-        val cp = origin ?: Checkpoint(radius = prefs.defaultRadius)
+        // v1.9.0：新建点半径默认取设置页手填值（保留 1 位小数）
+        val cp = origin ?: Checkpoint(radius = prefs.defaultRadius.toDouble())
 
         b.tvSheetTitle.text = if (editing) ctx.getString(com.dut.runmate.R.string.edit_point)
         else ctx.getString(com.dut.runmate.R.string.add_point)
@@ -35,8 +36,10 @@ object CheckpointSheet {
         b.etCpName.setText(cp.name.ifEmpty { store.defaultName() })
         b.etCpNote.setText(cp.note)
         b.etCpGroup.setText(cp.group)   // v1.8.15：分组（留空 = 不分组）
-        b.sliderSheetRadius.value = cp.radius.toFloat().coerceIn(1f, 100f)   // v1.8.13：最小 1m
-        b.tvSheetRadius.text = "${cp.radius} m"
+        // v1.9.0：检测半径改手填（支持 1 位小数，旧滑杆步长 1m 无法表达亚米级）。
+        // 首次回填时自愈历史脏数据（夹取到 1~100m 并四舍五入到 1 位小数）。
+        fun radiusFmt(v: Double) = String.format("%.1f", v)
+        b.etCpRadius.setText(radiusFmt(cp.radius.coerceIn(1.0, 100.0)))
 
         if (lat != null && lon != null) {
             b.etLat.setText(GeoKit.fmt7(lat))
@@ -65,10 +68,6 @@ object CheckpointSheet {
         b.etLon.doAfterTextChangedCompat { refreshGcjLabel() }
         refreshGcjLabel()
 
-        b.sliderSheetRadius.addOnChangeListener { _, v, _ ->
-            b.tvSheetRadius.text = "${v.toInt()} m"
-        }
-
         if (editing) b.btnSheetDelete.isVisibleSafe(true) else b.btnSheetDelete.isVisibleSafe(false)
 
         b.btnSheetDelete.setOnClickListener {
@@ -92,7 +91,15 @@ object CheckpointSheet {
             cp.name = b.etCpName.text.toString().ifBlank { store.defaultName() }
             cp.note = b.etCpNote.text.toString()
             cp.group = b.etCpGroup.text.toString().trim()   // v1.8.15：保存分组
-            cp.radius = b.sliderSheetRadius.value.toInt()
+            // v1.9.0：半径手填（1~100m，保留 1 位小数）；非法/空输入就地报错不关窗
+            b.tilCpRadius.error = null
+            val radiusRaw = b.etCpRadius.text.toString().toDoubleOrNull()
+            if (radiusRaw == null) {
+                b.tilCpRadius.error = "半径无效（0-9 与小数点，1~100 m）"
+                return@setOnClickListener
+            }
+            val radiusVal = Math.round(radiusRaw.coerceIn(1.0, 100.0) * 10.0) / 10.0
+            cp.radius = radiusVal
             cp.lat = wLat; cp.lon = wLon
             if (!editing) cp.source = "manual"
             store.upsert(cp)

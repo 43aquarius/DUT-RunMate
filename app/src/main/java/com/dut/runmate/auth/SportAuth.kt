@@ -158,8 +158,12 @@ object SportAuth {
         log: (String) -> Unit = {}
     ): Result = withContext(Dispatchers.IO) {
         try {
-            if (number.isBlank() || password.isBlank())
-                return@withContext Result.Err("参数", "请输入学号和密码")
+            // v1.9.0：扫码登录拿到新鲜 CASTGC 后免密码调本链路（freshCas=false 时
+            // password 仅在「CASTGC 失效需重登」兑底路径用到，可为空）
+            if (number.isBlank())
+                return@withContext Result.Err("参数", "请输入学号")
+            if (password.isBlank() && freshCas)
+                return@withContext Result.Err("参数", "请输入密码")
 
             // 1) CAS（可跳过：调用方刚登录过，jar 里已有新鲜 CASTGC）
             if (freshCas) {

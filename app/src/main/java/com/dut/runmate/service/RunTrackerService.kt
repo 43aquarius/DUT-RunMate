@@ -177,12 +177,26 @@ class RunTrackerService : Service() {
         val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         notifMgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
-            // v1.8.3：锁屏可见性修复——Android 13+/MIUI 上通知渠道默认锁屏可见性
-            // 不一定跟随通知自身的 VISIBILITY_PUBLIC，显式设置渠道级锁屏公开，
-            // 否则部分 ROM 锁屏不显示跑步状态（用户实报「锁屏后没有显示」）
+            // v1.9.0：跑步通知显示开关（用户需求：开始跑步后弹窗可自由选择是否出现在
+            // 锁屏页面与状态栏）。渠道级设置只在渠道创建时生效且之后不可更新——
+            // 每次开跑先删旧渠道再按当前设置重建（Briar 项目验证的做法）。
+            //  锁屏关 = VISIBILITY_SECRET（锁屏不显示媒体卡片）；
+            //  状态栏关 = IMPORTANCE_MIN（不显示状态栏图标；Android 对前台服务通知
+            //  有系统级可见性要求，部分 ROM 仍可能显示图标——设置页文案已说明）。
+            // 开跑中改开关不即时生效，下次开始跑步时应用新设置。
+            try {
+                notifMgr?.deleteNotificationChannel(CH_ID)
+            } catch (_: Throwable) {
+            }
             notifMgr?.createNotificationChannel(
-                NotificationChannel(CH_ID, getString(R.string.ch_name), NotificationManager.IMPORTANCE_LOW).apply {
-                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                NotificationChannel(
+                    CH_ID, getString(R.string.ch_name),
+                    if (prefs.notifStatusbar) NotificationManager.IMPORTANCE_LOW
+                    else NotificationManager.IMPORTANCE_MIN
+                ).apply {
+                    lockscreenVisibility = if (prefs.notifLockscreen)
+                        Notification.VISIBILITY_PUBLIC
+                    else Notification.VISIBILITY_SECRET
                 }
             )
         }
@@ -586,8 +600,9 @@ class RunTrackerService : Service() {
             .setOnlyAlertOnce(true)
             // v1.8.3 保留：FGS 通知立即上屏
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            // v1.5.0 锁屏公开（渠道级 lockscreenVisibility=PUBLIC 见 startRun）
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            // v1.5.0 锁屏公开（渠道级 lockscreenVisibility 见 startRun；v1.9.0：随设置）
+            .setVisibility(if (prefs.notifLockscreen)
+                NotificationCompat.VISIBILITY_PUBLIC else NotificationCompat.VISIBILITY_SECRET)
             .setContentIntent(pi)
             .addAction(R.drawable.ic_check, getString(R.string.notif_verify), verifyPi)
             .addAction(R.drawable.ic_stop, getString(R.string.notif_stop), stopPi)

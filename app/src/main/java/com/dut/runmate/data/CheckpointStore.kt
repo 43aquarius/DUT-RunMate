@@ -10,7 +10,7 @@ data class Checkpoint(
     var name: String = "点位",
     var lat: Double = 0.0,          // WGS-84 存储
     var lon: Double = 0.0,
-    var radius: Int = 25,           // 检测半径（米）
+    var radius: Double = 10.0,      // 检测半径（米，v1.9.0 起支持 1 位小数）
     var note: String = "",
     var source: String = "map",     // map | gps | manual
     /** v1.8.15：点位分组（如「中心田径场」）——跑步页按组筛选显示，默认自动选中距离最近的组 */
@@ -40,7 +40,7 @@ class CheckpointStore private constructor(private val file: File) {
         return cp
     }
 
-    /** v1.8.15：清空并恢复为 8 个默认打卡点（设置页「恢复默认打卡点」入口） */
+    /** v1.8.15：清空并恢复为 8 个默认打卡点；v1.9.0 起由「全部恢复默认」一并调用 */
     fun resetToDefaults() {
         list.clear()
         DEFAULTS.forEach { list.add(it.copy()) }
@@ -129,7 +129,7 @@ class CheckpointStore private constructor(private val file: File) {
                             name = o.optString("name", "点位"),
                             lat = o.optDouble("lat"),
                             lon = o.optDouble("lon"),
-                            radius = o.optInt("radius", 25),
+                            radius = o.optDouble("radius", 10.0),   // v1.9.0：小数半径；旧文件存的 Int 值 optDouble 同样兼容
                             note = o.optString("note"),
                             source = o.optString("source", "map"),
                             group = o.optString("group")
@@ -144,7 +144,7 @@ class CheckpointStore private constructor(private val file: File) {
          * 中心田径场（a/b）、西山生活区（c/d）、西部校区田径场（e/f/g/h），
          * 坐标为用户现场 GPS 标定值（标定 ±3.8m，离散 ≤0.7m）。
          * 已有点位的旧版本升级不覆盖（marker 防重入）；老用户想换回这套点位
-         * 走设置页「恢复默认打卡点」。
+         * 走设置页「全部恢复默认」。
          */
         private fun CheckpointStore.seedDefaults() {
             val marker = File(file.parentFile, "seed_defaults.done")
@@ -158,7 +158,8 @@ class CheckpointStore private constructor(private val file: File) {
             try { marker.createNewFile() } catch (_: Exception) { }
         }
 
-        /** v1.8.15：默认打卡点（id 与用户标定数据一致；radius=20m，source=gps） */
+        /** v1.8.15：默认打卡点（id 与用户标定数据一致；radius=20m，source=gps；
+         * v1.9.0：radius 类型改 Double——整数字面量自动转 Double，值不变） */
         private val DEFAULTS = listOf(
             Checkpoint(1, "点位 h", 38.8835245, 121.5099830, 20, "标定 ±3.8m·离散0.3m", "gps", "西部校区田径场"),
             Checkpoint(2, "点位 e", 38.8825987, 121.5102414, 20, "标定 ±3.8m·离散0.3m", "gps", "西部校区田径场"),

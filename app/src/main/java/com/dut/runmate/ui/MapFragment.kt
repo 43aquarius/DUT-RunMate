@@ -238,7 +238,7 @@ class MapFragment : Fragment() {
 
         // 半径圈
         val poly = Polygon(b.map)
-        poly.points = circlePts(cLat, cLon, cp.radius.toDouble())
+        poly.points = circlePts(cLat, cLon, cp.radius)   // v1.9.0：radius 已是 Double
         poly.outlinePaint.color = ContextCompat.getColor(requireContext(), R.color.md_secondary)
         poly.outlinePaint.strokeWidth = 2.5f
         poly.fillPaint.color = Color.argb(26, 17, 81, 255)

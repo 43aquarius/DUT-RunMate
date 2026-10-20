@@ -6,21 +6,43 @@ import android.content.SharedPreferences
 /** 全局设置 */
 class Prefs private constructor(private val sp: SharedPreferences) {
 
-    var defaultRadius: Int
-        get() = sp.getInt("defaultRadius", 25)
-        set(v) = sp.edit().putInt("defaultRadius", v).apply()
-    var approachDist: Int
-        get() = sp.getInt("approachDist", 60)
-        set(v) = sp.edit().putInt("approachDist", v).apply()
-    var confirmDelta: Int
-        get() = sp.getInt("confirmDelta", 3)
-        set(v) = sp.edit().putInt("confirmDelta", v).apply()
-    var pollInterval: Int
-        get() = sp.getInt("pollInterval", 3)
-        set(v) = sp.edit().putInt("pollInterval", v).apply()
-    var graceSec: Int
-        get() = sp.getInt("graceSec", 15)
-        set(v) = sp.edit().putInt("graceSec", v).apply()
+    init {
+        // v1.9.0：检测参数从整数滑杆改为手填小数（保留 1 位）——旧版存的是 Int，
+        // getFloat 会 ClassCastException，首次构造时一次性迁移为 Float。
+        val e = sp.edit()
+        for (k in listOf("defaultRadius", "approachDist", "confirmDelta", "pollInterval", "graceSec")) {
+            if (sp.all[k] is Int) {
+                e.putFloat(k, (sp.all[k] as Int).toFloat())
+            }
+        }
+        e.apply()
+    }
+
+    /** v1.9.0：各检测参数默认值（用户拍板：默认检测半径 10m、预告距离 20m）。
+     * 「全部恢复默认」与 getter 共用这套常量，改默认只改这一处。 */
+    private object D {
+        const val RADIUS = 10f
+        const val APPROACH = 20f
+        const val DELTA = 3f
+        const val POLL = 3f
+        const val GRACE = 15f
+    }
+
+    var defaultRadius: Float
+        get() = sp.getFloat("defaultRadius", D.RADIUS)
+        set(v) = sp.edit().putFloat("defaultRadius", v).apply()
+    var approachDist: Float
+        get() = sp.getFloat("approachDist", D.APPROACH)
+        set(v) = sp.edit().putFloat("approachDist", v).apply()
+    var confirmDelta: Float
+        get() = sp.getFloat("confirmDelta", D.DELTA)
+        set(v) = sp.edit().putFloat("confirmDelta", v).apply()
+    var pollInterval: Float
+        get() = sp.getFloat("pollInterval", D.POLL)
+        set(v) = sp.edit().putFloat("pollInterval", v).apply()
+    var graceSec: Float
+        get() = sp.getFloat("graceSec", D.GRACE)
+        set(v) = sp.edit().putFloat("graceSec", v).apply()
 
     var ttsEnabled: Boolean
         get() = sp.getBoolean("tts", true)
@@ -129,6 +151,21 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         set(v) = sp.edit().putBoolean("mapHintShown", v).apply()
 
     /**
+     * v1.9.0：跑步通知显示开关（用户需求：开始跑步后弹窗可自由选择是否出现在
+     * 锁屏页面与状态栏）。锁屏关 = 通知渠道/通知 VISIBILITY_SECRET（锁屏不显示
+     * 媒体卡片）；状态栏关 = 渠道 IMPORTANCE_MIN（不显示状态栏图标；Android
+     * 对前台服务通知有系统级可见性要求，部分 ROM 仍可能显示）。均为默认开。
+     * 渠道级设置只在渠道创建时生效——服务每次开跑会删旧渠道重建，改开关后
+     * 下次开始跑步生效。
+     */
+    var notifLockscreen: Boolean
+        get() = sp.getBoolean("notifLockscreen", true)
+        set(v) = sp.edit().putBoolean("notifLockscreen", v).apply()
+    var notifStatusbar: Boolean
+        get() = sp.getBoolean("notifStatusbar", true)
+        set(v) = sp.edit().putBoolean("notifStatusbar", v).apply()
+
+    /**
      * v1.8.15：跑步页点位分组筛选。"auto"（默认，自动选中离当前位置平均
      * 距离最近的一组，开跑时锁定）/ "all"（全部）/ 其余值 = 分组名（锁定该组）。
      */
@@ -143,6 +180,38 @@ class Prefs private constructor(private val sp: SharedPreferences) {
     var updLastCheckMs: Long
         get() = sp.getLong("updLastCheckMs", 0L)
         set(v) = sp.edit().putLong("updLastCheckMs", v).apply()
+
+    /**
+     * v1.9.0：全部配置恢复默认（用户需求：替代旧「恢复默认打卡点」单一入口）。
+     * 重置范围 = 全部可调配置：检测参数 / 提醒总开关 + 分场景开关 / 跑步通知
+     * 显示 / API 判定 / 地图与坐标 / 跑步页筛选 / 更新自动检查。
+     * 【不碰】账号与会话（casTgt / token / apiCookie / ws* / accountsJson /
+     * tunnelPrefix）——恢复配置不应把用户登出；点位由调用方配合
+     * CheckpointStore.resetToDefaults() 一并重建 8 个官方默认点。
+     */
+    fun resetAllConfig() {
+        val e = sp.edit()
+        e.putFloat("defaultRadius", D.RADIUS)
+        e.putFloat("approachDist", D.APPROACH)
+        e.putFloat("confirmDelta", D.DELTA)
+        e.putFloat("pollInterval", D.POLL)
+        e.putFloat("graceSec", D.GRACE)
+        e.putBoolean("tts", true)
+        e.putBoolean("chime", true)
+        e.putBoolean("vibrate", true)
+        e.putBoolean("apiEnabled", false)
+        e.putBoolean("tileSat", true)
+        e.putBoolean("coordGcj", false)
+        e.putString("runFilter", "auto")
+        e.putBoolean("updAutoCheck", true)
+        e.putBoolean("notifLockscreen", true)
+        e.putBoolean("notifStatusbar", true)
+        // 分场景开关为动态键（scnv_*/scnvi_*）——显式移除后回到默认白名单
+        for (k in sp.all.keys.filter { it.startsWith("scnv_") || it.startsWith("scnvi_") }) {
+            e.remove(k)
+        }
+        e.apply()
+    }
 
     companion object {
         @Volatile private var inst: Prefs? = null

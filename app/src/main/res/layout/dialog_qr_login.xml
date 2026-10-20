@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.9.0：微信扫码登录对话框（协议见 CasAuth.beginQrLogin/pollQrLogin） -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:padding="24dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:text="@string/qr_intro" />
+
+    <ImageView
+        android:id="@+id/imgQr"
+        android:layout_width="264dp"
+        android:layout_height="264dp"
+        android:layout_marginTop="16dp"
+        android:contentDescription="@string/qr_login_title"
+        android:background="?attr/colorSurface"
+        android:padding="8dp" />
+
+    <TextView
+        android:id="@+id/tvQrStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:gravity="center_horizontal"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:text="@string/qr_status_loading" />
+</LinearLayout>

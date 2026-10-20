@@ -90,7 +90,7 @@ class CalibrateFragment : Fragment() {
             val g = GeoKit.wgs2gcj(cp.lat, cp.lon)
             ib.tvCoords.text =
                 "WGS ${GeoKit.fmt7(cp.lat)}, ${GeoKit.fmt7(cp.lon)}\n" +
-                "GCJ ${GeoKit.fmt7(g[0])}, ${GeoKit.fmt7(g[1])} · 半径${cp.radius}m"
+                "GCJ ${GeoKit.fmt7(g[0])}, ${GeoKit.fmt7(g[1])} · 半径${String.format("%.1f", cp.radius)}m"
             ib.btnDelete.setOnClickListener {
                 store.delete(cp.id)
                 refreshList()

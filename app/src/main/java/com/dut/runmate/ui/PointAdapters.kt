@@ -33,7 +33,7 @@ class RunPointAdapter(
         val s = items[pos]
         val ctx = holder.b.root.context
         holder.b.tvName.text = s.cp.name
-        holder.b.tvSub.text = "半径 ${s.cp.radius} m · ${if (s.distM >= 0) "${s.distM} m" else "--"}"
+        holder.b.tvSub.text = "半径 ${String.format("%.1f", s.cp.radius)} m · ${if (s.distM >= 0) "${s.distM} m" else "--"}"
 
         val (label, colorRes, filled) = when (s.state) {
             RunBus.CpState.PENDING -> Triple("待经过", R.color.map_stroke_pending, false)

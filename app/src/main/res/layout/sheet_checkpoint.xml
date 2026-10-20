@@ -70,27 +70,22 @@
         android:textColor="?attr/colorOnSurfaceVariant"
         android:text="" />
 
-    <TextView
+    <!-- v1.9.0：检测半径改手填（1~100m，保留 1 位小数；旧滑杆步长 1m） -->
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilCpRadius"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:textAppearance="?attr/textAppearanceTitleMedium"
-        android:text="@string/cp_radius" />
-
-    <TextView
-        android:id="@+id/tvSheetRadius"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textAppearance="?attr/textAppearanceBodySmall"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        android:text="25 m" />
-
-    <!-- v1.8.6：最小可调精度 1m（原步长 5m） -->
-    <com.google.android.material.slider.Slider
-        android:id="@+id/sliderSheetRadius"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:valueFrom="1" android:valueTo="100" android:stepSize="1" />
+        app:suffixText="m"
+        android:hint="@string/cp_radius_hint">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etCpRadius"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:maxLength="6"
+            android:singleLine="true" />
+    </com.google.android.material.textfield.TextInputLayout>
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/tilCpNote" android:layout_width="match_parent"

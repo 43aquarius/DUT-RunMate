@@ -11,8 +11,8 @@ android {
         applicationId = "com.dut.runmate"
         minSdk = 24
         targetSdk = 34
-        versionCode = 28
-        versionName = "1.8.15"
+        versionCode = 29
+        versionName = "1.9.0"
     }
 
     signingConfigs {
@@ -61,4 +61,6 @@ dependencies {
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     // v1.8.6：锁屏媒体卡片（音乐软件样式：MediaSessionCompat + MediaStyle）
     implementation("androidx.media:media:1.7.0")
+    // v1.9.0：扫码登录二维码生成（纯 Java 核心，无传递依赖）
+    implementation("com.google.zxing:core:3.5.3")
 }
