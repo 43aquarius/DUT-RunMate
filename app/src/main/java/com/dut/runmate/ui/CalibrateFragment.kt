@@ -174,7 +174,7 @@ class CalibrateFragment : Fragment() {
             Checkpoint(
                 name = name,
                 lat = p[0], lon = p[1],
-                radius = ((p[2].coerceAtLeast(6.0) * 3).toInt().coerceAtLeast(20)),
+                radius = ((p[2].coerceAtLeast(6.0) * 3).toInt().coerceAtLeast(20)).toDouble(),   // v1.9.0：radius 改 Double，语义不变
                 note = "标定 ±%.1fm·离散%.1fm".format(p[2], drift),
                 source = "gps"
             )
