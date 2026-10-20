@@ -9,21 +9,29 @@ class Prefs private constructor(private val sp: SharedPreferences) {
     init {
         // v1.9.0：检测参数从整数滑杆改为手填小数（保留 1 位）——旧版存的是 Int，
         // getFloat 会 ClassCastException，首次构造时一次性迁移为 Float。
+        // v1.9.2：confirmDelta 参数已删（学校固定点位每次打卡固定 +100/+200m），
+        // 死键一并清理。
         val e = sp.edit()
-        for (k in listOf("defaultRadius", "approachDist", "confirmDelta", "pollInterval", "graceSec")) {
+        for (k in listOf("defaultRadius", "approachDist", "pollInterval", "graceSec")) {
             if (sp.all[k] is Int) {
                 e.putFloat(k, (sp.all[k] as Int).toFloat())
             }
+        }
+        e.remove("confirmDelta")
+        // v1.9.2：跑步页「自动」分组已删（用户需求）——历史存值 auto 一律迁移为 all
+        if (sp.getString("runFilter", null) == "auto") {
+            e.putString("runFilter", "all")
         }
         e.apply()
     }
 
     /** v1.9.0：各检测参数默认值（用户拍板：默认检测半径 10m、预告距离 20m）。
-     * 「全部恢复默认」与 getter 共用这套常量，改默认只改这一处。 */
+     * 「全部恢复默认」与 getter 共用这套常量，改默认只改这一处。
+     * v1.9.2：确认增量阈值已删（固定点位每次打卡固定 +100/+200m，参数无意义），
+     * 阈值内置在 DetectEngine.CONFIRM_DELTA_M。 */
     private object D {
         const val RADIUS = 10f
         const val APPROACH = 20f
-        const val DELTA = 3f
         const val POLL = 3f
         const val GRACE = 15f
     }
@@ -34,9 +42,6 @@ class Prefs private constructor(private val sp: SharedPreferences) {
     var approachDist: Float
         get() = sp.getFloat("approachDist", D.APPROACH)
         set(v) = sp.edit().putFloat("approachDist", v).apply()
-    var confirmDelta: Float
-        get() = sp.getFloat("confirmDelta", D.DELTA)
-        set(v) = sp.edit().putFloat("confirmDelta", v).apply()
     var pollInterval: Float
         get() = sp.getFloat("pollInterval", D.POLL)
         set(v) = sp.edit().putFloat("pollInterval", v).apply()
@@ -166,11 +171,23 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         set(v) = sp.edit().putBoolean("notifStatusbar", v).apply()
 
     /**
-     * v1.8.15：跑步页点位分组筛选。"auto"（默认，自动选中离当前位置平均
-     * 距离最近的一组，开跑时锁定）/ "all"（全部）/ 其余值 = 分组名（锁定该组）。
+     * v1.9.2：媒体卡片显示开关（用户实报：状态栏图标关了，手机「正在播放」
+     * 位置仍显示——那是系统对 MediaSession 的独立渲染，不受通知渠道
+     * IMPORTANCE_MIN / VISIBILITY_SECRET 控制）。
+     * 关 = 开跑不创建媒体会话：锁屏/通知栏的音乐样式卡片与状态栏音乐指示
+     * 一并消失，通知变为普通样式；开 = 保持 v1.8.6 以来的音乐卡片行为。
+     * 与渠道级设置一样，改开关后下次开始跑步生效。
+     */
+    var notifMedia: Boolean
+        get() = sp.getBoolean("notifMedia", true)
+        set(v) = sp.edit().putBoolean("notifMedia", v).apply()
+
+    /**
+     * v1.8.15：跑步页点位分组筛选（v1.9.2：「自动」分组已删）。
+     * "all"（默认，全部点位）/ 其余值 = 分组名（锁定该组）。
      */
     var runFilter: String
-        get() = sp.getString("runFilter", "auto") ?: "auto"
+        get() = sp.getString("runFilter", "all") ?: "all"
         set(v) = sp.edit().putString("runFilter", v).apply()
 
     // 更新（v1.8.13：只走 GitHub Release，见 Updater.GITHUB_RELEASES_PAGE）
@@ -193,7 +210,6 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         val e = sp.edit()
         e.putFloat("defaultRadius", D.RADIUS)
         e.putFloat("approachDist", D.APPROACH)
-        e.putFloat("confirmDelta", D.DELTA)
         e.putFloat("pollInterval", D.POLL)
         e.putFloat("graceSec", D.GRACE)
         e.putBoolean("tts", true)
@@ -202,10 +218,11 @@ class Prefs private constructor(private val sp: SharedPreferences) {
         e.putBoolean("apiEnabled", false)
         e.putBoolean("tileSat", true)
         e.putBoolean("coordGcj", false)
-        e.putString("runFilter", "auto")
+        e.putString("runFilter", "all")
         e.putBoolean("updAutoCheck", true)
         e.putBoolean("notifLockscreen", true)
         e.putBoolean("notifStatusbar", true)
+        e.putBoolean("notifMedia", true)
         // 分场景开关为动态键（scnv_*/scnvi_*）——显式移除后回到默认白名单
         for (k in sp.all.keys.filter { it.startsWith("scnv_") || it.startsWith("scnvi_") }) {
             e.remove(k)

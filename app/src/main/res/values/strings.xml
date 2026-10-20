@@ -16,8 +16,11 @@
     <string name="stat_time">用时</string>
     <string name="stat_dist">自测距离</string>
     <string name="stat_pace">配速</string>
+    <!-- v1.9.2：大数字改为当前跑步距离（用户需求：这才是最重要的数字） -->
+    <string name="run_big_label">已跑里程（km）</string>
+    <string name="run_big_near_fmt">距 %1$s %2$d m</string>
+    <string name="run_big_inzone_fmt">%1$s · 区内</string>
     <string name="state_pending">待经过</string>
-    <string name="state_near">接近中</string>
     <string name="state_inzone">检测区内·等待确认</string>
     <string name="state_grace">已出区·宽限核查中</string>
     <string name="state_confirmed">已打卡 ✓</string>
@@ -98,13 +101,12 @@
     <string name="cp_name">名称</string>
     <string name="cp_radius_hint">检测半径（1~100，支持 1 位小数，单位米）</string>
     <string name="cp_note">备注（可选）</string>
-    <!-- v1.8.15：点位分组 + 跑步页筛选 -->
+    <!-- v1.8.15：点位分组 + 跑步页筛选（v1.9.2：「自动」分组已删，只留 全部/指定分组） -->
     <string name="cp_group">分组（如：中心田径场；留空不分组）</string>
-    <string name="run_filter_label">显示点位（自动 = 离最近的一组）</string>
-    <string name="filter_auto">自动</string>
+    <string name="run_filter_label">显示点位</string>
     <string name="filter_all">全部</string>
     <!-- v1.9.0：全部恢复默认（替代旧「恢复默认打卡点」单一入口） -->
-    <string name="reset_all_confirm">将把全部可调配置恢复为默认值：\n· 检测参数（默认半径 10m · 预告距离 20m · 确认阈值 3m · 轮询 3s · 宽限 15s）\n· 提醒开关（语音全开；震动仅打卡成功/区内未确认/漏卡）\n· 跑步通知显示（锁屏/状态栏均开）· API 判定关 · 地图卫星图 · 坐标 WGS-84\n· 点位：删除现有 %1$d 个，重建 8 个官方默认点（带分组）\n\n账号登录信息不受影响。此操作不可撤销，继续？</string>
+    <string name="reset_all_confirm">将把全部可调配置恢复为默认值：\n· 检测参数（默认半径 10m · 预告距离 20m · 轮询 3s · 宽限 15s）\n· 提醒开关（语音全开；震动仅打卡成功/区内未确认/漏卡）\n· 跑步通知显示（锁屏/状态栏/媒体卡片均开）· API 判定关 · 地图卫星图 · 坐标 WGS-84\n· 点位：删除现有 %1$d 个，重建 8 个官方默认点（带分组）\n\n账号登录信息不受影响。此操作不可撤销，继续？</string>
     <string name="reset_all_go">恢复默认</string>
     <string name="reset_all_done">已恢复全部默认配置与 8 个默认打卡点</string>
     <string name="save">保存</string>
@@ -254,21 +256,25 @@
     <string name="pref_detect">检测参数</string>
     <string name="pref_default_radius">默认检测半径（米）</string>
     <string name="pref_approach">预告距离（米）</string>
-    <string name="pref_confirm_delta">确认距离增量阈值（米）</string>
     <string name="pref_poll_interval">轮询间隔（秒）</string>
     <string name="pref_grace">出区宽限期（秒）</string>
     <!-- v1.9.0：检测参数改手填（保留 1 位小数；旧滑杆步长 1m 只能整数） -->
     <string name="pref_radius_range">范围 1~80，支持 1 位小数（如 12.5）</string>
     <string name="pref_approach_range">范围 1~150，支持 1 位小数（如 20.5）</string>
-    <string name="pref_delta_range">范围 1~10，支持 1 位小数</string>
     <string name="pref_poll_range">范围 2~15，支持 1 位小数</string>
     <string name="pref_grace_range">范围 5~40，支持 1 位小数</string>
     <!-- v1.9.0：跑步通知显示开关 -->
     <string name="pref_notif_section">跑步通知显示</string>
     <string name="pref_notif_lock">锁屏页面显示</string>
-    <string name="pref_notif_lock_sub">跑步时锁屏媒体卡片（距离/漏卡状态）；关闭后锁屏不显示</string>
+    <string name="pref_notif_lock_sub">跑步通知在锁屏页面的显示；关闭后锁屏不显示</string>
     <string name="pref_notif_bar">状态栏显示图标</string>
     <string name="pref_notif_bar_sub">关闭后尽力隐藏状态栏图标（下次开跑生效）；系统对前台服务有可见性要求，部分机型可能仍显示</string>
+    <!-- v1.9.2：媒体卡片开关（用户实报：状态栏图标关了，系统媒体区的「正在播放」
+         位置仍显示——那是 MediaSession 的独立渲染，不受通知渠道 IMPORTANCE_MIN
+         控制。关 = 不创建媒体会话，锁屏/通知栏的音乐样式卡片与状态栏音乐指示
+         一并消失，通知变为普通样式） -->
+    <string name="pref_notif_media">媒体卡片显示</string>
+    <string name="pref_notif_media_sub">音乐软件样式的跑步卡片与状态栏音乐指示；关闭后通知变为普通样式（下次开跑生效）</string>
     <string name="pref_alert">提醒方式</string>
     <string name="pref_tts">语音提醒（预录语音，跟媒体音量）</string>
     <string name="pref_chime">提示音</string>
@@ -336,7 +342,6 @@
     <!-- v1.8.8：CAS 短信二次认证（MFA）——学校统一认证新启用的登录第二道验证。
          凭据验对后需：图形验证码 → 发短信 → 输入短信码，才发 CASTGC。 -->
     <string name="mfa_title">短信二次认证</string>
-    <string name="mfa_intro">学校统一认证近期启用了短信二次认证：账号密码验证通过后，还需图形验证码 + 短信验证码两步完成登录。</string>
     <string name="mfa_phone_fmt">验证码将发送至尾号 %1$s 的手机</string>
     <string name="mfa_captcha_desc">图形验证码，点击刷新</string>
     <string name="mfa_graphic_hint">图形验证码（点图片可刷新）</string>
@@ -344,7 +349,7 @@
     <string name="mfa_sms_hint">短信验证码</string>
     <string name="mfa_submit">完成登录</string>
     <string name="mfa_sending">发送中…</string>
-    <string name="mfa_send_ok">✓ 已发送，请查收短信（部分手机会拦截，注意查看）。若需重发：先点上方图片刷新图形码、输入新码后再点发送</string>
+    <string name="mfa_send_ok">✓ 已发送，请查收短信（重发需先刷新图形码）</string>
     <string name="mfa_need_graphic">请先输入图形验证码</string>
     <string name="mfa_need_sms">请输入收到的短信验证码</string>
     <string name="mfa_submitting">正在验证…</string>

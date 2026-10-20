@@ -151,27 +151,8 @@
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
-            <!-- 确认阈值（v1.9.0：手填，保留 1 位小数） -->
-            <LinearLayout android:orientation="vertical"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
-                android:padding="16dp">
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:text="@string/pref_confirm_delta" />
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp" app:suffixText="m"
-                    android:hint="@string/pref_delta_range">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etDelta" android:layout_width="match_parent"
-                        android:layout_height="wrap_content" android:inputType="numberDecimal"
-                        android:maxLength="5" android:singleLine="true" />
-                </com.google.android.material.textfield.TextInputLayout>
-            </LinearLayout>
-
-            <!-- 轮询间隔（v1.9.0：手填，保留 1 位小数） -->
+            <!-- 轮询间隔（v1.9.0：手填，保留 1 位小数）。v1.9.2：确认阈值卡已删
+                 （学校固定点位每次打卡固定 +100/+200m，参数无意义） -->
             <LinearLayout android:orientation="vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:background="?attr/colorSurfaceVariant" android:layout_marginTop="12dp"
@@ -211,7 +192,8 @@
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
-            <!-- v1.9.0：跑步通知显示（用户需求：开始跑步后弹窗可自由选择是否出现在锁屏页面与状态栏） -->
+            <!-- v1.9.0：跑步通知显示（用户需求：开始跑步后弹窗可自由选择是否出现在锁屏页面与状态栏）；
+                 v1.9.2：新增媒体卡片开关 -->
             <TextView style="@style/TextAppearance.RunMate.Label"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="24dp" android:text="@string/pref_notif_section" />
@@ -246,6 +228,24 @@
                 </LinearLayout>
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/swNotifBar" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- v1.9.2：媒体卡片显示（用户实报：状态栏图标关了，系统媒体区「正在播放」
+                 仍显示——MediaSession 独立渲染，需单独开关） -->
+            <LinearLayout android:orientation="horizontal" android:gravity="center_vertical"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:background="?attr/colorSurfaceVariant" android:layout_marginTop="8dp"
+                android:paddingHorizontal="16dp" android:paddingVertical="8dp">
+                <LinearLayout android:orientation="vertical" android:layout_width="0dp"
+                    android:layout_weight="1" android:layout_height="wrap_content">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" android:text="@string/pref_notif_media" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/pref_notif_media_sub" />
+                </LinearLayout>
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/swNotifMedia" android:layout_width="wrap_content" android:layout_height="wrap_content" />
             </LinearLayout>
 
             <TextView style="@style/TextAppearance.RunMate.Label"

@@ -12,11 +12,20 @@ import com.dut.runmate.data.Prefs
  *   出圈后宽限期内仍未增量 ⇒ 漏卡，强提醒。
  * 纯 GPS 模式：
  *   进圈/出圈语音提示，无法判定漏卡。
+ *
+ * v1.9.2：确认增量阈值从用户参数改为内置常量 CONFIRM_DELTA_M（用户确认：学校为
+ * 固定点位，每次打卡官方距离固定 +100m 或 +200m——参数无意义，设置项已删）。
+ * 取 50m：远低于最小真实增量 100m，又远高于接口数值抖动，判定更稳健。
  */
 class DetectEngine(
     private val prefs: Prefs,
     private val onEvent: (Ev) -> Unit
 ) {
+
+    companion object {
+        /** v1.9.2：确认增量阈值内置（学校固定点位每次打卡固定 +100m/+200m） */
+        const val CONFIRM_DELTA_M = 50.0
+    }
 
     sealed class Ev {
         data class Approach(val r: Snap, val distM: Int) : Ev()
@@ -125,7 +134,7 @@ class DetectEngine(
                 RunBus.CpState.IN_ZONE, RunBus.CpState.GRACE -> {
                     val b = s.baseline
                     if (b == null) s.baseline = v
-                    else if (v >= b + prefs.confirmDelta) {
+                    else if (v >= b + CONFIRM_DELTA_M) {   // v1.9.2：阈值内置（原用户参数 confirmDelta 已删）
                         s.state = RunBus.CpState.CONFIRMED
                         s.confirmedCount++      // v1.8.13：多圈累计（重武装后每圈各计一次）
                         onEvent(Ev.Confirmed(s))

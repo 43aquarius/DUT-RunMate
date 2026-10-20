@@ -385,9 +385,10 @@ class SettingsFragment : Fragment() {
      */
     private fun bindConfigControls() {
         // 检测参数（手填，范围与旧滑杆一致；1 位小数）
+        // v1.9.2：「确认距离增量阈值」已删（学校固定点位每次打卡固定 +100/+200m，
+        // 参数无意义——阈值内置 DetectEngine.CONFIRM_DELTA_M）
         bindDecimalInput(b.etRadius, 1f, 80f, { prefs.defaultRadius }, { prefs.defaultRadius = it })
         bindDecimalInput(b.etApproach, 1f, 150f, { prefs.approachDist }, { prefs.approachDist = it })
-        bindDecimalInput(b.etDelta, 1f, 10f, { prefs.confirmDelta }, { prefs.confirmDelta = it })
         bindDecimalInput(b.etPoll, 2f, 15f, { prefs.pollInterval }, { prefs.pollInterval = it })
         bindDecimalInput(b.etGrace, 5f, 40f, { prefs.graceSec }, { prefs.graceSec = it })
 
@@ -399,11 +400,15 @@ class SettingsFragment : Fragment() {
         b.swVibrate.isChecked = prefs.vibrateEnabled
         b.swVibrate.setOnCheckedChangeListener { _, c -> prefs.vibrateEnabled = c }
 
-        // v1.9.0：跑步通知显示（锁屏/状态栏；RunTrackerService 下次开跑时重建渠道生效）
+        // v1.9.0：跑步通知显示（锁屏/状态栏/媒体卡片；RunTrackerService 下次开跑时生效）
         b.swNotifLock.isChecked = prefs.notifLockscreen
         b.swNotifLock.setOnCheckedChangeListener { _, c -> prefs.notifLockscreen = c }
         b.swNotifBar.isChecked = prefs.notifStatusbar
         b.swNotifBar.setOnCheckedChangeListener { _, c -> prefs.notifStatusbar = c }
+        // v1.9.2：媒体卡片（音乐样式卡片与状态栏音乐指示随 MediaSession 独立渲染，
+        // 关 = 不创建会话，通知退回普通样式）
+        b.swNotifMedia.isChecked = prefs.notifMedia
+        b.swNotifMedia.setOnCheckedChangeListener { _, c -> prefs.notifMedia = c }
 
         // API
         b.swApi.isChecked = prefs.apiEnabled
@@ -792,8 +797,9 @@ class SettingsFragment : Fragment() {
         val etSms = view.findViewById<EditText>(R.id.etMfaSms)
         val tvErr = view.findViewById<TextView>(R.id.tvMfaErr)
 
-        tvPhone.text = getString(R.string.mfa_intro) + "\n" +
-            getString(R.string.mfa_phone_fmt, mfa.phoneTail.ifBlank { "****" })
+        // v1.9.2：对话框文案瘦身（用户需求：文字太多）——只留尾号提示一行，
+        // 流程说明删去（图形码 hint/发送后提示各自就位）
+        tvPhone.text = getString(R.string.mfa_phone_fmt, mfa.phoneTail.ifBlank { "****" })
         if (prefillSms.isNotBlank()) etSms.setText(prefillSms)
 
         fun showErr(res: Int) {

@@ -220,8 +220,11 @@ class RunTrackerService : Service() {
         goalSaid = false   // v1.8.15：打卡结束播报每跑重置
 
         // 前台服务 + 常驻通知
-        // v1.8.6：锁屏媒体卡片会话先建（buildNotification 的 MediaStyle 需要其 token）
-        setupMediaSession()
+        // v1.8.6：锁屏媒体卡片会话先建（buildNotification 的 MediaStyle 需要其 token）。
+        // v1.9.2：媒体卡片开关（用户实报：状态栏图标关了，系统媒体区「正在播放」
+        // 仍显示——那是 MediaSession 的独立渲染，不受渠道 IMPORTANCE_MIN 控制）。
+        // 关 = 不创建会话，通知用普通样式（buildNotification 内同步分流）。
+        if (prefs.notifMedia) setupMediaSession()
         // v1.6.0：部分 ROM 对 startForeground(带类型) 有私有限制，失败时逐级降级
         val n = buildNotification("定位中…")
         try {
@@ -580,7 +583,7 @@ class RunTrackerService : Service() {
         val verifyPi = PendingIntent.getService(this, 2,
             Intent(this, RunTrackerService::class.java).setAction(ACT_VERIFY),
             PendingIntent.FLAG_IMMUTABLE)
-        return NotificationCompat.Builder(this, CH_ID)
+        val nb = NotificationCompat.Builder(this, CH_ID)
             .setSmallIcon(R.drawable.ic_run)
             .setContentTitle(getString(R.string.notif_title))
             .setContentText(text)
@@ -590,12 +593,6 @@ class RunTrackerService : Service() {
             // 取自 setColor/专辑图（见 pushMediaMeta 的 artBitmap），不再透出壁纸
             .setColor(0xFF1151FF.toInt())          // md_tertiary 品牌蓝
             .setColorized(true)
-            // v1.8.6：锁屏改为音乐软件样式的媒体卡片（用户澄清：不是显示整个主页面，
-            // 而是一个框框里只显示关键信息）。Android 11+ 锁屏/QS 媒体区、5~10 锁屏
-            // 媒体卡；卡片标题/副标题来自 MediaSession 元数据（pushMediaMeta）
-            .setStyle(MediaNotif.MediaStyle()
-                .setMediaSession(mediaSession?.sessionToken)
-                .setShowActionsInCompactView(0, 1))
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             // v1.8.3 保留：FGS 通知立即上屏
@@ -606,7 +603,17 @@ class RunTrackerService : Service() {
             .setContentIntent(pi)
             .addAction(R.drawable.ic_check, getString(R.string.notif_verify), verifyPi)
             .addAction(R.drawable.ic_stop, getString(R.string.notif_stop), stopPi)
-            .build()
+        // v1.8.6：锁屏改为音乐软件样式的媒体卡片（用户澄清：不是显示整个主页面，
+        // 而是一个框框里只显示关键信息）。Android 11+ 锁屏/QS 媒体区、5~10 锁屏
+        // 媒体卡；卡片标题/副标题来自 MediaSession 元数据（pushMediaMeta）。
+        // v1.9.2：媒体卡片开关关 = 不挂 MediaStyle——系统媒体区/状态栏音乐指示
+        // 不再出现，通知退回普通样式（两颗按钮在普通通知上照常可用）。
+        if (prefs.notifMedia) {
+            nb.setStyle(MediaNotif.MediaStyle()
+                .setMediaSession(mediaSession?.sessionToken)
+                .setShowActionsInCompactView(0, 1))
+        }
+        return nb.build()
     }
 
     // ---------- v1.8.6：锁屏媒体卡片（音乐软件样式） ----------

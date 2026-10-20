@@ -65,6 +65,15 @@
                             android:layout_weight="1"
                             android:orientation="vertical">
 
+                            <!-- v1.9.2：大数字改为「当前跑步距离」（用户需求：这才是
+                                 最重要的数字）；原最近点位距离下移到 tvTargetName 行 -->
+                            <TextView
+                                android:id="@+id/tvBigLabel"
+                                style="@style/TextAppearance.RunMate.Label"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/run_big_label" />
+
                             <TextView
                                 android:id="@+id/tvBigDist"
                                 style="@style/TextAppearance.RunMate.Display"
@@ -157,8 +166,8 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:text="@string/run_idle_hint" />
 
-            <!-- v1.8.15：点位分组筛选（自动=离当前位置平均距离最近的一组，开跑时锁定；
-                 可手动切「全部」或指定分组；无分组数据时整行隐藏） -->
+            <!-- v1.8.15：点位分组筛选（v1.9.2：「自动」分组已删，只留 全部/指定分组；
+                 无分组数据时整行隐藏） -->
             <LinearLayout
                 android:id="@+id/layoutFilter"
                 android:layout_width="match_parent"
