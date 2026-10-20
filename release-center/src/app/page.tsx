@@ -73,7 +73,7 @@ export default async function Home() {
           {[
             { icon: Volume2, title: '耳机语音提醒', desc: '接近预告 · 打卡播报 · 漏卡强提醒' },
             { icon: MapPin, title: '双模式录入点位', desc: '现场 GPS 标定 / 高德地图深放大选点' },
-            { icon: RefreshCw, title: '应用内自更新', desc: '本站直连 或 GitHub Release 双通道' },
+            { icon: RefreshCw, title: '应用内自更新', desc: '仅 GitHub Release 通道（v1.8.13 起）' },
           ].map((f) => (
             <Card key={f.title} className="p-4">
               <f.icon className="mb-2 h-5 w-5 text-emerald-600" aria-hidden />
@@ -132,7 +132,7 @@ export default async function Home() {
               <Smartphone className="h-4 w-4 text-emerald-600" aria-hidden />
               App 内更新配置
             </CardTitle>
-            <CardDescription>v1.5.0 起更新服务器已内置为本站（dut-runmate.space-z.ai），无需任何配置；≤1.4.x 旧版更新通道已失效，请直接下载最新 APK 覆盖安装</CardDescription>
+            <CardDescription>v1.8.13 起应用内更新仅从 GitHub Release 拉取，无需任何配置；更早的旧版本请直接下载最新 APK 覆盖安装</CardDescription>
           </CardHeader>
           <CardContent>
             <ConfigCard apiPath="/api/latest" />
@@ -150,9 +150,9 @@ export default async function Home() {
                 <Badge variant="secondary">v{h.versionName}</Badge>
                 <span className="text-xs text-muted-foreground">{h.date} · {fmtSize(h.sizeBytes)}</span>
                 <div className="ml-auto flex gap-2">
-                  <a href={`/apk/${h.apkFile}`} download>
+                  <a href={h.githubApkUrl || `/apk/${h.apkFile}`} download target="_blank" rel="noreferrer">
                     <Button variant="ghost" size="sm" className="text-emerald-700">
-                      本站下载
+                      下载 APK
                     </Button>
                   </a>
                   <a href={h.githubReleaseUrl} target="_blank" rel="noreferrer">
