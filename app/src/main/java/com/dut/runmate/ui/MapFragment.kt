@@ -135,6 +135,13 @@ class MapFragment : Fragment() {
         // 回到我（GPS 为 WGS-84，显示前转 GCJ-02）
         b.fabLocate.setOnClickListener { locateMe() }
 
+        // v1.9.1：现场标定并入地图页（原「标定」Tab 移除，底部导航 4→3）——
+        // 弹出底部标定面板：实时坐标/精度/卫星 + 定点平均采集 + 保存；
+        // 地图仍在身后可见（蓝点+精度圈），可一边看地图一边标定点位
+        b.fabCalib.setOnClickListener {
+            CalibSheet.show(this, store) { rebuild() }
+        }
+
         // 我的位置（蓝点，坐标已归一 WGS-84 → GCJ-02 显示；不使用 MyLocationNewOverlay）
         viewLifecycleOwner.lifecycleScope.launch {
             RunBus.state.collect { st ->
@@ -191,10 +198,18 @@ class MapFragment : Fragment() {
         }
     }
 
-    /** GPS 新鲜（30s 内）优先，否则用最近一次网络定位 */
+    /**
+     * v1.9.1 修复：新鲜度判定改用 SystemClock.elapsedRealtimeNanos()（与
+     * Location.elapsedRealtimeNanos 同时间基）。旧版 System.nanoTime() 不含深度
+     * 休眠——手机息屏再亮屏后，旧 GPS 被误判为「30s 内新鲜」，切到地图页会
+     * 居中到息屏前的旧位置。网络定位同步补 90s 新鲜度门槛。
+     */
     private fun bestFix(): Location? {
+        val now = android.os.SystemClock.elapsedRealtimeNanos()
         val g = lastGpsFix
-        if (g != null && System.nanoTime() - g.elapsedRealtimeNanos < 30_000_000_000L) return g
+        if (g != null && now - g.elapsedRealtimeNanos < 30_000_000_000L) return g
+        val n = lastNetFix
+        if (n != null && now - n.elapsedRealtimeNanos < 90_000_000_000L) return n
         return lastNetFix ?: g
     }
 

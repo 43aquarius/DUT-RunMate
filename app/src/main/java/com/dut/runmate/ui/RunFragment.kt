@@ -141,11 +141,37 @@ class RunFragment : Fragment() {
 
     // ---------- 定位预览 ----------
 
-    /** GPS 30s 内新鲜优先，否则网络定位兜底（坐标均已 LocGate 归一 WGS-84） */
+    /**
+     * v1.9.1 修复：定位新鲜度改用 SystemClock.elapsedRealtimeNanos()。
+     * 旧版用 System.nanoTime()（CLOCK_MONOTONIC，不含深度休眠）去比
+     * Location.elapsedRealtimeNanos（BOOTTIME，含休眠）——手机息屏一段时间
+     * （哪怕放兜里走到了另一个场地）再亮屏，两时间基之差 = 累计休眠时长，
+     * 息屏前的旧 GPS fix 差值为负、被永远判定为「30s 内新鲜」→ bestPreviewFix
+     * 一直返回旧位置 → 「自动」分组按错误位置选组/锁组（用户实报根因）。
+     */
+    private fun freshAgeNs(fix: Location): Long =
+        android.os.SystemClock.elapsedRealtimeNanos() - fix.elapsedRealtimeNanos
+
+    /** GPS 30s 内新鲜优先，其次 90s 内网络定位，最后旧定位兜底（仅显示用） */
     private fun bestPreviewFix(): Location? {
         val g = pvGps
-        if (g != null && System.nanoTime() - g.elapsedRealtimeNanos < 30_000_000_000L) return g
+        if (g != null && freshAgeNs(g) < 30_000_000_000L) return g
+        val n = pvNet
+        if (n != null && freshAgeNs(n) < 90_000_000_000L) return n
         return pvNet ?: g
+    }
+
+    /**
+     * v1.9.1：选组/锁组专用「可信托管」定位——宁可不选（等服务首个合格定位），
+     * 也不拿旧/粗定位错锁别组：GPS 需 30s 内且精度 ≤ 100m；网络定位需 90s 内
+     * 且精度 ≤ 200m（默认三场地组间距 ~700m+，该精度内不会跨场地）。
+     */
+    private fun lockGradeFix(): Location? {
+        val g = pvGps
+        if (g != null && freshAgeNs(g) < 30_000_000_000L && g.accuracy <= 100f) return g
+        val n = pvNet
+        if (n != null && freshAgeNs(n) < 90_000_000_000L && n.accuracy <= 200f) return n
+        return null
     }
 
     private val pvListener = LocationListener { raw ->
@@ -417,9 +443,11 @@ class RunFragment : Fragment() {
 
     private fun startService() {
         val ctx = requireContext()
-        // v1.8.15：auto 分组筛选开跑锁定——按按下「开始」时的预览定位选最近组
-        //（无预览定位时由服务首个定位到达后再锁，见 filterSnaps）
-        lockedGroup = bestPreviewFix()?.let { fix ->
+        // v1.8.15：auto 分组筛选开跑锁定——按按下「开始」时的定位选最近组。
+        // v1.9.1：改用 lockGradeFix()（时间基修复 + 精度门槛）——旧定位/粗定位
+        // 宁可不锁，交由服务首个合格定位到达后再锁（见 filterSnaps）；旧版用
+        // bestPreviewFix() 拿息屏前旧 GPS 锁错组是用户实报 bug 的根因
+        lockedGroup = lockGradeFix()?.let { fix ->
             nearestGroupOf(
                 store.all().filter { it.group.isNotBlank() }
                     .map { Triple(it.group, it.lat, it.lon) }, fix)
@@ -503,37 +531,52 @@ class RunFragment : Fragment() {
             .entries.minByOrNull { it.value }?.key
     }
 
+    /** v1.9.1：auto 模式当前实际生效的分组（null=未解析/全量兑底；用于 chip 标注） */
+    private var lastAutoGroup: String? = null
+
+    private fun groupedPtsOf(all: List<RunBus.CpSnap>): List<Triple<String, Double, Double>> =
+        all.filter { it.cp.group.isNotBlank() }
+            .map { Triple(it.cp.group, it.cp.lat, it.cp.lon) }
+
     /**
      * 跑步页列表按分组筛选：
      *  - all：全部；指定组名：只显示该组（组空时回退全部防白屏）；
-     *  - auto（默认）：未跑步按当前定位实时选「平均距离最近的组」；开始跑步时
+     *  - auto（默认）：未跑步按可信托管定位实时选「平均距离最近的组」；开始跑步时
      *    锁定（用户需求：今天去哪个场地，开跑时离得最近的那组），跑步中不随
      *    位置切换，结束自动解锁。
+     *
+     * v1.9.1 修复「自动切到错误分组」：选组/锁组只信合格定位——开跑锁组用
+     * lockGradeFix()；跑步中兑底锁组要求定位精度 ≤ 60m（服务已过滤 >60m，双保险）；
+     * 未跑步不再拿 st.fix（可能是息屏前旧定位）选组，改用 lockGradeFix() 实时判：
+     * 定位不可信时先显示全部点位，等下一个合格定位再收敛到最近组（宁晚勿错）。
      */
     private fun filterSnaps(st: RunBus.UiState): List<RunBus.CpSnap> {
         val all = st.snaps
-        if (all.isEmpty()) return all
+        if (all.isEmpty()) { lastAutoGroup = null; return all }
         val groups = all.map { it.cp.group }.filter { it.isNotBlank() }.distinct()
-        if (groups.isEmpty()) return all               // 无分组数据：不过滤
+        if (groups.isEmpty()) { lastAutoGroup = null; return all }   // 无分组数据：不过滤
         val mode = prefs.runFilter
-        if (mode == "all") return all
+        if (mode == "all") { lastAutoGroup = null; return all }
         if (mode != "auto") {
+            lastAutoGroup = null
             return all.filter { s -> s.cp.group == mode }.ifEmpty { all }
         }
         // auto
         if (st.running) {
-            val fix = st.fix
-            val g = lockedGroup
-                ?: fix?.let { nearestGroupOf(all.filter { it.cp.group.isNotBlank() }
-                    .map { Triple(it.cp.group, it.cp.lat, it.cp.lon) }, it) }
-                    ?.also { lockedGroup = it }
-            return if (g != null) all.filter { s -> s.cp.group == g } else all
+            if (lockedGroup == null) {
+                val fix = st.fix
+                if (fix != null && fix.accuracy <= 60f) {
+                    lockedGroup = nearestGroupOf(groupedPtsOf(all), fix)
+                }
+            }
+            lastAutoGroup = lockedGroup
+            return if (lockedGroup != null)
+                all.filter { s -> s.cp.group == lockedGroup } else all
         }
         lockedGroup = null                               // 结束跑步后解除锁定
-        val fix = st.fix ?: return all                   // 无定位时先全量显示
-        val g = nearestGroupOf(all.filter { it.cp.group.isNotBlank() }
-            .map { Triple(it.cp.group, it.cp.lat, it.cp.lon) }, fix) ?: return all
-        return all.filter { s -> s.cp.group == g }
+        val g = lockGradeFix()?.let { nearestGroupOf(groupedPtsOf(all), it) }
+        lastAutoGroup = g
+        return if (g != null) all.filter { s -> s.cp.group == g } else all
     }
 
     // ---------- 渲染 ----------
@@ -575,6 +618,13 @@ class RunFragment : Fragment() {
         // v1.8.15：列表按分组筛选（默认自动 = 最近一组；开跑锁定）
         val visible = filterSnaps(st)
         adapter.submit(visible)
+        // v1.9.1：auto 模式把当前生效分组标注在「自动」chip 上（如「自动 · 西部校区
+        // 田径场」）——选组结果可见，错了当场看得出来，不再「默默选错」
+        try {
+            chipByTag["auto"]?.text = if (prefs.runFilter == "auto" && lastAutoGroup != null)
+                getString(R.string.filter_auto) + " · " + lastAutoGroup
+            else getString(R.string.filter_auto)
+        } catch (_: Throwable) { }
 
         // 状态大字：跑步中 = 检测状态；未跑步 = 定位预览（有定位时显示源+精度）
         // v1.8.15：最近点位在「可见集合」内取（雷达/大字与列表同源，不跳到别组远点）

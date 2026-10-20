@@ -11,7 +11,7 @@ import android.location.LocationManager
  *   必须先 gcj2wgs 归一，否则与 GPS 混用时会产生数百米的双重偏移
  *   （大连地区 GCJ-02 偏移量约 450m）。
  *
- * 消费端：RunTrackerService / MapFragment / CalibrateFragment。
+ * 消费端：RunTrackerService / MapFragment / CalibSheet（v1.9.1 起原标定页并入地图页）。
  */
 object LocGate {
 

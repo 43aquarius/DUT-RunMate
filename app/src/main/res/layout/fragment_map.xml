@@ -55,14 +55,32 @@
         </LinearLayout>
     </HorizontalScrollView>
 
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabLocate"
+    <!-- v1.9.1：现场标定并入地图页——底部右侧 FAB 列：标定（上）+ 回到我（下）。
+         原独立「标定」Tab 移除（底部导航 4→3），地图页可一边看地图一边标定/选点 -->
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
-        app:fabSize="mini"
-        app:srcCompat="@drawable/ic_locate" />
+        android:orientation="vertical">
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabCalib"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            app:fabSize="mini"
+            android:contentDescription="@string/calib_title"
+            app:srcCompat="@drawable/ic_gps" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fabLocate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:fabSize="mini"
+            android:contentDescription="@string/map_locate"
+            app:srcCompat="@drawable/ic_locate" />
+    </LinearLayout>
 
     <!-- 选点确认栏：点按地图放置准星后出现，核对/拖动微调后再确认添加 -->
     <com.google.android.material.card.MaterialCardView
@@ -72,7 +90,7 @@
         android:layout_gravity="bottom"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="72dp"
+        android:layout_marginBottom="128dp"
         android:visibility="gone"
         app:cardCornerRadius="16dp"
         app:cardElevation="6dp">

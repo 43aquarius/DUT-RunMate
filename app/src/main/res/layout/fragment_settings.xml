@@ -27,7 +27,8 @@
                 android:layout_marginTop="8dp" android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/api_usage_hint" />
 
-            <!-- v1.4.0 账号登录 · 一键配置（v1.8.14 移入设置页） -->
+            <!-- v1.4.0 账号登录 · 一键配置（v1.8.14 移入设置页；v1.9.1 按用户需求精简：
+                 卡内长说明全部移入「说明」对话框，卡片只留输入框与按钮） -->
             <LinearLayout android:orientation="vertical"
                 android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
@@ -44,10 +45,7 @@
                         android:paddingHorizontal="12dp"
                         android:text="@string/api_help" />
                 </LinearLayout>
-                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp" android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:text="@string/ws_card_hint" />
+                <!-- v1.9.1：卡内长说明文案移入「说明」对话框（用户需求：卡片别太多字） -->
                 <LinearLayout android:orientation="horizontal"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="10dp">
@@ -82,11 +80,8 @@
                     android:id="@+id/btnQrLogin" style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:layout_marginTop="8dp" android:text="@string/ws_btn_qr" />
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnOpenH5" style="?attr/materialButtonOutlinedStyle"
-                    android:layout_width="match_parent" android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp" android:visibility="gone"
-                    android:text="@string/ws_btn_open_h5" />
+                <!-- v1.9.1：「重新捕获 H5 参数」按钮移除（令牌失效直接重新登录即可；
+                     H5 捕获页仍作为登录失败时的自动兑底保留，无手动入口） -->
                 <TextView android:id="@+id/tvWsStatus" android:layout_width="match_parent"
                     android:layout_height="wrap_content" android:layout_marginTop="6dp"
                     android:textAppearance="?attr/textAppearanceBodySmall"

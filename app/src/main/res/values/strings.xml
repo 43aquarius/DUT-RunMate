@@ -6,13 +6,12 @@
     <!-- 底部导航 -->
     <string name="tab_run">跑步</string>
     <string name="tab_map">地图</string>
-    <string name="tab_calib">标定</string>
     <string name="title_settings">设置</string>
 
     <!-- 跑步页 -->
     <string name="run_start">开始跑步</string>
     <string name="run_stop">结束跑步</string>
-    <string name="run_idle_hint">未开始跑步也可实时定位预览（本页即显示位置与最近点位）。\n先在「地图/标定」页录入打卡点，开始跑步后自动语音提醒。\n跑步中请保持本App后台运行（建议佩戴耳机）。</string>
+    <string name="run_idle_hint">未开始跑步也可实时定位预览（本页即显示位置与最近点位）。\n先在「地图」页录入打卡点，开始跑步后自动语音提醒。\n跑步中请保持本App后台运行（建议佩戴耳机）。</string>
     <string name="run_no_points">尚未录入任何打卡点</string>
     <string name="stat_time">用时</string>
     <string name="stat_dist">自测距离</string>
@@ -84,7 +83,7 @@
     <string name="satellites">卫星 %1$d/%2$d</string>
 
     <!-- 地图页 -->
-    <string name="map_hint">点按地图放置橙色准星 → 拖动微调、放大核对位置 → 确认添加打卡点。\n拖动图钉调整已有点位，点按图钉编辑。图源为高德：街道 20 级，卫星 18 级（更深自动放大）。</string>
+    <string name="map_hint">点按地图放置橙色准星 → 拖动微调、放大核对位置 → 确认添加打卡点。\n右下角两个按钮：十字 = 现场标定（站在打卡点上方 GPS 平均采集），圆点 = 回到我的位置。\n拖动图钉调整已有点位，点按图钉编辑。图源为高德：街道 20 级，卫星 18 级（更深自动放大）。</string>
     <string name="map_tile_sat">卫星</string>
     <string name="map_tile_street">街道</string>
     <string name="map_locate">回到我的位置</string>
@@ -139,25 +138,24 @@
     <string name="api_hint_offcampus">⚠ 该地址（202.118.65.138:8081）是校内服务器，校园网外无法访问。v1.8.0 起所有连接默认走 WebVPN 隧道（webvpn.dlut.edu.cn，校内外通用）：请用下方「账号登录」重新登录一次，自动捕获隧道地址即可。</string>
     <!-- v1.8.0：隧道请求被重定向到登录页（会话 Cookie 缺失/过期）的根因提示 -->
     <string name="api_hint_webvpn_expired">⚠ WebVPN 会话未建立或已过期（请求被重定向到登录页）。请在上方「账号登录」重新登录一次，自动捕获最新隧道令牌后重试。</string>
-    <string name="api_usage_hint">输入学号密码点「登录并自动配置」即可：自动完成统一认证登录（需短信二次认证时自动引导）、打开健康长跑并捕获接口参数，无需任何手工配置。多账号保存切换、批量查距离见下方账号列表。</string>
+    <!-- v1.9.1：按用户需求精简——卡上只留一句话，详细说明全部进「说明」对话框（api_help_body） -->
+    <string name="api_usage_hint">输入学号密码，点「登录并自动配置」即可（详见「说明」）。</string>
 
     <!-- v1.4.0 账号登录 · 一键配置 -->
     <string name="ws_card_title">账号登录 · 一键配置</string>
-    <string name="ws_card_hint">输入 i大工（校园统一身份）学号与密码：登录后自动打开健康长跑页面并捕获接口参数（令牌/请求体自动配好）。登录信息保存在本机；多人使用时每个账号一套配置（账号列表点击切换），长按密码框清除当前账号信息。</string>
     <string name="ws_number_hint">学号</string>
     <string name="ws_pwd_hint">密码（统一身份）</string>
     <string name="ws_btn_login">登录并自动配置</string>
     <!-- v1.9.0：微信扫码登录（免输密码） -->
     <string name="ws_btn_qr">微信扫码登录（免输密码）</string>
-    <string name="ws_btn_open_h5">重新捕获 H5 参数（换学期/令牌失效时用）</string>
-    <string name="ws_status_none">未登录。登录后自动填写 userId/令牌/amId/pmId/sign，无需抓包。</string>
+    <string name="ws_status_none">未登录（登录即自动配置，无需抓包）</string>
     <string name="ws_status_need_input">请先输入学号和密码</string>
     <string name="ws_status_logging">正在登录 i大工 服务…</string>
     <string name="ws_status_saved">会话已过期。登录信息（%1$s）已保存，点击上方按钮一键重新登录。</string>
-    <string name="ws_status_logged">已登录：%1$s（userId %2$s…）。到「H5 捕获」页完成一次自动配置即可。</string>
+    <string name="ws_status_logged">已登录：%1$s（userId %2$s…）。令牌失效时重新登录一次即可。</string>
     <string name="ws_login_ok">登录成功，欢迎 %1$s。正在打开自动配置…</string>
     <string name="ws_login_fail">登录失败：%1$s</string>
-    <string name="ws_status_cas_only">CAS 统一认证已登录（%1$s）。微哨通道未通过，H5 捕获将走 CAS 鉴权，点「打开H5捕获」完成自动配置。</string>
+    <string name="ws_status_cas_only">CAS 统一认证已登录（%1$s）。微哨通道未通过，点「登录并自动配置」即可完成配置。</string>
     <string name="ws_login_cas_ok">CAS 统一认证成功，正在打开自动配置…（微哨通道未通过，不影响使用）</string>
 
     <!-- v1.9.0：微信扫码登录（协议复刻 sso.dlut.edu.cn login-qrcode.js：
@@ -191,11 +189,11 @@
     <string name="acct_delete_msg">删除「%1$s」的登录信息与接口配置？此操作不影响其他账号。</string>
     <string name="acct_deleted">已删除 %1$s</string>
     <string name="acct_switched">已切换到 %1$s</string>
-    <string name="acct_switch_need_capture">已切换到 %1$s。该账号还未做过 H5 捕获：点「登录并自动配置」或「重新捕获 H5 参数」补全令牌。</string>
+    <string name="acct_switch_need_capture">已切换到 %1$s。该账号还未配置令牌：点「登录并自动配置」即可补全。</string>
     <string name="acct_btn_query_all">查询全部账号距离</string>
     <string name="acct_query_title">全部账号距离（%1$d 个账号）</string>
     <string name="acct_query_progress">正在查询 %1$d/%2$d：%3$s…</string>
-    <string name="acct_query_none">还没有已保存的账号。先用学号密码登录并完成 H5 捕获，之后就能在这里同时查多个人的跑步距离。</string>
+    <string name="acct_query_none">还没有已保存的账号。先用学号密码登录一次，之后就能在这里同时查多个人的跑步距离。</string>
     <string name="acct_not_captured">未捕获接口（点该账号切换后重新登录/捕获即可）</string>
 
     <!-- v1.4.0 H5 捕获页 -->
@@ -429,5 +427,5 @@ aquars@mail.dlut.edu.cn</string>
 
     <!-- v1.6.1：账号登录 / H5 捕获页共用「说明」对话框（v1.8.14：原接口页已并入设置页） -->
     <string name="api_help_title">账号登录说明</string>
-    <string name="api_help_body">【账号登录 · 一键配置】\n输入 i大工（校园统一身份）学号与密码，点「登录并自动配置」：App 自动完成统一认证登录（学校开启短信二次认证时弹窗引导）→ 打开健康长跑 → 捕获接口参数并自动填好，API 判定同步开启。登录信息只存本机。\n\n【多账号】\n登录并完成一次配置后，该账号自动进入下方账号列表（✓ 为当前账号）。点击账号即切换整套配置；长按删除；「＋添加」录入新同学账号；「查询全部账号距离」一次查完所有人的距离——给室友/同学代查打卡进度用这个。\n\n【重新捕获 H5 参数】\n换学期/令牌失效/会话过期时点它重走一遍自动配置。\n\n【API 判定开关】\n开启后，跑步进入打卡检测圈时自动轮询服务端距离判定打卡；关闭则为纯 GPS 模式（出区即提示，无法判定漏卡）。</string>
+    <string name="api_help_body">【账号登录 · 一键配置】\n输入 i大工（校园统一身份）学号与密码，点「登录并自动配置」：App 自动完成统一认证登录（学校开启短信二次认证时弹窗引导）→ 打开健康长跑 → 捕获接口参数并自动填好，API 判定同步开启。校外网络自动走 WebVPN 隧道，校内校外通用；登录信息只存本机。\n\n【微信扫码登录】\n不想输密码时用「微信扫码登录」：弹窗展示二维码，微信扫一扫并确认即可（需已在微信中绑定学校账号）；二维码 60 秒内有效。\n\n【令牌失效/换学期怎么办】\n重新登录一次即可——登录会自动重跑全套配置（令牌/请求体/会话全部刷新），无需其他操作。\n\n【多账号】\n登录并完成一次配置后，该账号自动进入下方账号列表（✓ 为当前账号）。点击账号即切换整套配置；长按删除；「＋添加」录入新同学账号；「查询全部账号距离」一次查完所有人的距离——给室友/同学代查打卡进度用这个。长按密码框可清除当前账号信息。\n\n【API 判定开关】\n开启后，跑步进入打卡检测圈时自动轮询服务端距离判定打卡；关闭则为纯 GPS 模式（出区即提示，无法判定漏卡）。</string>
 </resources>

@@ -100,7 +100,10 @@ class SettingsFragment : Fragment() {
         // v1.9.0：微信扫码登录（免输密码；协议复刻网页端 login-qrcode.js，见
         // CasAuth.beginQrLogin / pollQrLogin）
         b.btnQrLogin.setOnClickListener { showQrLoginDialog() }
-        b.btnOpenH5.setOnClickListener { openH5Catcher(prefs.wsPwdDecoded()) }
+        // v1.9.1：移除「重新捕获 H5 参数」手动按钮（用户拍板：令牌失效直接重新登录
+        // 即可，登录链路会重跑原生一键配置全套参数）。openH5Catcher 仍保留作
+        // 原生配置失败/微哨仅存时的自动兑底入口（doLogin/startNativeConfig 调用），
+        // 只是不再提供手动入口。
 
         // v1.7.0 多账号：chips 列表（切换/长按删除/＋添加）+ 批量查询全部账号距离
         renderAccounts()
@@ -593,23 +596,20 @@ class SettingsFragment : Fragment() {
         val casOk = prefs.casTgt.isNotBlank()
         when {
             wsOk -> {
+                // v1.9.1：按钮已删（重新登录即重新捕获）；状态只描述现状，操作指引入「说明」
                 b.tvWsStatus.text = getString(
                     R.string.ws_status_logged, prefs.wsName, prefs.wsUserId.take(8)
                 )
-                b.btnOpenH5.visibility = View.VISIBLE
             }
             casOk -> {
-                // v1.5.1：微哨通道失败但 CAS 会话可用，H5 捕获仍可走 CAS 鉴权
+                // v1.5.1：微哨通道失败但 CAS 会话可用；v1.9.1：指引改为重新登录
                 b.tvWsStatus.text = getString(R.string.ws_status_cas_only, prefs.wsNumber)
-                b.btnOpenH5.visibility = View.VISIBLE
             }
             prefs.wsNumber.isNotBlank() && prefs.wsPwdSaved.isNotBlank() -> {
                 b.tvWsStatus.text = getString(R.string.ws_status_saved, prefs.wsNumber)
-                b.btnOpenH5.visibility = View.GONE
             }
             else -> {
                 b.tvWsStatus.text = getString(R.string.ws_status_none)
-                b.btnOpenH5.visibility = View.GONE
             }
         }
     }

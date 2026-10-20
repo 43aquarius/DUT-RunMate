@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.9.1：现场标定底部面板（地图页 FAB「标定」弹出；原「标定」Tab 并入地图页） -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/tvSheetTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:text="@string/calib_title" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:text="@string/calib_hint" />
+
+    <!-- 实时定位（面板自持监听，弹起即刷新；地图在面板身后仍可见） -->
+    <TextView android:id="@+id/tvLat" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="12dp"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:fontFamily="sans-serif-condensed" android:text="纬度 --" />
+    <TextView android:id="@+id/tvLon" android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceTitleMedium"
+        android:fontFamily="sans-serif-condensed" android:text="经度 --" />
+    <TextView android:id="@+id/tvGcj" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="4dp"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant" android:text="@string/calib_gcj_label" />
+    <LinearLayout android:orientation="horizontal" android:layout_marginTop="4dp"
+        android:layout_width="match_parent" android:layout_height="wrap_content">
+        <TextView android:id="@+id/tvAcc" android:layout_width="0dp"
+            android:layout_weight="1" android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:text="±-- m" />
+        <TextView android:id="@+id/tvSats" android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:text="--" />
+    </LinearLayout>
+
+    <!-- 平均标定：时长 chips + 开始/停止 + 状态 -->
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/chipsDur" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_marginTop="12dp"
+        app:singleSelection="true" app:selectionRequired="true">
+        <com.google.android.material.chip.Chip android:id="@+id/chip10"
+            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="10 s" />
+        <com.google.android.material.chip.Chip android:id="@+id/chip20"
+            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:checkable="true" android:text="20 s" />
+        <com.google.android.material.chip.Chip android:id="@+id/chip30"
+            style="@style/Widget.Material3.Chip.Filter" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="30 s" />
+    </com.google.android.material.chip.ChipGroup>
+
+    <TextView android:id="@+id/tvAvgStatus" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="8dp"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:text="待开始" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnAvg" style="@style/Widget.RunMate.PillButton"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:text="@string/calib_start" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/tilName" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="12dp"
+        android:hint="@string/calib_point_name">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etName" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:text="点位" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSave" style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="8dp" android:enabled="false"
+        android:text="@string/calib_save_as" />
+</LinearLayout>
